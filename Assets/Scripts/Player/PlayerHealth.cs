@@ -80,11 +80,26 @@ public class PlayerHealth : MonoBehaviour
     /// </summary>
     public void TakeDamage(float amount, Vector3 attackerPos)
     {
+        ThirdPersonPlayerController playerCtrl = GetComponent<ThirdPersonPlayerController>();
+        if (playerCtrl == null) playerCtrl = ThirdPersonPlayerController.Instance;
+
+        // Nếu đang trong trạng thái Đỡ Đòn (Block): Triệt tiêu sát thương và giữ chân con ma trong 3 giây
+        if (playerCtrl != null && playerCtrl.isBlocking)
+        {
+            playerCtrl.OnBlockSuccessful(attackerPos);
+            return;
+        }
+
         if (Time.time < lastDamageTime + invulnerableDuration) return;
         lastDamageTime = Time.time;
 
         currentHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
         vignetteAlpha = 0.55f;
+
+        if (playerCtrl != null && playerCtrl.playerAnimator != null && !string.IsNullOrEmpty(playerCtrl.takeHitTriggerName))
+        {
+            playerCtrl.playerAnimator.SetTrigger(playerCtrl.takeHitTriggerName);
+        }
 
         if (damageVignette != null)
         {
@@ -99,7 +114,7 @@ public class PlayerHealth : MonoBehaviour
         }
 
         // Đẩy lùi nhẹ nhân vật khi trúng đòn
-        if (characterController != null && characterController.enabled)
+        if (characterController != null && characterController.enabled && gameObject.activeInHierarchy)
         {
             Vector3 knockDir = (transform.position - attackerPos);
             knockDir.y = 0f;
@@ -116,6 +131,10 @@ public class PlayerHealth : MonoBehaviour
 
         if (currentHealth <= 0f)
         {
+            if (playerCtrl != null && playerCtrl.playerAnimator != null && !string.IsNullOrEmpty(playerCtrl.deathTriggerName))
+            {
+                playerCtrl.playerAnimator.SetTrigger(playerCtrl.deathTriggerName);
+            }
             HandlePlayerDown();
         }
     }
@@ -139,6 +158,7 @@ public class PlayerHealth : MonoBehaviour
             characterController.enabled = false;
             transform.position = playerCtrl.respawnPoint;
             characterController.enabled = true;
+            playerCtrl.ValidateAndRepairController();
         }
     }
 

@@ -42,6 +42,14 @@ public class PumpkinGhostAI : MonoBehaviour
     public AudioClip outOfBreathClip;
     public AudioClip vanishClip;
 
+    [Header("6. Hiệu Ứng Bị Giam Cầm / Khóa Cứng (Freeze VFX)")]
+    [Tooltip("GameObject chứa vòng xích ma thuật phát sáng khóa cứng thân ma khi người chơi nhấn E")]
+    public GameObject freezeVFXRoot;
+    [Tooltip("Đèn hào quang phong ấn ma thuật")]
+    public Light freezeLight;
+    [Tooltip("Màu ánh sáng khi bị khóa (Mặc định: Xanh lam băng giá)")]
+    public Color freezeVFXColor = new Color(0.2f, 0.75f, 1.0f);
+
     // Component nội bộ
     private CharacterController controller;
     private Animator animator;
@@ -59,6 +67,13 @@ public class PumpkinGhostAI : MonoBehaviour
     private Vector3 verticalVelocity = Vector3.zero;
     private float currentMoveSpeed = 0f;
     private bool isLeaping = false;
+
+    // Trạng thái bị người chơi giữ chân (Block) hoặc choáng váng (Rising Wave)
+    public bool isFrozen { get; private set; } = false;
+    private Coroutine freezeRoutine;
+    private Renderer[] cachedBodyRenderers;
+    private Material runtimeFreezeMaterial;
+    private PumpkinGhostConfig runtimeConfigInstance;
 
     // Bộ đệm Raycast tĩnh tái sử dụng tối ưu tuyệt đối 0 GC Allocation mỗi frame
     private static readonly RaycastHit[] s_HitBuffer = new RaycastHit[16];
@@ -78,20 +93,67 @@ public class PumpkinGhostAI : MonoBehaviour
 
         if (config == null)
         {
-            config = ScriptableObject.CreateInstance<PumpkinGhostConfig>();
+            runtimeConfigInstance = ScriptableObject.CreateInstance<PumpkinGhostConfig>();
+            config = runtimeConfigInstance;
         }
 
+        CacheBodyRenderers();
         spawnPosition = transform.position;
         ApplyColliderSettingsFromConfig();
     }
 
-    private void OnValidate()
+    private void OnEnable()
     {
-        // Cập nhật ngay tức thì trong Scene View khi người thiết kế chỉnh thông số trong Inspector
-        if (controller == null) controller = GetComponent<CharacterController>();
-        if (config != null && controller != null)
+        ApplyColliderSettingsFromConfig();
+    }
+
+    private void OnDestroy()
+    {
+        if (runtimeFreezeMaterial != null)
         {
-            ApplyColliderSettingsFromConfig();
+            Destroy(runtimeFreezeMaterial);
+        }
+        if (runtimeConfigInstance != null)
+        {
+            Destroy(runtimeConfigInstance);
+        }
+    }
+
+    private void CacheBodyRenderers()
+    {
+        Renderer[] all = GetComponentsInChildren<Renderer>(true);
+        var list = new System.Collections.Generic.List<Renderer>(all.Length);
+        for (int i = 0; i < all.Length; i++)
+        {
+            Renderer r = all[i];
+            if (r == null) continue;
+            if (freezeVFXRoot != null && r.transform.IsChildOf(freezeVFXRoot.transform)) continue;
+            if (r.name.StartsWith("MagicBindingRing")) continue;
+            list.Add(r);
+        }
+        cachedBodyRenderers = list.ToArray();
+    }
+
+    private void SetGhostBodyVisible(bool visible)
+    {
+        if (cachedBodyRenderers == null || cachedBodyRenderers.Length == 0)
+        {
+            CacheBodyRenderers();
+        }
+        for (int i = 0; i < cachedBodyRenderers.Length; i++)
+        {
+            if (cachedBodyRenderers[i] != null)
+            {
+                cachedBodyRenderers[i].enabled = visible;
+            }
+        }
+    }
+
+    private void SafeMove(Vector3 motion)
+    {
+        if (controller != null && controller.enabled && gameObject.activeInHierarchy)
+        {
+            controller.Move(motion);
         }
     }
 
@@ -117,6 +179,16 @@ public class PumpkinGhostAI : MonoBehaviour
     {
         CheckAbyssProtection();
         ApplyGravity();
+
+        // Nếu đang bị người chơi giữ chân (Block 3s) hoặc choáng đòn (RisingWave 5s)
+        if (isFrozen)
+        {
+            if (freezeVFXRoot != null && freezeVFXRoot.activeSelf)
+            {
+                freezeVFXRoot.transform.Rotate(0f, 150f * Time.deltaTime, 0f);
+            }
+            return;
+        }
 
         if (targetPlayer == null)
         {
@@ -182,7 +254,7 @@ public class PumpkinGhostAI : MonoBehaviour
             RotateTowardsDirection(steerDir);
 
             currentMoveSpeed = Mathf.MoveTowards(currentMoveSpeed, config.patrolSpeed, config.acceleration * Time.deltaTime);
-            controller.Move(steerDir * currentMoveSpeed * Time.deltaTime);
+            SafeMove(steerDir * currentMoveSpeed * Time.deltaTime);
             SetAnimatorSpeed(currentMoveSpeed);
             PlayAnimState("Walk", 0.2f);
         }
@@ -311,7 +383,7 @@ public class PumpkinGhostAI : MonoBehaviour
             RotateTowardsDirection(steerDir);
 
             currentMoveSpeed = Mathf.MoveTowards(currentMoveSpeed, config.chaseSpeed, config.acceleration * Time.deltaTime);
-            controller.Move(steerDir * currentMoveSpeed * Time.deltaTime);
+            SafeMove(steerDir * currentMoveSpeed * Time.deltaTime);
             SetAnimatorSpeed(currentMoveSpeed);
             PlayAnimState("Run", 0.15f);
         }
@@ -433,7 +505,7 @@ public class PumpkinGhostAI : MonoBehaviour
         {
             float verticalArc = Mathf.Sin((elapsed / duration) * Mathf.PI) * config.leapArcHeight;
             Vector3 moveStep = (leapDir * config.leapSpeed + Vector3.up * verticalArc) * Time.deltaTime;
-            controller.Move(moveStep);
+            SafeMove(moveStep);
 
             elapsed += Time.deltaTime;
 
@@ -465,7 +537,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
         if (!hitPlayer)
         {
-            yield return StartCoroutine(RoutineOutOfBreath());
+            yield return RoutineOutOfBreath();
         }
         else
         {
@@ -530,11 +602,7 @@ public class PumpkinGhostAI : MonoBehaviour
         yield return new WaitForSeconds(0.5f);
 
         SetEyeIntensity(0f);
-        Renderer[] renderers = GetComponentsInChildren<Renderer>();
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            renderers[i].enabled = false;
-        }
+        SetGhostBodyVisible(false);
 
         float elapsed = 0f;
         while (elapsed < config.hideDuration)
@@ -547,17 +615,14 @@ public class PumpkinGhostAI : MonoBehaviour
                 if (toBehind.sqrMagnitude > 0.5f)
                 {
                     Vector3 steer = ComputeSteeredDirection(toBehind.normalized);
-                    controller.Move(steer * (config.chaseSpeed * 1.3f) * Time.deltaTime);
+                    SafeMove(steer * (config.chaseSpeed * 1.3f) * Time.deltaTime);
                 }
             }
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            renderers[i].enabled = true;
-        }
+        SetGhostBodyVisible(true);
 
         SetEyeIntensity(config.aggroEyeIntensity);
         SetEyeColor(config.aggroEyeColor);
@@ -663,15 +728,26 @@ public class PumpkinGhostAI : MonoBehaviour
 
             if (!wallBehind)
             {
-                controller.Move(pushDir * pushStrength * Time.deltaTime);
+                SafeMove(pushDir * pushStrength * Time.deltaTime);
             }
             else
             {
                 // Nếu sau lưng vướng tường, trượt vuông góc (Tangent slide) né sang bên
                 Vector3 tangent = Vector3.Cross(pushDir, Vector3.up).normalized;
-                controller.Move(tangent * (pushStrength * 0.7f) * Time.deltaTime);
+                SafeMove(tangent * (pushStrength * 0.7f) * Time.deltaTime);
             }
         }
+    }
+
+    private Vector3 GetPlayerWorldTargetPoint()
+    {
+        if (targetPlayer == null) return transform.position;
+        CharacterController pcc = targetPlayer.GetComponent<CharacterController>();
+        if (pcc != null && pcc.enabled)
+        {
+            return pcc.bounds.center;
+        }
+        return targetPlayer.position + (targetPlayer.rotation * config.playerTargetEyeOffset);
     }
 
     /// <summary>
@@ -683,7 +759,7 @@ public class PumpkinGhostAI : MonoBehaviour
         if (targetPlayer == null) return false;
 
         Vector3 eyePos = transform.TransformPoint(config.visionEyeOffset);
-        Vector3 targetPoint = targetPlayer.TransformPoint(config.playerTargetEyeOffset);
+        Vector3 targetPoint = GetPlayerWorldTargetPoint();
         Vector3 swipeDir = (targetPoint - eyePos);
         float distanceToTarget = swipeDir.magnitude;
 
@@ -854,7 +930,7 @@ public class PumpkinGhostAI : MonoBehaviour
             if (angle <= config.fieldOfViewAngle * 0.5f)
             {
                 Vector3 eyePos = transform.TransformPoint(config.visionEyeOffset);
-                Vector3 playerEyePos = targetPlayer.TransformPoint(config.playerTargetEyeOffset);
+                Vector3 playerEyePos = targetPlayer.position + (targetPlayer.rotation * config.playerTargetEyeOffset);
                 Vector3 rayDir = (playerEyePos - eyePos);
                 float rayDist = rayDir.magnitude;
                 if (rayDist > 0.001f) rayDir.Normalize();
@@ -928,7 +1004,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private void ApplyGravity()
     {
-        if (isLeaping) return;
+        if (isLeaping || controller == null || !controller.enabled) return;
 
         bool grounded = controller.isGrounded;
         if (!grounded)
@@ -955,17 +1031,18 @@ public class PumpkinGhostAI : MonoBehaviour
         {
             verticalVelocity.y += -config.gravity * Time.deltaTime;
         }
-        controller.Move(verticalVelocity * Time.deltaTime);
+        SafeMove(verticalVelocity * Time.deltaTime);
     }
 
     private void CheckAbyssProtection()
     {
         if (transform.position.y < config.abyssThresholdY)
         {
-            controller.enabled = false;
+            if (controller != null) controller.enabled = false;
             transform.position = spawnPosition;
             verticalVelocity = Vector3.zero;
-            controller.enabled = true;
+            if (controller != null) controller.enabled = true;
+            ApplyColliderSettingsFromConfig();
             currentState = config.defaultChasePlayer ? GhostState.Chase : GhostState.Patrol;
         }
     }
@@ -989,14 +1066,39 @@ public class PumpkinGhostAI : MonoBehaviour
         }
     }
 
-    private void ApplyColliderSettingsFromConfig()
+    public void ApplyColliderSettingsFromConfig()
     {
+        if (controller == null) controller = GetComponent<CharacterController>();
         if (controller == null || config == null) return;
+
         controller.radius = config.colliderRadius;
         controller.height = config.colliderHeight;
         controller.center = config.colliderCenter;
         controller.slopeLimit = config.slopeLimit;
-        controller.stepOffset = config.stepOffset;
+
+        Vector3 lossy = transform.lossyScale;
+        float scaleY = Mathf.Max(0.0001f, Mathf.Abs(lossy.y));
+        float scaleXZ = Mathf.Max(0.0001f, Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z)));
+
+        float scaledRadius = controller.radius * scaleXZ;
+        float scaledCylinderHeight = Mathf.Max(0f, controller.height * scaleY - scaledRadius * 2f);
+        float maxAllowedStepOffset = scaledCylinderHeight + scaledRadius * 2f;
+
+        float desiredStep = Mathf.Min(config.stepOffset, maxAllowedStepOffset * 0.75f);
+        bool needsReactivate = controller.stepOffset > maxAllowedStepOffset * 0.9f;
+        controller.stepOffset = Mathf.Max(0.01f, desiredStep);
+
+        if (scaledRadius > 0.005f && controller.skinWidth > scaledRadius * 0.8f)
+        {
+            controller.skinWidth = Mathf.Max(0.005f, scaledRadius * 0.25f);
+            needsReactivate = true;
+        }
+
+        if (Application.isPlaying && needsReactivate && controller.enabled && gameObject.activeInHierarchy)
+        {
+            controller.enabled = false;
+            controller.enabled = true;
+        }
     }
 
     private void SetEyeColor(Color c)
@@ -1010,6 +1112,200 @@ public class PumpkinGhostAI : MonoBehaviour
     {
         if (leftEyeLight != null) leftEyeLight.intensity = intensity;
         if (rightEyeLight != null) rightEyeLight.intensity = intensity;
+    }
+
+    // =========================================================================
+    // 8. TƯƠNG TÁC PHẢN ĐÒN VỚI PLAYER (BLOCK & RISING WAVE)
+    // =========================================================================
+
+    /// <summary>
+    /// Giữ chân / đóng băng con ma trong số giây chỉ định (từ chiêu Block của Player)
+    /// </summary>
+    public void Freeze(float duration)
+    {
+        if (activeActionRoutine != null)
+        {
+            StopCoroutine(activeActionRoutine);
+            activeActionRoutine = null;
+        }
+        isLeaping = false;
+        SetGhostBodyVisible(true);
+
+        if (freezeRoutine != null)
+        {
+            StopCoroutine(freezeRoutine);
+        }
+        freezeRoutine = StartCoroutine(RoutineFreeze(duration));
+    }
+
+    /// <summary>
+    /// Đẩy lùi con ma ra xa theo cự ly chỉ định và làm đứng im trong số giây (từ chiêu RisingWave của Player)
+    /// </summary>
+    public void ApplyKnockbackAndFreeze(Vector3 pushDirection, float pushDistance, float freezeDuration)
+    {
+        if (activeActionRoutine != null)
+        {
+            StopCoroutine(activeActionRoutine);
+            activeActionRoutine = null;
+        }
+        isLeaping = false;
+        SetGhostBodyVisible(true);
+
+        if (freezeRoutine != null)
+        {
+            StopCoroutine(freezeRoutine);
+        }
+        freezeRoutine = StartCoroutine(RoutineKnockbackAndFreeze(pushDirection, pushDistance, freezeDuration));
+    }
+
+    private IEnumerator RoutineFreeze(float duration)
+    {
+        isFrozen = true;
+        currentMoveSpeed = 0f;
+        SetAnimatorSpeed(0f);
+        SetFreezeVFX(true);
+        SetEyeColor(config != null ? config.stunEyeColor : freezeVFXColor);
+        if (config != null) SetEyeIntensity(config.normalEyeIntensity * 0.8f);
+
+        if (animator != null && config != null && !string.IsNullOrEmpty(config.stunTriggerName))
+        {
+            animator.SetTrigger(config.stunTriggerName);
+        }
+        PlayAnimState("OutOfBreath", 0.15f, true);
+
+        if (audioSource != null && outOfBreathClip != null)
+        {
+            audioSource.PlayOneShot(outOfBreathClip);
+        }
+
+        yield return new WaitForSeconds(duration);
+
+        isFrozen = false;
+        SetFreezeVFX(false);
+        SetEyeColor(config != null ? config.aggroEyeColor : Color.red);
+        if (config != null) SetEyeIntensity(config.aggroEyeIntensity);
+        currentState = GhostState.Chase;
+        freezeRoutine = null;
+    }
+
+    private IEnumerator RoutineKnockbackAndFreeze(Vector3 pushDirection, float pushDistance, float freezeDuration)
+    {
+        isFrozen = true;
+        currentMoveSpeed = 0f;
+        SetAnimatorSpeed(0f);
+        SetFreezeVFX(true);
+        SetEyeColor(config != null ? config.stunEyeColor : freezeVFXColor);
+        if (config != null) SetEyeIntensity(config.normalEyeIntensity * 0.8f);
+
+        if (animator != null && config != null && !string.IsNullOrEmpty(config.stunTriggerName))
+        {
+            animator.SetTrigger(config.stunTriggerName);
+        }
+        PlayAnimState("OutOfBreath", 0.1f, true);
+
+        if (audioSource != null && outOfBreathClip != null)
+        {
+            audioSource.PlayOneShot(outOfBreathClip);
+        }
+
+        pushDirection.y = 0f;
+        if (pushDirection.sqrMagnitude > 0.001f) pushDirection.Normalize();
+
+        float knockDuration = 0.22f;
+        float elapsed = 0f;
+        float speed = pushDistance / knockDuration;
+
+        while (elapsed < knockDuration)
+        {
+            SafeMove(pushDirection * (speed * Time.deltaTime));
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        yield return new WaitForSeconds(Mathf.Max(0.1f, freezeDuration - knockDuration));
+
+        isFrozen = false;
+        SetFreezeVFX(false);
+        SetEyeColor(config != null ? config.aggroEyeColor : Color.red);
+        if (config != null) SetEyeIntensity(config.aggroEyeIntensity);
+        currentState = GhostState.Chase;
+        freezeRoutine = null;
+    }
+
+    /// <summary>
+    /// Bật/tắt hiệu ứng vòng xích ma thuật và đèn phong ấn quanh thân ma
+    /// </summary>
+    private void SetFreezeVFX(bool active)
+    {
+        EnsureFreezeVFX();
+        if (freezeVFXRoot != null)
+        {
+            freezeVFXRoot.SetActive(active);
+        }
+        if (freezeLight != null)
+        {
+            freezeLight.enabled = active;
+        }
+    }
+
+    private void EnsureFreezeVFX()
+    {
+        if (freezeVFXRoot != null) return;
+
+        Transform existing = transform.Find("FreezeVFX_Root");
+        if (existing != null)
+        {
+            freezeVFXRoot = existing.gameObject;
+            freezeLight = freezeVFXRoot.GetComponentInChildren<Light>();
+            return;
+        }
+
+        GameObject root = new GameObject("FreezeVFX_Root");
+        root.transform.SetParent(transform, false);
+        root.transform.localPosition = new Vector3(0f, 0.95f, 0f);
+
+        // Vòng phong ấn 1 (ngang ngực)
+        GameObject ring1 = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        ring1.name = "MagicBindingRing_1";
+        ring1.transform.SetParent(root.transform, false);
+        ring1.transform.localPosition = new Vector3(0f, 0.25f, 0f);
+        ring1.transform.localScale = new Vector3(1.15f, 0.035f, 1.15f);
+        Collider c1 = ring1.GetComponent<Collider>();
+        if (c1 != null) Destroy(c1);
+
+        // Vòng phong ấn 2 (ngang eo, xoay nghiêng)
+        GameObject ring2 = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        ring2.name = "MagicBindingRing_2";
+        ring2.transform.SetParent(root.transform, false);
+        ring2.transform.localPosition = new Vector3(0f, -0.25f, 0f);
+        ring2.transform.localRotation = Quaternion.Euler(22f, 45f, 15f);
+        ring2.transform.localScale = new Vector3(1.25f, 0.035f, 1.25f);
+        Collider c2 = ring2.GetComponent<Collider>();
+        if (c2 != null) Destroy(c2);
+
+        // Gán Material phát sáng URP Lit màu xanh lam (quản lý vòng đời giải phóng chống rò rỉ bộ nhớ)
+        Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        runtimeFreezeMaterial = new Material(urpLit);
+        runtimeFreezeMaterial.color = freezeVFXColor;
+        runtimeFreezeMaterial.EnableKeyword("_EMISSION");
+        runtimeFreezeMaterial.SetColor("_EmissionColor", freezeVFXColor * 4.0f);
+        ring1.GetComponent<MeshRenderer>().sharedMaterial = runtimeFreezeMaterial;
+        ring2.GetComponent<MeshRenderer>().sharedMaterial = runtimeFreezeMaterial;
+
+        // Đèn tỏa sáng ma mị
+        GameObject lightObj = new GameObject("FreezePointLight");
+        lightObj.transform.SetParent(root.transform, false);
+        lightObj.transform.localPosition = Vector3.zero;
+        Light pLight = lightObj.AddComponent<Light>();
+        pLight.type = LightType.Point;
+        pLight.color = freezeVFXColor;
+        pLight.intensity = 4.5f;
+        pLight.range = 5.0f;
+        pLight.shadows = LightShadows.None;
+
+        freezeLight = pLight;
+        freezeVFXRoot = root;
+        freezeVFXRoot.SetActive(false);
     }
 
     // =========================================================================

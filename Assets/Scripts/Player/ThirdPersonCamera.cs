@@ -69,10 +69,17 @@ public class ThirdPersonCamera : MonoBehaviour
     private float currentYaw = 0f;
     private float currentPitch = 15f;
     private float currentDistance;
+    private static readonly RaycastHit[] s_CameraHitBuffer = new RaycastHit[8];
 
     private void Start()
     {
+        isUIPanelOpen = false;
         currentDistance = distance;
+
+        if (target == null && ThirdPersonPlayerController.Instance != null)
+        {
+            target = ThirdPersonPlayerController.Instance.transform;
+        }
 
         if (target != null)
         {
@@ -94,7 +101,14 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (target == null) return;
+        if (target == null)
+        {
+            if (ThirdPersonPlayerController.Instance != null)
+            {
+                target = ThirdPersonPlayerController.Instance.transform;
+            }
+            if (target == null) return;
+        }
 
         HandleCameraRotation();
         HandleCameraZoom();
@@ -184,18 +198,33 @@ public class ThirdPersonCamera : MonoBehaviour
         Quaternion rotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
         Vector3 desiredCameraPos = focusPoint - (rotation * Vector3.forward * distance);
 
-        // Kiểm tra chống xuyên tường/bia mộ
+        // Kiểm tra chống xuyên tường/bia mộ (SphereCastNonAlloc 0 GC)
         float targetDist = distance;
         if (enableCollisionClip)
         {
             Vector3 direction = (desiredCameraPos - focusPoint).normalized;
             float maxRayDist = distance;
+            float closestHit = maxRayDist;
+            bool foundHit = false;
 
-            // Bắn hình cầu từ Player tới Camera
-            int mask = obstacleLayer & ~(1 << target.gameObject.layer);
-            if (Physics.SphereCast(focusPoint, collisionRadius, direction, out RaycastHit hit, maxRayDist, mask))
+            int hitCount = Physics.SphereCastNonAlloc(focusPoint, collisionRadius, direction, s_CameraHitBuffer, maxRayDist, obstacleLayer, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < hitCount; i++)
             {
-                targetDist = Mathf.Clamp(hit.distance - 0.15f, minDistance * 0.6f, distance);
+                RaycastHit hit = s_CameraHitBuffer[i];
+                if (hit.collider == null) continue;
+                if (hit.transform == target || hit.transform.IsChildOf(target)) continue;
+                if (hit.collider.GetComponentInParent<MagicWaveOrb>() != null) continue;
+
+                if (hit.distance < closestHit)
+                {
+                    closestHit = hit.distance;
+                    foundHit = true;
+                }
+            }
+
+            if (foundHit)
+            {
+                targetDist = Mathf.Clamp(closestHit - 0.15f, minDistance * 0.6f, distance);
             }
         }
 

@@ -8,7 +8,13 @@ public static class AssetInspector
 {
     static AssetInspector()
     {
-        EditorApplication.delayCall += InspectAssets;
+        EditorApplication.delayCall += () =>
+        {
+            if (!EditorApplication.isPlayingOrWillChangePlaymode && !File.Exists("Logs/cemetery_assets_report.txt"))
+            {
+                InspectAssets();
+            }
+        };
     }
 
     [MenuItem("Tools/Inspect Assets")]
