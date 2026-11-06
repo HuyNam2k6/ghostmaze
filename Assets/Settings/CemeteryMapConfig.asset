@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d276e5d39958bdf49bfb4f6368327f21, type: 3}
+  m_Name: CemeteryMapConfig
+  m_EditorClassIdentifier: Assembly-CSharp::CemeteryMapConfig
+  colliders:
+    enableAllColliders: 1
+    enableFenceBarriers: 1
+    fenceBarrierHeight: 1.6
+    fenceBarrierThickness: 0.85
+    pillarColliderSize: {x: 0.68, y: 1.9, z: 0.68}
+    obeliskColliderThickness: 1.4
+    giantTreeTrunkRadius: 1.6
+    normalTreeTrunkRadius: 0.95
+    treeTrunkHeight: 6.5
+    tombstoneColliderMultiplier: 1
+    coffinColliderSize: {x: 1.25, y: 1.1, z: 2.45}
+    groundLayer: Default
+    obstacleLayer: Default
+  atmosphere:
+    enableFog: 1
+    fogColor: {r: 0.012, g: 0.018, b: 0.045, a: 1}
+    fogDensity: 0.0038
+    ambientSkyColor: {r: 0.032, g: 0.046, b: 0.105, a: 1}
+    ambientEquatorColor: {r: 0.018, g: 0.025, b: 0.058, a: 1}
+    ambientGroundColor: {r: 0.005, g: 0.007, b: 0.018, a: 1}
+    moonlightColor: {r: 0.68, g: 0.82, b: 1, a: 1}
+    moonlightIntensity: 0.95
+    moonPosition: {x: -22, y: 32.5, z: 52}
+    moonScale: 12.5
+    lanternColor: {r: 1, g: 0.56, b: 0.16, a: 1}
+    lanternIntensity: 5
+    lanternRange: 8
+    ritualFireIntensity: 14
+  layout:
+    centralPlazaDiameter: 32
+    cathedralIslandY: 8.5
+    cathedralPosition: {x: 26.5, y: 9.2, z: 44}
+    grandStairWidth: 6.8
+    standardBridgeWidth: 4.8
+    radialRoadWidth: 4.8
+  density:
+    tombstoneDensityMultiplier: 1
+    spawnGhosts: 1
+    spawnCrows: 1
+    spawnCoffins: 1
+    spawnAbyssClouds: 1

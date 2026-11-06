@@ -9,7 +9,7 @@ using System.IO;
 [InitializeOnLoad]
 public static class HorrorCemeteryBuilder
 {
-    private const string BUILD_VERSION_KEY = "GhostMaze_HorrorMap_v8";
+    private const string BUILD_VERSION_KEY = "GhostMaze_HorrorMap_v10";
 
     private static class Object
     {
@@ -37,13 +37,31 @@ public static class HorrorCemeteryBuilder
     [MenuItem("Tools/Rebuild Horror Cemetery Map")]
     public static void ScheduleRebuild()
     {
-        EditorApplication.delayCall += BuildHorrorCemeteryMap;
+        EditorApplication.delayCall += () => BuildHorrorCemeteryMap();
     }
 
-    public static void BuildHorrorCemeteryMap()
+    public static void BuildHorrorCemeteryMap(CemeteryMapConfig config = null)
     {
         try
         {
+            if (config == null)
+            {
+                string configPath = "Assets/Settings/CemeteryMapConfig.asset";
+                config = AssetDatabase.LoadAssetAtPath<CemeteryMapConfig>(configPath);
+                if (config == null)
+                {
+                    config = ScriptableObject.CreateInstance<CemeteryMapConfig>();
+                    if (!Directory.Exists("Assets/Settings")) Directory.CreateDirectory("Assets/Settings");
+                    AssetDatabase.CreateAsset(config, configPath);
+                    AssetDatabase.SaveAssets();
+                }
+            }
+
+            var colSettings = config.colliders;
+            var atmSettings = config.atmosphere;
+            var layoutSettings = config.layout;
+            var densitySettings = config.density;
+
             Random.InitState(2026);
 
             // 1. Clean all existing or leftover world roots in the active scene (including "Maps" & "--- CEMETERY WORLD ---")
@@ -66,6 +84,8 @@ public static class HorrorCemeteryBuilder
             }
 
             GameObject worldRoot = new GameObject(rootName);
+            var mapManager = worldRoot.AddComponent<CemeteryMapManager>();
+            mapManager.config = config;
 
             GameObject envGroup = new GameObject("Environment & Horror Sky");
             envGroup.transform.SetParent(worldRoot.transform);
@@ -240,9 +260,35 @@ public static class HorrorCemeteryBuilder
                 return inst;
             }
 
-            // Helper: Spawn glowing lantern + guaranteed warm floor light pool decal + optional point light
-            void SpawnLantern(Vector3 pos, float groundY, Transform parent, float poolRadius = 3.6f, bool withPointLight = false, float lightIntensity = 5.5f, float lightRange = 8.5f)
+            // Helper: Add solid BoxCollider to obstacle for physics collision & raycast hit detection
+            void AddBoxCollider(Transform parent, Vector3 center, Vector3 size, Quaternion rot, string name = "ObstacleCollider")
             {
+                GameObject colGo = new GameObject(name);
+                colGo.transform.SetParent(parent);
+                colGo.transform.position = center;
+                colGo.transform.rotation = rot;
+                var col = colGo.AddComponent<BoxCollider>();
+                col.size = size;
+            }
+
+            // Helper: Add solid CapsuleCollider for tree trunks & cylindrical obstacles
+            void AddCapsuleCollider(Transform parent, Vector3 center, float radius, float height, string name = "ObstacleCollider")
+            {
+                GameObject colGo = new GameObject(name);
+                colGo.transform.SetParent(parent);
+                colGo.transform.position = center;
+                var col = colGo.AddComponent<CapsuleCollider>();
+                col.radius = radius;
+                col.height = height;
+                col.direction = 1; // Y-axis
+            }
+
+            // Helper: Spawn glowing lantern + guaranteed warm floor light pool decal + optional point light
+            void SpawnLantern(Vector3 pos, float groundY, Transform parent, float poolRadius = 3.6f, bool withPointLight = false, float lightIntensity = -1f, float lightRange = -1f)
+            {
+                if (lightIntensity < 0f) lightIntensity = atmSettings.lanternIntensity;
+                if (lightRange < 0f) lightRange = atmSettings.lanternRange;
+
                 GameObject housing = new GameObject("GothicLantern");
                 housing.transform.SetParent(parent);
                 housing.transform.position = pos;
@@ -434,13 +480,15 @@ public static class HorrorCemeteryBuilder
                     if (postPart != null)
                     {
                         SpawnOnGround(postPart, fencesGroup.transform, pPos, UprightZ(yaw), new Vector3(46f, 46f, 44f), matStone);
+                        if (colSettings.enableAllColliders)
+                            AddBoxCollider(fencesGroup.transform, pPos + new Vector3(0f, colSettings.pillarColliderSize.y * 0.5f, 0f), colSettings.pillarColliderSize, UprightZ(yaw), "FencePostCollider");
                     }
 
                     // Lantern on pillar
                     if (!lanternEveryOther || (i % 2 == 0) || i == 0 || i == segments)
                     {
                         bool addLight = (i == 0 || i == segments || i % 4 == 0);
-                        SpawnLantern(pPos + new Vector3(0f, 1.52f, 0f), pPos.y, lanternsGroup.transform, 3.8f, addLight, 5.0f, 8.0f);
+                        SpawnLantern(pPos + new Vector3(0f, 1.52f, 0f), pPos.y, lanternsGroup.transform, 3.8f, addLight, atmSettings.lanternIntensity, atmSettings.lanternRange);
                     }
 
                     // Wrought Iron Fence Segment between post i and i+1
@@ -455,14 +503,21 @@ public static class HorrorCemeteryBuilder
                         float segLen = Vector3.Distance(pPos, nextPos);
                         Vector3 segDir = (nextPos - pPos).normalized;
 
-                        // Low stone curb wall under iron fence
+                        // Low stone curb wall under iron fence with tall invisible barrier collider to block falling off cliffs
                         GameObject curb = GameObject.CreatePrimitive(PrimitiveType.Cube);
                         curb.name = "FenceCurb";
                         curb.transform.SetParent(fencesGroup.transform);
                         curb.transform.position = midPos + new Vector3(0f, 0.22f, 0f);
                         curb.transform.rotation = Quaternion.LookRotation(segDir);
                         curb.transform.localScale = new Vector3(0.38f, 0.44f, segLen);
-                        Object.DestroyImmediate(curb.GetComponent<Collider>());
+                        var curbCol = curb.GetComponent<BoxCollider>();
+                        if (curbCol != null)
+                        {
+                            curbCol.enabled = colSettings.enableAllColliders && colSettings.enableFenceBarriers;
+                            float halfH = colSettings.fenceBarrierHeight * 0.5f;
+                            curbCol.center = new Vector3(0f, halfH * 1.6f, 0f);
+                            curbCol.size = new Vector3(colSettings.fenceBarrierThickness, colSettings.fenceBarrierHeight * 2.2f, 1.0f);
+                        }
                         if (matStone != null) curb.GetComponent<MeshRenderer>().sharedMaterial = matStone;
 
                         // Iron railing
@@ -561,6 +616,8 @@ public static class HorrorCemeteryBuilder
                     {
                         SpawnOnGround(tree1Part, foliageGroup.transform, pos + new Vector3(-0.8f, 0f, 0.6f), Quaternion.Euler(6f, yaw + 55f, -8f), new Vector3(3.8f, 4.2f, 3.8f) * scaleMul, matTree);
                     }
+                    if (colSettings.enableAllColliders)
+                        AddCapsuleCollider(foliageGroup.transform, pos + new Vector3(0.2f, colSettings.treeTrunkHeight * 0.5f, 0f), colSettings.giantTreeTrunkRadius * scaleMul, colSettings.treeTrunkHeight, "TreeTrunkCollider");
                 }
                 else
                 {
@@ -572,6 +629,8 @@ public static class HorrorCemeteryBuilder
                     {
                         SpawnOnGround(tree1Part, foliageGroup.transform, pos, Quaternion.Euler(Random.Range(-5f, 5f), yaw, Random.Range(-5f, 5f)), new Vector3(2.5f, 2.8f, 2.5f) * scaleMul, matTree);
                     }
+                    if (colSettings.enableAllColliders)
+                        AddCapsuleCollider(foliageGroup.transform, pos + new Vector3(0f, colSettings.treeTrunkHeight * 0.5f, 0f), colSettings.normalTreeTrunkRadius * scaleMul, colSettings.treeTrunkHeight, "TreeTrunkCollider");
                 }
             }
 
@@ -588,6 +647,12 @@ public static class HorrorCemeteryBuilder
                 top.transform.SetParent(island.transform);
                 top.transform.position = pos;
                 top.transform.localScale = circular ? new Vector3(width, 0.22f, length) : new Vector3(width, 0.42f, length);
+                if (circular)
+                {
+                    // Replace bulging CapsuleCollider with an exact flat circular MeshCollider
+                    Object.DestroyImmediate(top.GetComponent<Collider>());
+                    top.AddComponent<MeshCollider>();
+                }
                 if (topMat != null) top.GetComponent<MeshRenderer>().sharedMaterial = topMat;
 
                 // Stone border trim around the island top
@@ -596,6 +661,7 @@ public static class HorrorCemeteryBuilder
                 rim.transform.SetParent(island.transform);
                 rim.transform.position = pos + new Vector3(0f, -0.25f, 0f);
                 rim.transform.localScale = circular ? new Vector3(width * 1.03f, 0.25f, length * 1.03f) : new Vector3(width * 1.02f, 0.45f, length * 1.02f);
+                Object.DestroyImmediate(rim.GetComponent<Collider>());
                 if (matStone != null) rim.GetComponent<MeshRenderer>().sharedMaterial = matStone;
 
                 // 2. Main Cliff Core
@@ -605,6 +671,7 @@ public static class HorrorCemeteryBuilder
                 float cliffH = cliffDepth * 0.65f;
                 cliff.transform.position = new Vector3(pos.x, pos.y - cliffH * 0.5f - 0.3f, pos.z);
                 cliff.transform.localScale = new Vector3(width * 0.90f, circular ? cliffH * 0.5f : cliffH, length * 0.90f);
+                Object.DestroyImmediate(cliff.GetComponent<Collider>());
                 if (matCliffDark != null) cliff.GetComponent<MeshRenderer>().sharedMaterial = matCliffDark;
 
                 // 3. Tapered Lower Underbelly
@@ -615,6 +682,7 @@ public static class HorrorCemeteryBuilder
                 keel.transform.position = new Vector3(pos.x, pos.y - cliffDepth * 0.72f, pos.z);
                 keel.transform.rotation = Quaternion.Euler(0f, 28f, 0f);
                 keel.transform.localScale = new Vector3(width * 0.68f, circular ? keelH * 0.5f : keelH, length * 0.68f);
+                Object.DestroyImmediate(keel.GetComponent<Collider>());
                 if (matCliffDark != null) keel.GetComponent<MeshRenderer>().sharedMaterial = matCliffDark;
 
                 // 4. Rugged Layered Rock Strata & Hanging Crags around the cliff perimeter
@@ -816,6 +884,7 @@ public static class HorrorCemeteryBuilder
                 ring.transform.SetParent(plazaGroup.transform);
                 ring.transform.position = new Vector3(0f, ringHeights[r], 0f);
                 ring.transform.localScale = new Vector3(ringSizes[r], 0.12f, ringSizes[r]);
+                Object.DestroyImmediate(ring.GetComponent<Collider>());
                 ring.GetComponent<MeshRenderer>().sharedMaterial = (r % 2 == 0) ? matPavers : matStone;
             }
 
@@ -833,11 +902,13 @@ public static class HorrorCemeteryBuilder
             altarPedestal.transform.SetParent(plazaGroup.transform);
             altarPedestal.transform.position = new Vector3(0f, 0.65f, 0f);
             altarPedestal.transform.localScale = new Vector3(4.2f, 0.32f, 4.2f);
+            Object.DestroyImmediate(altarPedestal.GetComponent<Collider>());
             if (matStone != null) altarPedestal.GetComponent<MeshRenderer>().sharedMaterial = matStone;
 
             if (obelisk1Part != null)
             {
                 SpawnOnGround(obelisk1Part, plazaGroup.transform, new Vector3(0f, 0.95f, 0f), UprightZ(0f), new Vector3(1.1f, 1.1f, 1.4f), matStone);
+                AddBoxCollider(plazaGroup.transform, new Vector3(0f, 2.3f, 0f), new Vector3(1.1f, 3.2f, 1.1f), Quaternion.identity, "CentralObeliskCollider");
             }
 
             // Central Ritual Fire Core + Large Golden Floor Glow Pool
@@ -867,7 +938,7 @@ public static class HorrorCemeteryBuilder
             Light altarLight = altarLightGo.AddComponent<Light>();
             altarLight.type = LightType.Point;
             altarLight.color = new Color(1.0f, 0.52f, 0.12f);
-            altarLight.intensity = 14.0f;
+            altarLight.intensity = atmSettings.ritualFireIntensity;
             altarLight.range = 20f;
             altarLight.shadows = LightShadows.Soft;
 
@@ -902,6 +973,7 @@ public static class HorrorCemeteryBuilder
                 {
                     Vector3 sc = (chosenOb == obelisk3Part) ? new Vector3(0.85f, 0.85f, 0.92f) : new Vector3(1.25f, 1.25f, 1.55f);
                     SpawnOnGround(chosenOb, plazaGroup.transform, obPos + new Vector3(0f, 0.9f, 0f), UprightZ(ang), sc, matCathedralStone);
+                    AddBoxCollider(plazaGroup.transform, obPos + new Vector3(0f, 4.4f, 0f), new Vector3(1.4f, 8.0f, 1.4f), Quaternion.Euler(0f, ang, 0f), "PlazaObeliskCollider");
                 }
 
                 SpawnLantern(obPos + new Vector3(0.95f, 0.92f, 0f), 0.25f, lanternsGroup.transform, 4.8f, true, 6.5f, 10f);
@@ -949,6 +1021,11 @@ public static class HorrorCemeteryBuilder
                 SpawnOnGround(cryptPart, cathedralGroup.transform, cathCenter + cathRot * new Vector3(0f, 0f, 4.8f), cathRot, new Vector3(4.8f, 5.2f, 3.8f), matCathedralStone);
                 SpawnOnGround(cryptPart, cathedralGroup.transform, cathCenter + cathRot * new Vector3(-9.5f, 0f, -0.5f), cathRot, new Vector3(4.8f, 6.0f, 4.8f), matCathedralStone);
                 SpawnOnGround(cryptPart, cathedralGroup.transform, cathCenter + cathRot * new Vector3(9.5f, 0f, -0.5f), cathRot, new Vector3(4.8f, 6.0f, 4.8f), matCathedralStone);
+
+                // Solid colliders for Cathedral buildings
+                AddBoxCollider(cathedralGroup.transform, cathCenter + cathRot * new Vector3(0f, 5.5f, 0.5f), new Vector3(15.0f, 11.0f, 15.0f), cathRot, "CathedralNaveCollider");
+                AddBoxCollider(cathedralGroup.transform, cathCenter + cathRot * new Vector3(-9.5f, 4.5f, -0.5f), new Vector3(7.0f, 9.0f, 8.0f), cathRot, "CathedralLeftWingCollider");
+                AddBoxCollider(cathedralGroup.transform, cathCenter + cathRot * new Vector3(9.5f, 4.5f, -0.5f), new Vector3(7.0f, 9.0f, 8.0f), cathRot, "CathedralRightWingCollider");
             }
             if (obelisk3Part != null)
             {
@@ -1047,13 +1124,17 @@ public static class HorrorCemeteryBuilder
             if (obelisk3Part != null)
             {
                 SpawnOnGround(obelisk3Part, graveyardsGroup.transform, brObPos, UprightZ(-35f), new Vector3(1.05f, 1.05f, 1.15f), matCathedralStone);
+                AddBoxCollider(graveyardsGroup.transform, brObPos + new Vector3(0f, 4.0f, 0f), new Vector3(1.35f, 8.0f, 1.35f), Quaternion.Euler(0f, -35f, 0f), "CornerObeliskCollider");
                 SpawnLantern(brObPos + new Vector3(-1.1f, 0.4f, 0.8f), -1.8f, lanternsGroup.transform, 5.5f, true, 7.0f, 10f);
             }
 
             // --- 4.8 CONNECTED SHRINE CRAG & BACKGROUND ROCK CRAGS ---
             CreateFloatingIsland("Crag_LowerLeft", new Vector3(-34f, -3.5f, -49f), 11f, 11f, 14f, matPavers, false, false);
             if (obeliscMonPart != null)
+            {
                 SpawnOnGround(obeliscMonPart, graveyardsGroup.transform, new Vector3(-34f, -3.3f, -49f), UprightZ(25f), new Vector3(1.2f, 1.2f, 1.3f), matCathedralStone);
+                AddBoxCollider(graveyardsGroup.transform, new Vector3(-34f, -3.3f + 4.0f, -49f), new Vector3(1.35f, 8.0f, 1.35f), Quaternion.Euler(0f, 25f, 0f), "CragObeliskCollider");
+            }
             SpawnLantern(new Vector3(-33f, -3.2f, -47.5f), -3.3f, lanternsGroup.transform, 4.5f, true, 6.0f, 9f);
 
             CreateFloatingIsland("Crag_FarRight", new Vector3(56f, -2.5f, -16f), 12f, 12f, 14f, matDirt, false, false);
@@ -1117,9 +1198,10 @@ public static class HorrorCemeteryBuilder
 
             void PopulateGraveyard(Vector3 center, float rx, float rz, int count, bool addCandles = true)
             {
+                int targetCount = Mathf.Max(2, Mathf.RoundToInt(count * densitySettings.tombstoneDensityMultiplier));
                 int placed = 0;
                 int attempts = 0;
-                while (placed < count && attempts < count * 4)
+                while (placed < targetCount && attempts < targetCount * 4)
                 {
                     attempts++;
                     Vector3 pos = center + new Vector3(Random.Range(-rx, rx), 0.22f, Random.Range(-rz, rz));
@@ -1143,14 +1225,19 @@ public static class HorrorCemeteryBuilder
                                    : Vector3.one * Random.Range(1.05f, 1.35f);
 
                         SpawnOnGround(g, graveyardsGroup.transform, pos, UprightZ(yaw, tiltX, tiltZ), sc, matTomb);
+                        if (colSettings.enableAllColliders)
+                        {
+                            Vector3 colSize = (isPillar ? new Vector3(0.65f, 1.6f, 0.65f) : new Vector3(0.85f, 1.4f, 0.45f)) * colSettings.tombstoneColliderMultiplier;
+                            AddBoxCollider(graveyardsGroup.transform, pos + new Vector3(0f, colSize.y * 0.5f, 0f), colSize, Quaternion.Euler(0f, yaw, 0f), "TombstoneCollider");
+                        }
                     }
 
                     if (addCandles && (placed % 4 == 0))
                     {
-                        SpawnLantern(pos + new Vector3(0.4f, 0.08f, 0.3f), center.y, lanternsGroup.transform, 3.6f, (placed % 12 == 0), 5.0f, 8.0f);
+                        SpawnLantern(pos + new Vector3(0.4f, 0.08f, 0.3f), center.y, lanternsGroup.transform, 3.6f, (placed % 12 == 0), atmSettings.lanternIntensity, atmSettings.lanternRange);
                     }
 
-                    if (crowPart != null && (placed % 9 == 0))
+                    if (densitySettings.spawnCrows && crowPart != null && (placed % 9 == 0))
                     {
                         SpawnOnGround(crowPart, graveyardsGroup.transform, pos + new Vector3(0f, 1.2f, 0f), UprightZ(Random.Range(0f, 360f)), Vector3.one * 85f, matIronFence);
                     }
@@ -1169,7 +1256,7 @@ public static class HorrorCemeteryBuilder
             PopulateGraveyard(new Vector3(41f, 8.7f, 42f), 5.5f, 8.5f, 24);
 
             // Stone Sarcophagi / Coffins (Placed beside roads)
-            if (coffin1Part != null)
+            if (densitySettings.spawnCoffins && coffin1Part != null)
             {
                 Vector3[] coffinCoords = new Vector3[] {
                     new Vector3(1.5f, -1.8f, -36f),
@@ -1179,11 +1266,16 @@ public static class HorrorCemeteryBuilder
                     new Vector3(-43f, 1.2f, -2f)
                 };
                 foreach (var cPos in coffinCoords)
-                    SpawnOnGround(coffin1Part, graveyardsGroup.transform, cPos, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f), Vector3.one * 1.45f, matCathedralStone);
+                {
+                    float cYaw = Random.Range(0f, 360f);
+                    SpawnOnGround(coffin1Part, graveyardsGroup.transform, cPos, Quaternion.Euler(0f, cYaw, 0f), Vector3.one * 1.45f, matCathedralStone);
+                    if (colSettings.enableAllColliders)
+                        AddBoxCollider(graveyardsGroup.transform, cPos + new Vector3(0f, colSettings.coffinColliderSize.y * 0.5f, 0f), colSettings.coffinColliderSize, Quaternion.Euler(0f, cYaw, 0f), "CoffinCollider");
+                }
             }
 
             // Subtle Haunted Spirits (Ghosts hovering over graveyard plots)
-            if (ghostPart != null && matGhostGlow != null)
+            if (densitySettings.spawnGhosts && ghostPart != null && matGhostGlow != null)
             {
                 Vector3[] ghostPositions = new Vector3[] {
                     new Vector3(-36f, 2.0f, 9f),
@@ -1410,8 +1502,8 @@ public static class HorrorCemeteryBuilder
             Light dirLight = dirLightGo.GetComponent<Light>();
             if (dirLight == null) dirLight = dirLightGo.AddComponent<Light>();
             dirLight.type = LightType.Directional;
-            dirLight.color = new Color(0.42f, 0.56f, 0.92f);
-            dirLight.intensity = 1.15f;
+            dirLight.color = atmSettings.moonlightColor;
+            dirLight.intensity = atmSettings.moonlightIntensity;
             dirLight.shadows = LightShadows.Soft;
             dirLight.shadowStrength = 0.88f;
 
@@ -1419,16 +1511,16 @@ public static class HorrorCemeteryBuilder
                 RenderSettings.skybox = matSkybox;
 
             // Deep Haunted Midnight Fog
-            RenderSettings.fog = true;
+            RenderSettings.fog = atmSettings.enableFog;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogColor = new Color(0.012f, 0.018f, 0.045f);
-            RenderSettings.fogDensity = 0.0038f;
+            RenderSettings.fogColor = atmSettings.fogColor;
+            RenderSettings.fogDensity = atmSettings.fogDensity;
 
             // Dark Gothic Ambient Lighting
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.032f, 0.046f, 0.105f);
-            RenderSettings.ambientEquatorColor = new Color(0.018f, 0.025f, 0.058f);
-            RenderSettings.ambientGroundColor = new Color(0.005f, 0.007f, 0.018f);
+            RenderSettings.ambientSkyColor = atmSettings.ambientSkyColor;
+            RenderSettings.ambientEquatorColor = atmSettings.ambientEquatorColor;
+            RenderSettings.ambientGroundColor = atmSettings.ambientGroundColor;
 
             // Global Volume
             GameObject volGo = GameObject.Find("Global Volume");
@@ -1471,8 +1563,11 @@ public static class HorrorCemeteryBuilder
             if (camGo == null) camGo = GameObject.Find("Main Camera");
             if (camGo != null)
             {
-                camGo.transform.position = camPos;
-                camGo.transform.rotation = camRot;
+                if (GameObject.Find("Player_ThirdPerson") == null)
+                {
+                    camGo.transform.position = camPos;
+                    camGo.transform.rotation = camRot;
+                }
                 Camera cam = camGo.GetComponent<Camera>();
                 if (cam != null)
                 {
