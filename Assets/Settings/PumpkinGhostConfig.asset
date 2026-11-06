@@ -1,0 +1,90 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6c3cb1261585e849bd04288032e4c66, type: 3}
+  m_Name: PumpkinGhostConfig
+  m_EditorClassIdentifier: Assembly-CSharp::PumpkinGhostConfig
+  defaultChasePlayer: 1
+  playerTag: Player
+  patrolSpeed: 2.4
+  chaseSpeed: 4.8
+  rotationSpeed: 10
+  acceleration: 12
+  stoppingDistance: 1.6
+  colliderRadius: 0.5
+  colliderHeight: 1.92
+  colliderCenter: {x: 0, y: 0.96, z: 0}
+  slopeLimit: 48
+  stepOffset: 0.4
+  obstacleCheckOffset: {x: 0, y: 0.85, z: 0}
+  obstacleCheckRadius: 0.35
+  obstacleAvoidanceDistance: 2.2
+  avoidanceAngles:
+  - 35
+  - -35
+  - 65
+  - -65
+  - 95
+  - -95
+  obstacleLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckOffset: {x: 0, y: 0.15, z: 0}
+  groundCheckDistance: 0.35
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  gravity: 20
+  abyssThresholdY: -15
+  visionEyeOffset: {x: 0, y: 1.45, z: 0}
+  playerTargetEyeOffset: {x: 0, y: 1.4, z: 0}
+  detectionRadius: 35
+  fieldOfViewAngle: 180
+  closeProximityDistance: 7.5
+  losePlayerDistance: 45
+  visionBlockerLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  attackRange: 2
+  attackDamage: 20
+  attackCooldown: 1.4
+  attackHitDelay: 0.32
+  attackTotalDuration: 0.75
+  enableLeap: 1
+  leapMinDistance: 4
+  leapMaxDistance: 8.5
+  leapSpeed: 9.2
+  leapArcHeight: 1.8
+  leapDuration: 0.78
+  leapDamage: 30
+  leapCooldown: 9
+  outOfBreathDuration: 2.2
+  enableVanishHide: 1
+  vanishTriggerDistance: 11
+  hideDuration: 2.5
+  ambushBehindDistance: 3.2
+  hideCooldown: 16
+  patrolRadius: 12
+  waypointWaitTime: 1.8
+  speedParamName: Speed
+  isChasingParamName: IsChasing
+  attackTriggerName: Attack
+  jumpTriggerName: Jump
+  hideTriggerName: Hide
+  unHideTriggerName: UnHide
+  stunTriggerName: Stun
+  normalEyeColor: {r: 0.25, g: 0.95, b: 0.7, a: 1}
+  warnEyeColor: {r: 1, g: 0.75, b: 0.2, a: 1}
+  aggroEyeColor: {r: 1, g: 0.12, b: 0.15, a: 1}
+  stunEyeColor: {r: 0.4, g: 0.6, b: 0.85, a: 1}
+  normalEyeIntensity: 1.2
+  aggroEyeIntensity: 2.4
+  eyeLightRange: 2.5

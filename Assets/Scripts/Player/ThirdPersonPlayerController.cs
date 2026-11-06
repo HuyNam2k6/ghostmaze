@@ -42,6 +42,15 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Nguồn sáng đèn lồng cầm tay đi đêm")]
     public Light lanternLight;
 
+    [Header("Cấu Hình Va Chạm (Character Controller)")]
+    [Tooltip("Nếu bật, script sẽ cập nhật thông số CharacterController theo các trường bên dưới. Nếu tắt, giữ nguyên thiết lập trên component.")]
+    public bool overrideColliderSettings = false;
+    [Range(0.1f, 1.5f)] public float colliderRadius = 0.35f;
+    [Range(0.5f, 3.0f)] public float colliderHeight = 1.8f;
+    public Vector3 colliderCenter = new Vector3(0f, 0.9f, 0f);
+    [Range(10f, 80f)] public float slopeLimit = 46f;
+    [Range(0.1f, 1.0f)] public float stepOffset = 0.38f;
+
     // Thành phần nội bộ
     private CharacterController characterController;
     private Vector3 verticalVelocity;
@@ -51,13 +60,15 @@ public class ThirdPersonPlayerController : MonoBehaviour
     {
         characterController = GetComponent<CharacterController>();
 
-        // Thiết lập CharacterController tối ưu cho địa hình bậc thang và cầu đá
-        characterController.radius = 0.35f;
-        characterController.height = 1.8f;
-        characterController.center = new Vector3(0f, 0.9f, 0f);
-        characterController.slopeLimit = 46f;
-        characterController.stepOffset = 0.38f;
-        characterController.minMoveDistance = 0.001f;
+        if (overrideColliderSettings && characterController != null)
+        {
+            characterController.radius = colliderRadius;
+            characterController.height = colliderHeight;
+            characterController.center = colliderCenter;
+            characterController.slopeLimit = slopeLimit;
+            characterController.stepOffset = stepOffset;
+            characterController.minMoveDistance = 0.001f;
+        }
 
         if (cameraTransform == null && Camera.main != null)
         {
