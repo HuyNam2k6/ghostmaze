@@ -51,10 +51,19 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Range(10f, 80f)] public float slopeLimit = 46f;
     [Range(0.1f, 1.0f)] public float stepOffset = 0.38f;
 
+    [Header("Tối Ưu Hóa Va Chạm Bằng Raycast (Performance & Raycast Proximity)")]
+    [Tooltip("Sử dụng Raycast/SphereCast NonAlloc kiểm tra khoảng cách với quái vật để trượt mềm mại, tránh tình trạng 2 Collider đẩy nhau gây nghẽn PhysX sụt FPS")]
+    public bool useRaycastEnemyAvoidance = true;
+    [Range(0.4f, 2.5f)] public float enemyAvoidanceDistance = 0.95f;
+    [Tooltip("Layer Mask của quái vật")]
+    public LayerMask enemyLayers = ~0;
+
     // Thành phần nội bộ
     private CharacterController characterController;
     private Vector3 verticalVelocity;
     private bool isGrounded;
+
+    private static readonly RaycastHit[] s_PlayerHitBuffer = new RaycastHit[8];
 
     private void Awake()
     {
@@ -167,6 +176,28 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
         // Thực hiện di chuyển phẳng
         Vector3 horizontalMove = moveDirection * currentSpeed;
+
+        if (useRaycastEnemyAvoidance && horizontalMove.sqrMagnitude > 0.001f)
+        {
+            Vector3 rayOrigin = transform.position + Vector3.up * 0.9f;
+            Vector3 moveDir = horizontalMove.normalized;
+            int count = Physics.SphereCastNonAlloc(rayOrigin, colliderRadius * 0.9f, moveDir, s_PlayerHitBuffer, enemyAvoidanceDistance, enemyLayers, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit hit = s_PlayerHitBuffer[i];
+                if (hit.collider == null || hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+
+                // Nếu chạm phải quái vật (tag Enemy hoặc có PumpkinGhostAI)
+                if (hit.collider.CompareTag("Enemy") || hit.collider.GetComponentInParent<PumpkinGhostAI>() != null)
+                {
+                    // Lực cản mềm chống đâm xuyên
+                    Vector3 slideDir = Vector3.ProjectOnPlane(horizontalMove, hit.normal);
+                    horizontalMove = slideDir * 0.5f;
+                    break;
+                }
+            }
+        }
+
         characterController.Move(horizontalMove * Time.deltaTime);
     }
 

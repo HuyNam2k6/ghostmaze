@@ -88,3 +88,14 @@ MonoBehaviour:
   normalEyeIntensity: 1.2
   aggroEyeIntensity: 2.4
   eyeLightRange: 2.5
+  useRaycastAttack: 1
+  attackRaycastRadius: 0.45
+  attackRaycastDistance: 2.4
+  leapRaycastRadius: 0.65
+  playerLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  useRaycastSeparation: 1
+  separationDistance: 1.35
+  separationForce: 4.5
+  visionCheckInterval: 0.05

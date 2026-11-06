@@ -181,5 +181,33 @@ public class PumpkinGhostConfig : ScriptableObject
     [Range(0.2f, 5.0f)] public float normalEyeIntensity = 1.2f;
     [Range(0.5f, 8.0f)] public float aggroEyeIntensity = 2.4f;
     [Range(0.5f, 5.0f)] public float eyeLightRange = 2.5f;
+
+    [Header("14. Tối Ưu Hóa & Đòn Đánh Bằng Raycast (Performance & Raycast Combat)")]
+    [Tooltip("Sử dụng Raycast/SphereCast NonAlloc để kiểm tra va chạm đòn đánh thay vì phụ thuộc Collider vật lý, giảm tải PhysX và giữ FPS ổn định")]
+    public bool useRaycastAttack = true;
+
+    [Tooltip("Bán kính hình cầu SphereCast quét đường cào tấn công (m)")]
+    [Range(0.15f, 1.5f)] public float attackRaycastRadius = 0.45f;
+
+    [Tooltip("Cự ly quét đòn cào về phía trước (m)")]
+    [Range(0.8f, 4.0f)] public float attackRaycastDistance = 2.4f;
+
+    [Tooltip("Bán kính hình cầu SphereCast quét mục tiêu khi đang nhảy vồ trên không")]
+    [Range(0.2f, 1.8f)] public float leapRaycastRadius = 0.65f;
+
+    [Tooltip("Layer Mask của người chơi")]
+    public LayerMask playerLayer = ~0;
+
+    [Tooltip("Bật cơ chế Raycast Separation để duy trì cự ly mềm giữa ma và người chơi, ngăn 2 collider đè lên nhau gây sụt khung hình")]
+    public bool useRaycastSeparation = true;
+
+    [Tooltip("Cự ly an toàn tối thiểu giữa ma và người chơi tính bằng Raycast (m)")]
+    [Range(0.6f, 3.0f)] public float separationDistance = 1.35f;
+
+    [Tooltip("Lực trượt mềm né tránh bằng Raycast khi tiếp cận quá gần")]
+    [Range(1.0f, 15.0f)] public float separationForce = 4.5f;
+
+    [Tooltip("Khoảng cách tối thiểu giữa 2 lần cập nhật tầm nhìn (giây) nhằm tối ưu xung nhịp CPU")]
+    [Range(0.02f, 0.2f)] public float visionCheckInterval = 0.05f;
 }
 

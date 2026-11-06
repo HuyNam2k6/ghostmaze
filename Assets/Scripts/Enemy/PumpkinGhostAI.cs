@@ -60,8 +60,16 @@ public class PumpkinGhostAI : MonoBehaviour
     private float currentMoveSpeed = 0f;
     private bool isLeaping = false;
 
+    // Bộ đệm Raycast tĩnh tái sử dụng tối ưu tuyệt đối 0 GC Allocation mỗi frame
+    private static readonly RaycastHit[] s_HitBuffer = new RaycastHit[16];
+
     // Bộ nhớ đệm Animation tránh gọi lặp
     private string currentAnimState = "";
+
+    // Bộ đệm thời gian kiểm tra tầm nhìn tối ưu hóa CPU
+    private float nextVisionCheckTime = 0f;
+    private bool lastVisionResult = false;
+    private float lastVisionDistance = float.MaxValue;
 
     private void Awake()
     {
@@ -314,6 +322,12 @@ public class PumpkinGhostAI : MonoBehaviour
             SetAnimatorSpeed(0f);
             PlayAnimState("Idle", 0.15f);
         }
+
+        // 6. Áp dụng cơ chế đẩy lùi mềm bằng Raycast (Raycast Separation) để giảm tải va chạm giữa các Collider
+        if (config.useRaycastSeparation && targetPlayer != null)
+        {
+            ApplyRaycastSeparation();
+        }
     }
 
     // =========================================================================
@@ -348,14 +362,22 @@ public class PumpkinGhostAI : MonoBehaviour
         if (targetPlayer != null)
         {
             RotateTowardsPosition(targetPlayer.position);
-            float dist = Vector3.Distance(transform.position, targetPlayer.position);
-            if (dist <= config.attackRange * 1.35f)
+
+            if (config.useRaycastAttack)
             {
-                PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
-                if (pHealth == null) pHealth = PlayerHealth.Instance;
-                if (pHealth != null)
+                ExecuteRaycastAttackHitCheck();
+            }
+            else
+            {
+                float dist = Vector3.Distance(transform.position, targetPlayer.position);
+                if (dist <= config.attackRange * 1.35f)
                 {
-                    pHealth.TakeDamage(config.attackDamage, transform.position);
+                    PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
+                    if (pHealth == null) pHealth = PlayerHealth.Instance;
+                    if (pHealth != null)
+                    {
+                        pHealth.TakeDamage(config.attackDamage, transform.position);
+                    }
                 }
             }
         }
@@ -417,15 +439,22 @@ public class PumpkinGhostAI : MonoBehaviour
 
             if (!hitPlayer && targetPlayer != null)
             {
-                float dist = Vector3.Distance(transform.position, targetPlayer.position);
-                if (dist <= config.stoppingDistance)
+                if (config.useRaycastAttack)
                 {
-                    hitPlayer = true;
-                    PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
-                    if (pHealth == null) pHealth = PlayerHealth.Instance;
-                    if (pHealth != null)
+                    hitPlayer = ExecuteRaycastLeapHitCheck(leapDir);
+                }
+                else
+                {
+                    float dist = Vector3.Distance(transform.position, targetPlayer.position);
+                    if (dist <= config.stoppingDistance)
                     {
-                        pHealth.TakeDamage(config.leapDamage, transform.position);
+                        hitPlayer = true;
+                        PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
+                        if (pHealth == null) pHealth = PlayerHealth.Instance;
+                        if (pHealth != null)
+                        {
+                            pHealth.TakeDamage(config.leapDamage, transform.position);
+                        }
                     }
                 }
             }
@@ -598,19 +627,190 @@ public class PumpkinGhostAI : MonoBehaviour
         return desiredDir;
     }
 
+    /// <summary>
+    /// Đẩy lùi mềm bằng Raycast giữa Ma và Người chơi:
+    /// Triệt tiêu hiện tượng 2 Collider va đập đè lên nhau trong PhysX, giúp duy trì FPS mượt mà ổn định.
+    /// </summary>
+    private void ApplyRaycastSeparation()
+    {
+        if (targetPlayer == null) return;
+
+        Vector3 myPos = transform.position;
+        Vector3 playerPos = targetPlayer.position;
+        Vector3 diff = playerPos - myPos;
+        diff.y = 0f;
+        float dist = diff.magnitude;
+
+        if (dist < config.separationDistance && dist > 0.001f)
+        {
+            Vector3 pushDir = -diff.normalized;
+            float pushStrength = (1.0f - (dist / config.separationDistance)) * config.separationForce;
+
+            // Kiểm tra Raycast sau lưng xem có vướng tường không trước khi trượt lùi
+            Vector3 rayOrigin = transform.TransformPoint(config.obstacleCheckOffset);
+            int hitCount = Physics.RaycastNonAlloc(rayOrigin, pushDir, s_HitBuffer, 0.45f, config.obstacleLayers, QueryTriggerInteraction.Ignore);
+            bool wallBehind = false;
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit h = s_HitBuffer[i];
+                if (h.collider == null) continue;
+                if (h.transform == transform || h.transform.IsChildOf(transform)) continue;
+                if (h.transform == targetPlayer || h.transform.IsChildOf(targetPlayer)) continue;
+
+                wallBehind = true;
+                break;
+            }
+
+            if (!wallBehind)
+            {
+                controller.Move(pushDir * pushStrength * Time.deltaTime);
+            }
+            else
+            {
+                // Nếu sau lưng vướng tường, trượt vuông góc (Tangent slide) né sang bên
+                Vector3 tangent = Vector3.Cross(pushDir, Vector3.up).normalized;
+                controller.Move(tangent * (pushStrength * 0.7f) * Time.deltaTime);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Kiểm tra va chạm đòn cào bằng SphereCast NonAlloc: Tối ưu 0 GC, không tạo Collider Trigger tạm,
+    /// tự động chặn đòn nếu có tường chắn ở giữa và xác định điểm va chạm thực tế.
+    /// </summary>
+    private bool ExecuteRaycastAttackHitCheck()
+    {
+        if (targetPlayer == null) return false;
+
+        Vector3 eyePos = transform.TransformPoint(config.visionEyeOffset);
+        Vector3 targetPoint = targetPlayer.TransformPoint(config.playerTargetEyeOffset);
+        Vector3 swipeDir = (targetPoint - eyePos);
+        float distanceToTarget = swipeDir.magnitude;
+
+        if (distanceToTarget > config.attackRaycastDistance)
+        {
+            return false;
+        }
+
+        if (distanceToTarget > 0.001f) swipeDir.Normalize();
+
+        int layerMask = config.playerLayer | config.visionBlockerLayers;
+        int hitCount = Physics.SphereCastNonAlloc(
+            eyePos,
+            config.attackRaycastRadius,
+            swipeDir,
+            s_HitBuffer,
+            config.attackRaycastDistance,
+            layerMask,
+            QueryTriggerInteraction.Ignore
+        );
+
+        RaycastHit closestHit = default;
+        bool hitFound = false;
+        float minDistance = float.MaxValue;
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = s_HitBuffer[i];
+            if (hit.collider == null) continue;
+            if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+
+            bool isWall = ((1 << hit.collider.gameObject.layer) & config.visionBlockerLayers) != 0;
+            bool isPlayer = (hit.transform == targetPlayer || hit.transform.IsChildOf(targetPlayer) || hit.collider.CompareTag(config.playerTag));
+
+            if (isWall && !isPlayer)
+            {
+                if (hit.distance < distanceToTarget)
+                {
+                    // Tường chắn trước người chơi -> trượt đòn đánh
+                    return false;
+                }
+            }
+
+            if (isPlayer)
+            {
+                if (hit.distance < minDistance)
+                {
+                    minDistance = hit.distance;
+                    closestHit = hit;
+                    hitFound = true;
+                }
+            }
+        }
+
+        if (hitFound)
+        {
+            PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
+            if (pHealth == null) pHealth = PlayerHealth.Instance;
+            if (pHealth != null)
+            {
+                Vector3 hitPoint = closestHit.point;
+                if (hitPoint == Vector3.zero) hitPoint = targetPlayer.position;
+                pHealth.TakeDamage(config.attackDamage, transform.position);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Kiểm tra va chạm vồ trúng Player bằng SphereCast NonAlloc theo hướng nhảy
+    /// </summary>
+    private bool ExecuteRaycastLeapHitCheck(Vector3 leapDir)
+    {
+        if (targetPlayer == null) return false;
+
+        Vector3 origin = transform.TransformPoint(config.obstacleCheckOffset);
+        float sweepDist = (config.leapSpeed * Time.deltaTime) + 0.45f;
+
+        int layerMask = config.playerLayer | config.visionBlockerLayers;
+        int hitCount = Physics.SphereCastNonAlloc(
+            origin,
+            config.leapRaycastRadius,
+            leapDir,
+            s_HitBuffer,
+            sweepDist,
+            layerMask,
+            QueryTriggerInteraction.Ignore
+        );
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = s_HitBuffer[i];
+            if (hit.collider == null) continue;
+            if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+
+            if (hit.transform == targetPlayer || hit.transform.IsChildOf(targetPlayer) || hit.collider.CompareTag(config.playerTag))
+            {
+                PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
+                if (pHealth == null) pHealth = PlayerHealth.Instance;
+                if (pHealth != null)
+                {
+                    pHealth.TakeDamage(config.leapDamage, transform.position);
+                }
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private bool CheckObstacleHit(Vector3 origin, Vector3 dir, float radius, float dist)
     {
-        if (Physics.SphereCast(origin, radius, dir, out RaycastHit hit, dist, config.obstacleLayers))
+        int count = Physics.SphereCastNonAlloc(origin, radius, dir, s_HitBuffer, dist, config.obstacleLayers, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < count; i++)
         {
-            // Bỏ qua nếu chạm vào người chơi mục tiêu
+            RaycastHit hit = s_HitBuffer[i];
+            if (hit.collider == null) continue;
+
             if (targetPlayer != null && (hit.transform == targetPlayer || hit.transform.IsChildOf(targetPlayer)))
             {
-                return false;
+                continue;
             }
-            // Bỏ qua nếu chạm vào chính mình
             if (hit.transform == transform || hit.transform.IsChildOf(transform))
             {
-                return false;
+                continue;
             }
             return true;
         }
@@ -619,14 +819,29 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private bool CanSeePlayer(out float distance)
     {
+        if (Time.time < nextVisionCheckTime)
+        {
+            distance = lastVisionDistance;
+            return lastVisionResult;
+        }
+
+        nextVisionCheckTime = Time.time + (config != null ? config.visionCheckInterval : 0.05f);
+
         distance = float.MaxValue;
-        if (targetPlayer == null) return false;
+        if (targetPlayer == null)
+        {
+            lastVisionResult = false;
+            lastVisionDistance = float.MaxValue;
+            return false;
+        }
 
         distance = Vector3.Distance(transform.position, targetPlayer.position);
+        lastVisionDistance = distance;
 
         // 1. Phát hiện cực gần (nghe tiếng chân)
         if (distance <= config.closeProximityDistance)
         {
+            lastVisionResult = true;
             return true;
         }
 
@@ -638,18 +853,34 @@ public class PumpkinGhostAI : MonoBehaviour
 
             if (angle <= config.fieldOfViewAngle * 0.5f)
             {
-                // Kiểm tra có bị tường chắn tầm mắt không
                 Vector3 eyePos = transform.TransformPoint(config.visionEyeOffset);
                 Vector3 playerEyePos = targetPlayer.TransformPoint(config.playerTargetEyeOffset);
+                Vector3 rayDir = (playerEyePos - eyePos);
+                float rayDist = rayDir.magnitude;
+                if (rayDist > 0.001f) rayDir.Normalize();
 
-                if (!Physics.Linecast(eyePos, playerEyePos, out RaycastHit hit, config.visionBlockerLayers) ||
-                    hit.transform == targetPlayer || hit.transform.IsChildOf(targetPlayer))
+                int count = Physics.RaycastNonAlloc(eyePos, rayDir, s_HitBuffer, rayDist, config.visionBlockerLayers, QueryTriggerInteraction.Ignore);
+                bool blocked = false;
+                for (int i = 0; i < count; i++)
                 {
+                    RaycastHit hit = s_HitBuffer[i];
+                    if (hit.collider == null) continue;
+                    if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
+                    if (hit.transform == targetPlayer || hit.transform.IsChildOf(targetPlayer)) continue;
+
+                    blocked = true;
+                    break;
+                }
+
+                if (!blocked)
+                {
+                    lastVisionResult = true;
                     return true;
                 }
             }
         }
 
+        lastVisionResult = false;
         return false;
     }
 
@@ -702,9 +933,18 @@ public class PumpkinGhostAI : MonoBehaviour
         bool grounded = controller.isGrounded;
         if (!grounded)
         {
-            // Bổ sung kiểm tra Raycast mặt đất từ cấu hình
+            // Bổ sung kiểm tra Raycast mặt đất từ cấu hình (NonAlloc 0 GC)
             Vector3 origin = transform.TransformPoint(config.groundCheckOffset);
-            grounded = Physics.Raycast(origin, Vector3.down, config.groundCheckDistance, config.groundLayers);
+            int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_HitBuffer, config.groundCheckDistance, config.groundLayers, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                RaycastHit h = s_HitBuffer[i];
+                if (h.collider != null && h.transform != transform && !h.transform.IsChildOf(transform))
+                {
+                    grounded = true;
+                    break;
+                }
+            }
         }
 
         if (grounded)
@@ -806,6 +1046,23 @@ public class PumpkinGhostAI : MonoBehaviour
         Vector3 gOrigin = transform.TransformPoint(config.groundCheckOffset);
         Gizmos.color = Color.magenta;
         Gizmos.DrawLine(gOrigin, gOrigin + Vector3.down * config.groundCheckDistance);
+
+        // Vùng cự ly đẩy lùi mềm bằng Raycast (Raycast Separation)
+        if (config.useRaycastSeparation)
+        {
+            Gizmos.color = new Color(0.2f, 0.8f, 1f, 0.7f);
+            Gizmos.DrawWireSphere(transform.position, config.separationDistance);
+        }
+
+        // Tầm quét đòn đánh bằng Raycast/SphereCast
+        if (config.useRaycastAttack)
+        {
+            Vector3 eyePos = transform.TransformPoint(config.visionEyeOffset);
+            Gizmos.color = new Color(1f, 0.2f, 0.2f, 0.9f);
+            Gizmos.DrawWireSphere(eyePos, config.attackRaycastRadius);
+            Gizmos.DrawLine(eyePos, eyePos + transform.forward * config.attackRaycastDistance);
+            Gizmos.DrawWireSphere(eyePos + transform.forward * config.attackRaycastDistance, config.attackRaycastRadius);
+        }
     }
 }
 

@@ -334,6 +334,17 @@ public static class PumpkinGhostSetup
         config.patrolRadius = 12.0f;
         config.waypointWaitTime = 1.8f;
 
+        // Tối ưu hóa hiệu năng & va chạm bằng Raycast NonAlloc (0 GC)
+        config.useRaycastAttack = true;
+        config.attackRaycastRadius = 0.45f;
+        config.attackRaycastDistance = 2.4f;
+        config.leapRaycastRadius = 0.65f;
+        config.playerLayer = ~0;
+        config.useRaycastSeparation = true;
+        config.separationDistance = 1.35f;
+        config.separationForce = 4.5f;
+        config.visionCheckInterval = 0.05f;
+
         EditorUtility.SetDirty(config);
         return config;
     }
@@ -362,6 +373,7 @@ public static class PumpkinGhostSetup
         GameObject ghostRoot = new GameObject("PumpkinGhost_Enemy");
         ghostRoot.transform.position = spawnPos;
         ghostRoot.transform.rotation = spawnRot;
+        try { ghostRoot.tag = "Enemy"; } catch { }
 
         // Model
         GameObject modelInst = (GameObject)PrefabUtility.InstantiatePrefab(fbxPrefab, ghostRoot.transform);
