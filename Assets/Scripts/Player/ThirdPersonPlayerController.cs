@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -52,12 +53,21 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Gia tốc trọng lực")]
     public float gravity = -20f;
 
+    [Tooltip("Khoảng thời gian tối thiểu giữa 2 lần nhảy (giây) tránh kích hoạt đúp hoạt ảnh nhảy")]
+    [Range(0.1f, 1f)] public float jumpCooldown = 0.35f;
+
+    [Tooltip("Thời gian chờ nhún chân lấy đà trong hoạt ảnh trước khi nhân vật thực sự bật bổng lên không trung (giây) - Khớp Frame 26")]
+    [Range(0.02f, 1.5f)] public float jumpTakeoffDelay = 0.80f;
+
     [Header("4. Kỹ Năng: Đỡ Đòn & Giữ Chân Ma (Block Skill - Freeze 3s)")]
     [Tooltip("Phím đỡ đòn (Mặc định: Chuột phải)")]
     public KeyCode blockKey = KeyCode.Mouse1;
 
     [Tooltip("Bán kính cảm biến giữ chân quái ma khi bật khiên đỡ đòn (m)")]
-    [Range(1.0f, 6.0f)] public float blockRange = 3.5f;
+    [Range(1.0f, 10.0f)] public float blockRange = 4.5f;
+
+    [Tooltip("Góc tối đa so với hướng nhìn của nhân vật để có thể kích hoạt phong ấn đỡ đòn (độ). Buộc phải hướng mặt về phía con ma mới nhấn E được.")]
+    [Range(30f, 90f)] public float blockFacingAngleThreshold = 65f;
 
     [Tooltip("Thời gian giữ con ma đứng im khi block trúng (giây)")]
     [Range(1.0f, 10.0f)] public float ghostHoldDuration = 3.0f;
@@ -90,8 +100,11 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Thời gian làm con ma đứng im khi quả cầu bắn trúng (giây)")]
     [Range(1f, 15f)] public float magicOrbStunDuration = 5.0f;
 
-    [Tooltip("Thời gian chờ vung tay phóng cầu trong hoạt ảnh (giây)")]
-    [Range(0.1f, 1.0f)] public float magicOrbCastDelay = 0.38f;
+    [Tooltip("Thời gian chờ vung tay phóng cầu trong hoạt ảnh (giây) - Khớp Frame 29")]
+    [Range(0.05f, 2.0f)] public float magicOrbCastDelay = 0.895f;
+
+    [Tooltip("Transform bàn tay phóng quả cầu ma thuật (tự động tìm xương RightHand của Prince)")]
+    public Transform castHandTransform;
 
     [Tooltip("Âm thanh phóng cầu ma thuật")]
     public AudioClip magicCastSound;
@@ -116,8 +129,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Range(0.1f, 1.5f)] public float colliderRadius = 0.30f;
     [Range(0.5f, 3.0f)] public float colliderHeight = 1.55f;
     public Vector3 colliderCenter = new Vector3(0f, 0.775f, 0f);
-    [Range(10f, 80f)] public float slopeLimit = 46f;
-    [Range(0.1f, 1.0f)] public float stepOffset = 0.35f;
+    [Range(10f, 85f)] public float slopeLimit = 65f;
+    [Range(0.1f, 1.2f)] public float stepOffset = 0.45f;
 
     [Header("9. Tối Ưu Hóa Va Chạm Bằng Raycast (Performance & Raycast Proximity)")]
     [Tooltip("Sử dụng Raycast/SphereCast NonAlloc kiểm tra khoảng cách với quái vật để trượt mềm mại, tránh tình trạng 2 Collider đẩy nhau gây nghẽn PhysX sụt FPS")]
@@ -126,11 +139,22 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Layer Mask của quái vật")]
     public LayerMask enemyLayers = ~0;
 
+    [Header("10. Tâm Ngắm Chấm Trắng & Thông Báo Kỹ Năng")]
+    [Tooltip("Image chấm trắng nhỏ ở giữa màn hình (Reticle)")]
+    public Image centerReticleImage;
+    [Tooltip("Text thông báo kỹ năng trên màn hình")]
+    public Text skillNoticeText;
+    private float skillNoticeTimer = 0f;
+    private Vector3 currentMagicAimPoint;
+
     // Trạng thái kỹ năng
     public bool isBlocking { get; private set; } = false;
     public bool isCastingMagic { get; private set; } = false;
     private float lastMagicAttackTime = -10f;
     private float lastGhostHoldTime = -10f;
+    private float lastJumpTime = -10f;
+    private bool isJumpAnticipating = false;
+    private bool hasCastOrbThisAttack = false;
 
     // Thành phần nội bộ & Object Pool tối ưu bộ nhớ (0 GC Allocation)
     private CharacterController characterController;
@@ -179,6 +203,120 @@ public class ThirdPersonPlayerController : MonoBehaviour
     {
         ApplyPlayerScale();
         ValidateAndRepairController();
+        AutoFindCastHand();
+        EnsureReticleAndNoticeUI();
+    }
+
+    private void EnsureReticleAndNoticeUI()
+    {
+        Canvas canvas = FindAnyObjectByType<Canvas>();
+        if (canvas == null) return;
+
+        // 1. Chấm trắng nhỏ ở giữa màn hình (Center Reticle Dot)
+        if (centerReticleImage == null)
+        {
+            GameObject dotGo = GameObject.Find("CenterReticleDot");
+            if (dotGo != null)
+            {
+                centerReticleImage = dotGo.GetComponent<Image>();
+            }
+            else
+            {
+                dotGo = new GameObject("CenterReticleDot");
+                dotGo.transform.SetParent(canvas.transform, false);
+
+                RectTransform rt = dotGo.AddComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = new Vector2(7f, 7f);
+
+                centerReticleImage = dotGo.AddComponent<Image>();
+                centerReticleImage.color = Color.white;
+                centerReticleImage.raycastTarget = false;
+
+                // Viền bóng đen nhẹ giúp chấm trắng luôn rõ trên nền trời sáng lẫn nền đất tối
+                UnityEngine.UI.Outline outline = dotGo.AddComponent<UnityEngine.UI.Outline>();
+                outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
+                outline.effectDistance = new Vector2(1f, -1f);
+            }
+        }
+
+        // 2. Text thông báo kỹ năng (Skill Notice)
+        if (skillNoticeText == null)
+        {
+            GameObject noticeGo = GameObject.Find("SkillNoticeText");
+            if (noticeGo != null)
+            {
+                skillNoticeText = noticeGo.GetComponent<Text>();
+            }
+            else
+            {
+                noticeGo = new GameObject("SkillNoticeText");
+                noticeGo.transform.SetParent(canvas.transform, false);
+
+                RectTransform rt = noticeGo.AddComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(0f, -55f);
+                rt.sizeDelta = new Vector2(400f, 40f);
+
+                skillNoticeText = noticeGo.AddComponent<Text>();
+                skillNoticeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (skillNoticeText.font == null) skillNoticeText.font = Font.CreateDynamicFontFromOSFont("Arial", 18);
+                skillNoticeText.fontSize = 20;
+                skillNoticeText.alignment = TextAnchor.MiddleCenter;
+                skillNoticeText.fontStyle = FontStyle.Bold;
+                skillNoticeText.color = new Color(1f, 0.38f, 0.38f, 0f);
+                skillNoticeText.raycastTarget = false;
+
+                UnityEngine.UI.Outline outline = noticeGo.AddComponent<UnityEngine.UI.Outline>();
+                outline.effectColor = new Color(0f, 0f, 0f, 0.95f);
+                outline.effectDistance = new Vector2(1.5f, -1.5f);
+
+                noticeGo.SetActive(false);
+            }
+        }
+    }
+
+    public void ShowTargetNotice(string msg)
+    {
+        EnsureReticleAndNoticeUI();
+        if (skillNoticeText != null)
+        {
+            skillNoticeText.gameObject.SetActive(true);
+            skillNoticeText.text = msg;
+            Color c = new Color(1f, 0.38f, 0.38f, 1f);
+            skillNoticeText.color = c;
+            skillNoticeTimer = 1.6f;
+        }
+        Debug.LogWarning($"<color=#FF6B6B>[Kỹ Năng E] {msg}</color>");
+    }
+
+    private void AutoFindCastHand()
+    {
+        if (castHandTransform == null)
+        {
+            castHandTransform = FindBoneRecursive(transform, "RightHand");
+            if (castHandTransform == null)
+            {
+                castHandTransform = FindBoneRecursive(transform, "LeftHand");
+            }
+        }
+    }
+
+    private Transform FindBoneRecursive(Transform parent, string boneName)
+    {
+        if (parent == null) return null;
+        if (parent.name.Equals(boneName, System.StringComparison.OrdinalIgnoreCase)) return parent;
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform found = FindBoneRecursive(parent.GetChild(i), boneName);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private void OnDestroy()
@@ -196,11 +334,37 @@ public class ThirdPersonPlayerController : MonoBehaviour
         {
             ApplyPlayerScale();
         }
+        isInOnValidate = true;
+        ValidateAndRepairController();
+        isInOnValidate = false;
     }
 
+    private bool isInOnValidate;
+    private bool pendingControllerReactivate;
+
+    [Tooltip("Chiều cao bậc thang tối đa nhân vật bước qua (đơn vị world, mét). Tự giới hạn theo kích thước collider đã scale.")]
+    [SerializeField] private float desiredWorldStepHeight = 0.22f;
+
+#if UNITY_EDITOR
+    [UnityEditor.InitializeOnLoadMethod]
+    private static void EditorAutoRepairAllControllers()
+    {
+        UnityEditor.EditorApplication.delayCall += () =>
+        {
+            if (Application.isPlaying) return;
+            var controllers = Object.FindObjectsByType<ThirdPersonPlayerController>();
+            foreach (var ctrl in controllers)
+            {
+                if (ctrl != null) ctrl.ValidateAndRepairController();
+            }
+            StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
+        };
+    }
+#endif
+
     /// <summary>
-    /// Đảm bảo thông số StepOffset & SkinWidth của CharacterController luôn hợp lệ với tỷ lệ Transform thực tế (lossyScale),
-    /// đồng thời kích hoạt lại PhysX Controller nếu trước Awake bị PhysX tạm ngưng do lệch tỷ lệ trên Scene.
+    /// Đảm bảo thông số Center, StepOffset & SkinWidth của CharacterController luôn hợp lệ với tỷ lệ Transform thực tế (lossyScale),
+    /// giúp đáy vòng xanh Collider luôn sát gót chân (y = 0) và leo bậc thang mượt mà.
     /// </summary>
     public void ValidateAndRepairController()
     {
@@ -216,36 +380,64 @@ public class ThirdPersonPlayerController : MonoBehaviour
             characterController.height = colliderHeight;
             characterController.center = colliderCenter;
             characterController.slopeLimit = slopeLimit;
-            characterController.stepOffset = stepOffset;
+            characterController.stepOffset = Mathf.Clamp(stepOffset, 0f, 0.05f);
             characterController.minMoveDistance = 0.001f;
         }
 
-        Vector3 lossy = transform.lossyScale;
-        float scaleY = Mathf.Max(0.0001f, Mathf.Abs(lossy.y));
-        float scaleXZ = Mathf.Max(0.0001f, Mathf.Max(Mathf.Abs(lossy.x), Mathf.Abs(lossy.z)));
-
-        float scaledRadius = characterController.radius * scaleXZ;
-        float scaledCylinderHeight = Mathf.Max(0f, characterController.height * scaleY - scaledRadius * 2f);
-        float maxAllowedStepOffset = scaledCylinderHeight + scaledRadius * 2f;
-
         bool needsReactivate = false;
 
-        if (characterController.stepOffset > maxAllowedStepOffset * 0.9f)
+        // 1. Đảm bảo đáy Capsule luôn nằm đúng tại bàn chân (y = 0): Center.y = Height * 0.5f
+        float expectedCenterY = characterController.height * 0.5f;
+        if (Mathf.Abs(characterController.center.y - expectedCenterY) > 0.02f)
         {
-            characterController.stepOffset = Mathf.Max(0.01f, maxAllowedStepOffset * 0.75f);
+            characterController.center = new Vector3(characterController.center.x, expectedCenterY, characterController.center.z);
             needsReactivate = true;
         }
 
-        if (scaledRadius > 0.005f && characterController.skinWidth > scaledRadius * 0.8f)
+        // 2. Đảm bảo slopeLimit luôn đủ lớn để leo cầu thang và dốc thoải mái (65 độ)
+        if (characterController.slopeLimit < 65f)
         {
-            characterController.skinWidth = Mathf.Max(0.005f, scaledRadius * 0.25f);
+            characterController.slopeLimit = 65f;
+            needsReactivate = true;
+        }
+
+        // 3. StepOffset của CharacterController KHÔNG bị scale (đơn vị world), còn Height/Radius thì bị scale theo lossyScale.
+        // PhysX yêu cầu: stepOffset <= scaledHeight + scaledRadius * 2 — vi phạm sẽ khiến controller "inactive".
+        Vector3 ls = transform.lossyScale;
+        float scaleY = Mathf.Max(0.0001f, Mathf.Abs(ls.y));
+        float scaleXZ = Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.z));
+        float scaledHeight = characterController.height * scaleY;
+        float scaledRadius = characterController.radius * scaleXZ;
+        float hardLimit = scaledHeight + scaledRadius * 2f;
+        float maxSafeStep = Mathf.Max(0f, Mathf.Min(scaledHeight * 0.45f, hardLimit * 0.9f));
+        float targetStep = Mathf.Min(desiredWorldStepHeight, maxSafeStep);
+
+        if (Mathf.Abs(characterController.stepOffset - targetStep) > 0.005f || characterController.stepOffset > maxSafeStep)
+        {
+            characterController.stepOffset = targetStep;
+            needsReactivate = true;
+        }
+
+        // 4. Đảm bảo skinWidth hợp lý theo bán kính
+        float targetSkin = Mathf.Clamp(characterController.radius * 0.1f, 0.01f, 0.08f);
+        if (characterController.skinWidth > characterController.radius * 0.5f || characterController.skinWidth < 0.01f)
+        {
+            characterController.skinWidth = targetSkin;
             needsReactivate = true;
         }
 
         if (Application.isPlaying && needsReactivate && characterController.enabled && gameObject.activeInHierarchy)
         {
-            characterController.enabled = false;
-            characterController.enabled = true;
+            if (isInOnValidate)
+            {
+                // Không bật/tắt component trong OnValidate (Unity không cho phép) -> dời sang Update kế tiếp
+                pendingControllerReactivate = true;
+            }
+            else
+            {
+                characterController.enabled = false;
+                characterController.enabled = true;
+            }
         }
     }
 
@@ -273,108 +465,172 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private void Update()
     {
+        if (pendingControllerReactivate)
+        {
+            pendingControllerReactivate = false;
+            if (characterController != null && characterController.enabled && gameObject.activeInHierarchy)
+            {
+                characterController.enabled = false;
+                characterController.enabled = true;
+            }
+        }
         CheckAbyssFall();
         HandleGroundCheck();
         HandleBlockInput();
         HandleMagicAttackInput();
         HandleMovement();
         HandleJumpAndGravity();
+        UpdateSkillNoticeFade();
+    }
+
+    private void UpdateSkillNoticeFade()
+    {
+        if (skillNoticeText != null && skillNoticeTimer > 0f)
+        {
+            skillNoticeTimer -= Time.deltaTime;
+            if (skillNoticeTimer <= 0.5f)
+            {
+                Color c = skillNoticeText.color;
+                c.a = Mathf.Clamp01(skillNoticeTimer / 0.5f);
+                skillNoticeText.color = c;
+            }
+            if (skillNoticeTimer <= 0f)
+            {
+                skillNoticeText.gameObject.SetActive(false);
+            }
+        }
     }
 
     /// <summary>
-    /// Xử lý phím đỡ đòn (Block): Giữ chân quái ma trong 3 giây
+    /// Xử lý phím đỡ đòn (Block): Buộc phải quay mặt về phía con ma mới kích hoạt và giữ phím E được
     /// </summary>
     private void HandleBlockInput()
     {
         if (ThirdPersonCamera.isUIPanelOpen || isCastingMagic) return;
 
+        bool blockPressedDown = ReadBlockInputDown();
         bool blockPressed = ReadBlockInput();
 
         if (blockPressed)
         {
-            if (!isBlocking)
+            // Kiểm tra điều kiện: Buộc phải hướng về con ma mới nhấn/giữ E được (toán học hình nón, không cần Collider)
+            PumpkinGhostAI targetGhost = GetTargetGhostInFacingCone(blockRange, blockFacingAngleThreshold);
+
+            if (targetGhost != null)
             {
-                isBlocking = true;
-                if (playerAnimator != null && !string.IsNullOrEmpty(blockBoolName))
+                if (!isBlocking)
                 {
-                    playerAnimator.SetBool(blockBoolName, true);
+                    isBlocking = true;
+                    if (playerAnimator != null && !string.IsNullOrEmpty(blockBoolName))
+                    {
+                        playerAnimator.SetBool(blockBoolName, true);
+                    }
+                    if (blockShieldLight != null)
+                    {
+                        blockShieldLight.enabled = true;
+                    }
+                    if (audioSource != null && blockSound != null)
+                    {
+                        audioSource.PlayOneShot(blockSound);
+                    }
                 }
-                if (blockShieldLight != null)
+
+                // Giữ chân quái ma trong thời gian quy định
+                if (Time.time >= lastGhostHoldTime + 0.5f)
                 {
-                    blockShieldLight.enabled = true;
-                }
-                if (audioSource != null && blockSound != null)
-                {
-                    audioSource.PlayOneShot(blockSound);
+                    cachedGhost = targetGhost;
+                    targetGhost.Freeze(ghostHoldDuration);
+                    lastGhostHoldTime = Time.time;
+                    Debug.Log($"<color=#3498DB>[PrinceGreen - Phím E] Đang nhìn thẳng vào {targetGhost.name}! Đã khóa cứng trong {ghostHoldDuration} giây!</color>");
                 }
             }
-
-            // Quét tìm quái ma trong tầm để giữ chân con ma trong 3 giây
-            if (Time.time >= lastGhostHoldTime + 0.5f)
+            else
             {
-                CheckAndHoldGhostInBlockRange();
+                // Khi người chơi vừa nhấn phím E mà không có con ma nào ở gần hoặc chưa nhìn thẳng vào ma
+                if (blockPressedDown)
+                {
+                    ShowTargetNotice("Không tìm thấy mục tiêu!");
+                }
+
+                // Nếu không nhìn thẳng vào con ma hoặc con ma ở sau lưng/ngoài tầm: Hủy thế thủ
+                if (isBlocking)
+                {
+                    CancelBlock();
+                }
             }
         }
         else
         {
             if (isBlocking)
             {
-                isBlocking = false;
-                if (playerAnimator != null && !string.IsNullOrEmpty(blockBoolName))
-                {
-                    playerAnimator.SetBool(blockBoolName, false);
-                }
-                if (blockShieldLight != null)
-                {
-                    blockShieldLight.enabled = false;
-                }
+                CancelBlock();
             }
         }
     }
 
-    /// <summary>
-    /// Quét và giữ chân con ma bí ngô trong 3 giây khi nhấn phím E (Block)
-    /// </summary>
-    private void CheckAndHoldGhostInBlockRange()
+    private void CancelBlock()
     {
-        Vector3 center = transform.position + Vector3.up * 0.9f;
-        int count = Physics.OverlapSphereNonAlloc(center, blockRange, s_OverlapBuffer, enemyLayers, QueryTriggerInteraction.Ignore);
-        bool found = false;
-
-        for (int i = 0; i < count; i++)
+        isBlocking = false;
+        if (playerAnimator != null && !string.IsNullOrEmpty(blockBoolName))
         {
-            Collider col = s_OverlapBuffer[i];
-            if (col == null) continue;
-
-            PumpkinGhostAI ghost = col.GetComponentInParent<PumpkinGhostAI>();
-            if (ghost != null)
-            {
-                cachedGhost = ghost;
-                ghost.Freeze(ghostHoldDuration);
-                lastGhostHoldTime = Time.time;
-                found = true;
-                Debug.Log($"<color=#3498DB>[PrinceGreen - Phím E] Đã phát sóng giam giữ, con ma bị khóa cứng trong {ghostHoldDuration} giây!</color>");
-                break;
-            }
+            playerAnimator.SetBool(blockBoolName, false);
         }
-
-        if (!found)
+        if (blockShieldLight != null)
         {
-            if (cachedGhost == null)
+            blockShieldLight.enabled = false;
+        }
+    }
+
+    /// <summary>
+    /// Tìm quái ma gần nhất nằm trong hình nón tầm nhìn phía trước nhân vật
+    /// Hoạt động chính xác 100% bằng toán học Vector kể cả khi quái hoàn toàn không có Collider
+    /// </summary>
+    public PumpkinGhostAI GetTargetGhostInFacingCone(float maxDist, float maxAngle)
+    {
+        PumpkinGhostAI[] allGhosts = Object.FindObjectsByType<PumpkinGhostAI>();
+        if (allGhosts == null || allGhosts.Length == 0) return null;
+
+        PumpkinGhostAI bestGhost = null;
+        float bestDist = maxDist;
+
+        Vector3 playerForward = transform.forward;
+        playerForward.y = 0f;
+        if (playerForward.sqrMagnitude > 0.0001f) playerForward.Normalize();
+        else playerForward = Vector3.forward;
+
+        Vector3 playerPos = transform.position;
+
+        for (int i = 0; i < allGhosts.Length; i++)
+        {
+            PumpkinGhostAI ghost = allGhosts[i];
+            if (ghost == null || !ghost.gameObject.activeInHierarchy) continue;
+
+            Vector3 diff = ghost.transform.position - playerPos;
+            diff.y = 0f;
+            float dist = diff.magnitude;
+
+            if (dist > maxDist) continue;
+
+            if (dist > 0.001f)
             {
-                cachedGhost = FindAnyObjectByType<PumpkinGhostAI>();
-            }
-            if (cachedGhost != null)
-            {
-                float dist = Vector3.Distance(transform.position, cachedGhost.transform.position);
-                if (dist <= blockRange)
+                Vector3 dirToGhost = diff / dist;
+                float angle = Vector3.Angle(playerForward, dirToGhost);
+                if (angle <= maxAngle)
                 {
-                    cachedGhost.Freeze(ghostHoldDuration);
-                    lastGhostHoldTime = Time.time;
-                    Debug.Log($"<color=#3498DB>[PrinceGreen - Phím E] Đã khóa cứng Con Ma Bí Ngô trong {ghostHoldDuration} giây!</color>");
+                    if (dist < bestDist)
+                    {
+                        bestDist = dist;
+                        bestGhost = ghost;
+                    }
                 }
             }
+            else
+            {
+                return ghost;
+            }
         }
+
+        return bestGhost;
     }
 
     /// <summary>
@@ -403,7 +659,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Xử lý tung chiêu phóng cầu ma thuật (Rising Wave): Đẩy lùi 3m và đứng im 5 giây
+    /// Xử lý tung chiêu phóng cầu ma thuật (Rising Wave): Đẩy lùi 3m và đứng im 5 giây.
+    /// Bắn thẳng về phía tâm ngắm chấm trắng ở giữa màn hình, tự động xoay thân nhân vật theo hướng bắn.
     /// </summary>
     private void HandleMagicAttackInput()
     {
@@ -414,6 +671,31 @@ public class ThirdPersonPlayerController : MonoBehaviour
             if (Time.time >= lastMagicAttackTime + magicAttackCooldown)
             {
                 lastMagicAttackTime = Time.time;
+
+                // Tính toán hướng bắn chính xác qua tâm ngắm chấm trắng ở giữa màn hình
+                Ray aimRay = cameraTransform != null
+                    ? new Ray(cameraTransform.position, cameraTransform.forward)
+                    : (Camera.main != null ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+                    : new Ray(transform.position + Vector3.up * 1.5f, transform.forward));
+
+                int mask = ~(1 << gameObject.layer);
+                if (Physics.Raycast(aimRay, out RaycastHit hit, 100f, mask, QueryTriggerInteraction.Ignore))
+                {
+                    currentMagicAimPoint = hit.point;
+                }
+                else
+                {
+                    currentMagicAimPoint = aimRay.GetPoint(50f);
+                }
+
+                // Tự động xoay thân nhân vật quay đúng về hướng chấm trắng ngắm tới
+                Vector3 toAimFlat = currentMagicAimPoint - transform.position;
+                toAimFlat.y = 0f;
+                if (toAimFlat.sqrMagnitude > 0.001f)
+                {
+                    transform.rotation = Quaternion.LookRotation(toAimFlat.normalized);
+                }
+
                 StartCoroutine(RoutineCastRisingWave());
             }
         }
@@ -422,6 +704,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private IEnumerator RoutineCastRisingWave()
     {
         isCastingMagic = true;
+        hasCastOrbThisAttack = false;
 
         if (playerAnimator != null && !string.IsNullOrEmpty(risingWaveTriggerName))
         {
@@ -433,29 +716,56 @@ public class ThirdPersonPlayerController : MonoBehaviour
             audioSource.PlayOneShot(magicCastSound);
         }
 
+        // Chờ đến đúng Frame 29 (hoặc sự kiện OnMagicOrbCastEvent kích hoạt trước)
         yield return new WaitForSeconds(magicOrbCastDelay);
 
-        SpawnMagicWaveOrb();
+        if (!hasCastOrbThisAttack)
+        {
+            SpawnMagicWaveOrb();
+        }
 
-        yield return new WaitForSeconds(0.45f);
+        yield return new WaitForSeconds(0.40f);
         isCastingMagic = false;
+    }
+
+    /// <summary>
+    /// Hàm gọi trực tiếp từ Animation Event trên clip RisingWave (ở Frame 29)
+    /// </summary>
+    public void OnMagicOrbCastEvent()
+    {
+        if (hasCastOrbThisAttack) return;
+        SpawnMagicWaveOrb();
     }
 
     private void SpawnMagicWaveOrb()
     {
-        Vector3 forwardDir = transform.forward;
+        hasCastOrbThisAttack = true;
 
-        if (cameraTransform != null)
+        Vector3 spawnPos = castHandTransform != null
+            ? castHandTransform.position
+            : transform.position + (transform.rotation * magicOrbSpawnOffset);
+
+        // Hướng bắn bay thẳng về phía tâm ngắm chấm trắng ở giữa màn hình
+        Vector3 shootDir = (currentMagicAimPoint - spawnPos);
+        if (shootDir.sqrMagnitude > 0.0001f)
         {
-            forwardDir = cameraTransform.forward;
-            forwardDir.y = 0f;
-            if (forwardDir.sqrMagnitude > 0.001f) forwardDir.Normalize();
-            else forwardDir = transform.forward;
+            shootDir.Normalize();
+        }
+        else
+        {
+            shootDir = transform.forward;
         }
 
-        // Tính tọa độ xuất phát theo không gian thế giới (không bị biến dạng khi Transform cha có localScale nhỏ như 0.1)
-        Quaternion spawnRot = Quaternion.LookRotation(forwardDir);
-        Vector3 spawnPos = transform.position + (spawnRot * magicOrbSpawnOffset);
+        // Đảm bảo thân nhân vật luôn quay đúng hướng mặt của đòn đánh
+        Vector3 forwardFlat = shootDir;
+        forwardFlat.y = 0f;
+        if (forwardFlat.sqrMagnitude > 0.001f)
+        {
+            transform.rotation = Quaternion.LookRotation(forwardFlat.normalized);
+        }
+
+        Quaternion spawnRot = Quaternion.LookRotation(shootDir);
+        spawnPos += shootDir * 0.15f;
 
         MagicWaveOrb orbScript = GetOrCreatePooledOrb();
         orbScript.transform.SetPositionAndRotation(spawnPos, spawnRot);
@@ -463,7 +773,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
         orbScript.knockbackDistance = magicOrbKnockback;
         orbScript.stunDuration = magicOrbStunDuration;
         orbScript.gameObject.SetActive(true);
-        orbScript.Launch(forwardDir);
+        orbScript.Launch(shootDir);
     }
 
     private MagicWaveOrb GetOrCreatePooledOrb()
@@ -547,10 +857,21 @@ public class ThirdPersonPlayerController : MonoBehaviour
     /// </summary>
     private void HandleGroundCheck()
     {
+        // Khi nhân vật đang trong pha bay lên do vừa nhấn nhảy, tuyệt đối không tính là chạm đất
+        if (verticalVelocity.y > 0.05f)
+        {
+            isGrounded = false;
+            if (playerAnimator != null && !string.IsNullOrEmpty(isGroundedParamName))
+            {
+                playerAnimator.SetBool(isGroundedParamName, false);
+            }
+            return;
+        }
+
         isGrounded = (characterController != null && characterController.enabled) && characterController.isGrounded;
 
-        // Bổ trợ bằng Raycast của CemeteryMapManager nếu có
-        if (!isGrounded && CemeteryMapManager.Instance != null)
+        // Bổ trợ bằng Raycast của CemeteryMapManager nếu có (chỉ kiểm tra khi đang rơi xuống hoặc đứng yên)
+        if (!isGrounded && verticalVelocity.y <= 0.05f && CemeteryMapManager.Instance != null)
         {
             if (CemeteryMapManager.Instance.RaycastGround(transform.position, out RaycastHit hit, 0.35f))
             {
@@ -610,8 +931,12 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 moveDirection = new Vector3(input.x, 0f, input.y).normalized;
             }
 
-            Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            // Ở góc nhìn thứ nhất, ThirdPersonCamera tự xoay nhân vật theo hướng nhìn -> không xoay theo hướng di chuyển
+            if (!ThirdPersonCamera.IsFirstPerson)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            }
         }
 
         Vector3 horizontalMove = moveDirection * currentSpeed;
@@ -650,22 +975,72 @@ public class ThirdPersonPlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Xử lý nhảy và trọng lực kéo xuống vực
+    /// Xử lý nhảy và trọng lực kéo xuống vực:
+    /// Đồng bộ hoàn hảo giữa hoạt ảnh nhún chân lấy đà và khoảnh khắc cơ thể bật bổng lên không trung
     /// </summary>
     private void HandleJumpAndGravity()
     {
-        if (isGrounded && ReadJumpInput() && !isBlocking && !isCastingMagic)
+        if (isGrounded && ReadJumpInput() && !isBlocking && !isCastingMagic && !isJumpAnticipating)
         {
-            verticalVelocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
-
-            if (playerAnimator != null && !string.IsNullOrEmpty(jumpTriggerName))
+            if (Time.time >= lastJumpTime + jumpCooldown)
             {
-                playerAnimator.SetTrigger(jumpTriggerName);
+                lastJumpTime = Time.time;
+                StartCoroutine(RoutineJumpTakeoff());
             }
         }
 
-        verticalVelocity.y += gravity * Time.deltaTime;
+        if (!isJumpAnticipating)
+        {
+            verticalVelocity.y += gravity * Time.deltaTime;
+        }
+        else
+        {
+            // Trong lúc nhún chân lấy đà trong hoạt ảnh: Giữ chân bám chắc mặt sàn, chưa bay lên vội
+            verticalVelocity.y = -2.5f;
+        }
+
         SafeMove(verticalVelocity * Time.deltaTime);
+    }
+
+    private IEnumerator RoutineJumpTakeoff()
+    {
+        isJumpAnticipating = true;
+
+        // 1. Kích hoạt ngay hoạt ảnh nhún chân chuẩn bị nhảy
+        if (playerAnimator != null && !string.IsNullOrEmpty(jumpTriggerName))
+        {
+            playerAnimator.ResetTrigger(jumpTriggerName);
+            playerAnimator.SetTrigger(jumpTriggerName);
+        }
+
+        // 2. Chờ đúng khoảnh khắc chân đạp đất bật người lên ở Frame 26
+        if (jumpTakeoffDelay > 0.001f)
+        {
+            yield return new WaitForSeconds(jumpTakeoffDelay);
+        }
+
+        ExecuteJumpTakeoff();
+    }
+
+    /// <summary>
+    /// Hàm gọi trực tiếp từ Animation Event trên clip Jump (ở Frame 26)
+    /// </summary>
+    public void OnJumpTakeoffEvent()
+    {
+        ExecuteJumpTakeoff();
+    }
+
+    private void ExecuteJumpTakeoff()
+    {
+        if (!isJumpAnticipating) return;
+        isJumpAnticipating = false;
+
+        // 3. Đúng pha chân bật khỏi sàn: Truyền lực nhảy nâng bổng nhân vật lên không trung
+        if (!isBlocking && !isCastingMagic)
+        {
+            isGrounded = false;
+            verticalVelocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+        }
     }
 
     // =========================================================================
@@ -735,7 +1110,23 @@ public class ThirdPersonPlayerController : MonoBehaviour
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKey(blockKey) || Input.GetKey(KeyCode.Mouse1) || Input.GetKey(KeyCode.F)) return true;
+        if (Input.GetKey(blockKey) || Input.GetKey(KeyCode.Mouse1) || Input.GetKey(KeyCode.F) || Input.GetKey(KeyCode.E)) return true;
+#endif
+
+        return false;
+    }
+
+    private bool ReadBlockInputDown()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
+        var kb = Keyboard.current;
+        if (kb != null && (kb.fKey.wasPressedThisFrame || kb.eKey.wasPressedThisFrame)) return true;
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(blockKey) || Input.GetKeyDown(KeyCode.Mouse1) || Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.E)) return true;
 #endif
 
         return false;

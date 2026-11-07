@@ -455,8 +455,8 @@ CharacterController:
   serializedVersion: 3
   m_Height: 1.8
   m_Radius: 0.35
-  m_SlopeLimit: 46
-  m_StepOffset: 0.38
+  m_SlopeLimit: 65
+  m_StepOffset: 0.45
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0.9, z: 0}
@@ -472,15 +472,56 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e33298cba4c85a744ba9af11bdf88476, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ThirdPersonPlayerController
+  playerAnimator: {fileID: 0}
+  overrideModelScale: 0
+  playerScale: 0.72
+  speedParamName: Speed
+  isGroundedParamName: IsGrounded
+  jumpTriggerName: Jump
+  blockBoolName: IsBlocking
+  risingWaveTriggerName: RisingWave
+  takeHitTriggerName: TakeHit
+  deathTriggerName: Death
   walkSpeed: 4.5
   sprintSpeed: 7.5
   rotationSpeed: 14
   jumpHeight: 1.25
   gravity: -20
+  jumpCooldown: 0.35
+  jumpTakeoffDelay: 0.8
+  blockKey: 324
+  blockRange: 4.5
+  blockFacingAngleThreshold: 65
+  ghostHoldDuration: 3
+  blockShieldLight: {fileID: 0}
+  blockSound: {fileID: 0}
+  magicAttackKey: 323
+  magicAttackCooldown: 1.2
+  magicOrbPrefab: {fileID: 0}
+  magicOrbSpawnOffset: {x: 0, y: 1.25, z: 0.65}
+  magicOrbSpeed: 15
+  magicOrbKnockback: 3
+  magicOrbStunDuration: 5
+  magicOrbCastDelay: 0.895
+  castHandTransform: {fileID: 0}
+  magicCastSound: {fileID: 0}
   fallThresholdY: -15
   respawnPoint: {x: 2.5, y: 0.45, z: 7.5}
   cameraTransform: {fileID: 0}
   lanternLight: {fileID: 75024274743340511}
+  overrideColliderSettings: 0
+  colliderRadius: 0.3
+  colliderHeight: 1.55
+  colliderCenter: {x: 0, y: 0.775, z: 0}
+  slopeLimit: 65
+  stepOffset: 0.45
+  useRaycastEnemyAvoidance: 1
+  enemyAvoidanceDistance: 0.95
+  enemyLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  centerReticleImage: {fileID: 0}
+  skillNoticeText: {fileID: 0}
 --- !u!1 &7491852996815443157
 GameObject:
   m_ObjectHideFlags: 0

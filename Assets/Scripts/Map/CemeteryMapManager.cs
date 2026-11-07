@@ -12,11 +12,13 @@ public class CemeteryMapManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
     }
 
     private void OnEnable()
     {
         if (Instance == null) Instance = this;
+        StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
     }
 
     /// <summary>

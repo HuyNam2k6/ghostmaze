@@ -373,8 +373,8 @@ public static class PrincePlayerSetup
         cc.radius = 0.30f;
         cc.height = 1.55f;
         cc.center = new Vector3(0f, 0.775f, 0f);
-        cc.slopeLimit = 46f;
-        cc.stepOffset = 0.35f;
+        cc.slopeLimit = 65f;
+        cc.stepOffset = 0.45f;
 
         // ThirdPersonPlayerController
         ThirdPersonPlayerController controller = playerGo.GetComponent<ThirdPersonPlayerController>();
@@ -383,8 +383,8 @@ public static class PrincePlayerSetup
         controller.colliderRadius = 0.30f;
         controller.colliderHeight = 1.55f;
         controller.colliderCenter = new Vector3(0f, 0.775f, 0f);
-        controller.slopeLimit = 46f;
-        controller.stepOffset = 0.35f;
+        controller.slopeLimit = 65f;
+        controller.stepOffset = 0.45f;
         controller.playerAnimator = animator;
         controller.respawnPoint = spawnPos;
         controller.magicOrbPrefab = orbPrefab;
@@ -392,6 +392,10 @@ public static class PrincePlayerSetup
         controller.magicOrbStunDuration = 5.0f;
         controller.ghostHoldDuration = 3.0f;
         controller.blockRange = 3.5f;
+        controller.blockFacingAngleThreshold = 65f;
+        controller.jumpCooldown = 0.35f;
+        controller.jumpTakeoffDelay = 0.80f;
+        controller.magicOrbCastDelay = 0.895f;
 
         // Tạo hiệu ứng ánh sáng khiên đỡ đòn (Aura Shield Light)
         GameObject shieldObj = new GameObject("BlockShieldLight");
@@ -414,11 +418,14 @@ public static class PrincePlayerSetup
         AudioSource audioSource = playerGo.GetComponent<AudioSource>();
         if (audioSource == null) audioSource = playerGo.AddComponent<AudioSource>();
 
-        // Cập nhật targetPlayer cho PumpkinGhostAI nếu có trong Scene
-        PumpkinGhostAI ghostAi = Object.FindAnyObjectByType<PumpkinGhostAI>();
-        if (ghostAi != null)
+        // Cập nhật targetPlayer cho tất cả PumpkinGhostAI trong Scene
+        PumpkinGhostAI[] ghostAis = Object.FindObjectsByType<PumpkinGhostAI>();
+        if (ghostAis != null)
         {
-            ghostAi.targetPlayer = playerGo.transform;
+            foreach (var ai in ghostAis)
+            {
+                if (ai != null) ai.targetPlayer = playerGo.transform;
+            }
         }
 
         // Lưu thành Prefab để tái sử dụng

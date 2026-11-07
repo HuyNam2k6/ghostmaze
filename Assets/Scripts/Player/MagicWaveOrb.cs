@@ -68,7 +68,29 @@ public class MagicWaveOrb : MonoBehaviour
             return;
         }
 
-        // 1. Kiểm tra tầm gần ngay tại tâm cầu (tránh trường hợp con ma đứng sát mặt làm SphereCast bỏ qua)
+        float stepDist = speed * Time.deltaTime;
+        Vector3 nextPos = transform.position + moveDirection * stepDist;
+
+        // 1. Kiểm tra va chạm với quái ma bằng toán học khoảng cách (kể cả khi quái KHÔNG có bất kỳ Collider nào)
+        PumpkinGhostAI[] activeGhosts = UnityEngine.Object.FindObjectsByType<PumpkinGhostAI>();
+        if (activeGhosts != null && activeGhosts.Length > 0)
+        {
+            for (int i = 0; i < activeGhosts.Length; i++)
+            {
+                PumpkinGhostAI ghost = activeGhosts[i];
+                if (ghost == null || !ghost.gameObject.activeInHierarchy) continue;
+
+                Vector3 ghostCenter = ghost.transform.position + Vector3.up * 0.9f;
+                float distToSegment = DistancePointToSegment(ghostCenter, transform.position, nextPos);
+                if (distToSegment <= hitRadius + 0.65f)
+                {
+                    ApplyHitToGhost(ghost);
+                    return;
+                }
+            }
+        }
+
+        // 2. Kiểm tra tầm gần ngay tại tâm cầu bằng OverlapSphereNonAlloc (dành cho Collider môi trường)
         int overlapCount = Physics.OverlapSphereNonAlloc(
             transform.position,
             hitRadius,
@@ -91,10 +113,7 @@ public class MagicWaveOrb : MonoBehaviour
             }
         }
 
-        float stepDist = speed * Time.deltaTime;
-        Vector3 nextPos = transform.position + moveDirection * stepDist;
-
-        // 2. Quét đường bay bằng SphereCastNonAlloc 0 GC (ưu tiên trúng quái trước tường/vật cản)
+        // 3. Quét đường bay bằng SphereCastNonAlloc 0 GC (ưu tiên trúng quái trước tường/vật cản)
         int hitCount = Physics.SphereCastNonAlloc(
             transform.position,
             hitRadius,
@@ -134,6 +153,17 @@ public class MagicWaveOrb : MonoBehaviour
         }
 
         transform.position = nextPos;
+    }
+
+    private static float DistancePointToSegment(Vector3 point, Vector3 start, Vector3 end)
+    {
+        Vector3 seg = end - start;
+        float segLenSqr = seg.sqrMagnitude;
+        if (segLenSqr < 0.0001f) return Vector3.Distance(point, start);
+
+        float t = Mathf.Clamp01(Vector3.Dot(point - start, seg) / segLenSqr);
+        Vector3 proj = start + seg * t;
+        return Vector3.Distance(point, proj);
     }
 
     private void ApplyHitToGhost(PumpkinGhostAI ghost)

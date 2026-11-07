@@ -28,6 +28,16 @@ public class PlayerHealth : MonoBehaviour
     [Tooltip("Hiệu ứng chớp đỏ màn hình khi bị ma cào trúng")]
     public Image damageVignette;
 
+    [Header("Hiệu Ứng 3 Dấu Móng Vuốt Cào (Claw Scratch Effect)")]
+    [Tooltip("Image hiển thị 3 vệt móng vuốt cào ở góc màn hình khi bị ma cào")]
+    public Image clawScratchImage;
+
+    [Tooltip("Sprite hình 3 vệt móng vuốt cào đẫm máu")]
+    public Sprite clawScratchSprite;
+
+    [Tooltip("Thời gian mờ dần của vết cào (giây)")]
+    [Range(0.4f, 2.5f)] public float clawScratchDuration = 0.9f;
+
     [Header("Âm Thanh Phản Hồi")]
     public AudioSource audioSource;
     public AudioClip hurtSound;
@@ -35,6 +45,7 @@ public class PlayerHealth : MonoBehaviour
     private CharacterController characterController;
     private float displayedHealthRatio = 1f;
     private float vignetteAlpha = 0f;
+    private float scratchAlpha = 0f;
 
     private readonly Color healthyColor = new Color(0.18f, 0.85f, 0.45f, 1f); // Xanh lục
     private readonly Color warningColor = new Color(0.95f, 0.75f, 0.18f, 1f); // Vàng cam
@@ -73,6 +84,20 @@ public class PlayerHealth : MonoBehaviour
             c.a = vignetteAlpha;
             damageVignette.color = c;
         }
+
+        // Làm mờ dần hiệu ứng 3 vết cào móng vuốt ở góc màn hình
+        if (clawScratchImage != null && scratchAlpha > 0.001f)
+        {
+            scratchAlpha = Mathf.MoveTowards(scratchAlpha, 0f, Time.deltaTime / Mathf.Max(0.1f, clawScratchDuration));
+            Color sc = clawScratchImage.color;
+            sc.a = scratchAlpha;
+            clawScratchImage.color = sc;
+            clawScratchImage.transform.localScale = Vector3.MoveTowards(clawScratchImage.transform.localScale, Vector3.one, Time.deltaTime * 0.9f);
+            if (scratchAlpha <= 0.001f && clawScratchImage.gameObject.activeSelf)
+            {
+                clawScratchImage.gameObject.SetActive(false);
+            }
+        }
     }
 
     /// <summary>
@@ -95,6 +120,16 @@ public class PlayerHealth : MonoBehaviour
 
         currentHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
         vignetteAlpha = 0.55f;
+        scratchAlpha = 1.0f;
+
+        if (clawScratchImage != null)
+        {
+            clawScratchImage.gameObject.SetActive(true);
+            Color sc = clawScratchImage.color;
+            sc.a = 1.0f;
+            clawScratchImage.color = sc;
+            clawScratchImage.transform.localScale = Vector3.one * 1.15f; // Giật nảy nhẹ khi trúng đòn cào
+        }
 
         if (playerCtrl != null && playerCtrl.playerAnimator != null && !string.IsNullOrEmpty(playerCtrl.takeHitTriggerName))
         {
@@ -235,6 +270,50 @@ public class PlayerHealth : MonoBehaviour
             if (vigGo != null)
             {
                 damageVignette = vigGo.GetComponent<Image>();
+            }
+        }
+
+        if (clawScratchImage == null)
+        {
+            GameObject scratchGo = GameObject.Find("PlayerClawScratch");
+            if (scratchGo != null)
+            {
+                clawScratchImage = scratchGo.GetComponent<Image>();
+            }
+            else
+            {
+                Canvas canvas = FindAnyObjectByType<Canvas>();
+                if (canvas != null)
+                {
+                    GameObject newScratchGo = new GameObject("PlayerClawScratch");
+                    newScratchGo.transform.SetParent(canvas.transform, false);
+                    RectTransform rt = newScratchGo.AddComponent<RectTransform>();
+
+                    // Cố định ở góc trên bên phải màn hình (Top-Right Corner)
+                    rt.anchorMin = new Vector2(1f, 1f);
+                    rt.anchorMax = new Vector2(1f, 1f);
+                    rt.pivot = new Vector2(1f, 1f);
+                    rt.anchoredPosition = new Vector2(-15f, -15f);
+                    rt.sizeDelta = new Vector2(380f, 380f);
+
+                    Image img = newScratchGo.AddComponent<Image>();
+                    img.raycastTarget = false;
+
+                    if (clawScratchSprite != null)
+                    {
+                        img.sprite = clawScratchSprite;
+                    }
+                    else
+                    {
+#if UNITY_EDITOR
+                        img.sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Textures/ClawScratch.png");
+#endif
+                    }
+
+                    img.color = new Color(1f, 1f, 1f, 0f);
+                    newScratchGo.SetActive(false);
+                    clawScratchImage = img;
+                }
             }
         }
     }

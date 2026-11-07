@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-[RequireComponent(typeof(CharacterController))]
+// Không bắt buộc CharacterController hay bất kỳ Collider nào: Trọng lực và di chuyển được tính hoàn toàn bằng code thuần
 public class PumpkinGhostAI : MonoBehaviour
 {
     public enum GhostState
@@ -155,6 +155,38 @@ public class PumpkinGhostAI : MonoBehaviour
         {
             controller.Move(motion);
         }
+        else if (gameObject.activeInHierarchy)
+        {
+            // Trọng lực và di chuyển hoàn toàn bằng code thuần, không cần Collider hay CharacterController
+            Vector3 horizontalMove = motion;
+            horizontalMove.y = 0f;
+            float moveDist = horizontalMove.magnitude;
+
+            if (moveDist > 0.0001f && config != null)
+            {
+                Vector3 moveDir = horizontalMove / moveDist;
+                Vector3 rayOrigin = transform.position + Vector3.up * 0.8f;
+                float checkDist = moveDist + 0.35f;
+
+                int count = Physics.RaycastNonAlloc(rayOrigin, moveDir, s_HitBuffer, checkDist, config.obstacleLayers, QueryTriggerInteraction.Ignore);
+                for (int i = 0; i < count; i++)
+                {
+                    RaycastHit h = s_HitBuffer[i];
+                    if (h.collider != null && h.transform != transform && !h.transform.IsChildOf(transform))
+                    {
+                        if (targetPlayer == null || (h.transform != targetPlayer && !h.transform.IsChildOf(targetPlayer)))
+                        {
+                            Vector3 slide = Vector3.ProjectOnPlane(horizontalMove, h.normal);
+                            motion.x = slide.x;
+                            motion.z = slide.z;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            transform.position += motion;
+        }
     }
 
     private void Start()
@@ -179,6 +211,7 @@ public class PumpkinGhostAI : MonoBehaviour
     {
         CheckAbyssProtection();
         ApplyGravity();
+        ApplyGhostSeparation();
 
         // Nếu đang bị người chơi giữ chân (Block 3s) hoặc choáng đòn (RisingWave 5s)
         if (isFrozen)
@@ -435,16 +468,20 @@ public class PumpkinGhostAI : MonoBehaviour
         {
             RotateTowardsPosition(targetPlayer.position);
 
+            bool hitSuccess = false;
             if (config.useRaycastAttack)
             {
-                ExecuteRaycastAttackHitCheck();
+                hitSuccess = ExecuteRaycastAttackHitCheck();
             }
-            else
+
+            // Fallback cự ly cận chiến: Nếu Raycast trượt do góc quét nhưng người chơi đang ở ngay trong tầm cào
+            if (!hitSuccess)
             {
                 float dist = Vector3.Distance(transform.position, targetPlayer.position);
-                if (dist <= config.attackRange * 1.35f)
+                if (dist <= config.attackRange * 1.5f)
                 {
                     PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
+                    if (pHealth == null) pHealth = targetPlayer.GetComponentInChildren<PlayerHealth>();
                     if (pHealth == null) pHealth = PlayerHealth.Instance;
                     if (pHealth != null)
                     {
@@ -762,8 +799,9 @@ public class PumpkinGhostAI : MonoBehaviour
         Vector3 targetPoint = GetPlayerWorldTargetPoint();
         Vector3 swipeDir = (targetPoint - eyePos);
         float distanceToTarget = swipeDir.magnitude;
+        float maxReach = Mathf.Max(config.attackRaycastDistance, config.attackRange * 1.6f);
 
-        if (distanceToTarget > config.attackRaycastDistance)
+        if (distanceToTarget > maxReach)
         {
             return false;
         }
@@ -776,7 +814,7 @@ public class PumpkinGhostAI : MonoBehaviour
             config.attackRaycastRadius,
             swipeDir,
             s_HitBuffer,
-            config.attackRaycastDistance,
+            maxReach,
             layerMask,
             QueryTriggerInteraction.Ignore
         );
@@ -791,14 +829,16 @@ public class PumpkinGhostAI : MonoBehaviour
             if (hit.collider == null) continue;
             if (hit.transform == transform || hit.transform.IsChildOf(transform)) continue;
 
-            bool isWall = ((1 << hit.collider.gameObject.layer) & config.visionBlockerLayers) != 0;
+            // Mặt sàn / dốc đất không bao giờ được tính là tường chắn đòn cào
+            bool isFloor = hit.normal.y > 0.55f || hit.point.y < Mathf.Min(transform.position.y, targetPlayer.position.y) + 0.25f;
+            bool isWall = !isFloor && (((1 << hit.collider.gameObject.layer) & config.visionBlockerLayers) != 0);
             bool isPlayer = (hit.transform == targetPlayer || hit.transform.IsChildOf(targetPlayer) || hit.collider.CompareTag(config.playerTag));
 
             if (isWall && !isPlayer)
             {
                 if (hit.distance < distanceToTarget)
                 {
-                    // Tường chắn trước người chơi -> trượt đòn đánh
+                    // Tường thật chắn trước người chơi -> trượt đòn đánh
                     return false;
                 }
             }
@@ -817,11 +857,10 @@ public class PumpkinGhostAI : MonoBehaviour
         if (hitFound)
         {
             PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
+            if (pHealth == null) pHealth = targetPlayer.GetComponentInChildren<PlayerHealth>();
             if (pHealth == null) pHealth = PlayerHealth.Instance;
             if (pHealth != null)
             {
-                Vector3 hitPoint = closestHit.point;
-                if (hitPoint == Vector3.zero) hitPoint = targetPlayer.position;
                 pHealth.TakeDamage(config.attackDamage, transform.position);
             }
             return true;
@@ -1002,36 +1041,115 @@ public class PumpkinGhostAI : MonoBehaviour
         animator.CrossFadeInFixedTime(stateName, fadeDuration, 0);
     }
 
+    /// <summary>
+    /// Tính toán trọng lực và độ cao mặt đất hoàn toàn bằng code thuần (Không bắt buộc quái có Collider)
+    /// </summary>
     private void ApplyGravity()
     {
-        if (isLeaping || controller == null || !controller.enabled) return;
+        if (isLeaping) return;
 
-        bool grounded = controller.isGrounded;
-        if (!grounded)
+        // Quét tìm mặt bằng Raycast NonAlloc (0 GC, xuyên qua các đối tượng con của quái)
+        Vector3 origin = transform.position + Vector3.up * 1.2f;
+        float rayDist = config != null ? config.groundCheckDistance + 2.5f : 15.0f;
+        LayerMask mask = config != null ? config.groundLayers : (LayerMask)(~0);
+
+        int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_HitBuffer, rayDist, mask, QueryTriggerInteraction.Ignore);
+        RaycastHit closestGroundHit = default;
+        float closestDist = float.MaxValue;
+        bool groundFound = false;
+
+        for (int i = 0; i < count; i++)
         {
-            // Bổ sung kiểm tra Raycast mặt đất từ cấu hình (NonAlloc 0 GC)
-            Vector3 origin = transform.TransformPoint(config.groundCheckOffset);
-            int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_HitBuffer, config.groundCheckDistance, config.groundLayers, QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < count; i++)
+            RaycastHit h = s_HitBuffer[i];
+            if (h.collider != null && h.transform != transform && !h.transform.IsChildOf(transform))
             {
-                RaycastHit h = s_HitBuffer[i];
-                if (h.collider != null && h.transform != transform && !h.transform.IsChildOf(transform))
+                if (h.distance < closestDist)
                 {
-                    grounded = true;
-                    break;
+                    closestDist = h.distance;
+                    closestGroundHit = h;
+                    groundFound = true;
                 }
             }
         }
 
-        if (grounded)
+        float targetOffset = config != null ? config.groundCheckOffset.y : 0.05f;
+
+        if (groundFound)
         {
-            verticalVelocity.y = -2.5f;
+            float groundY = closestGroundHit.point.y + targetOffset;
+            float currentY = transform.position.y;
+
+            if (currentY > groundY + 0.05f)
+            {
+                // Đang ở trên không: Trọng lực kéo xuống có gia tốc rơi tự do
+                float grav = config != null ? config.gravity : 18.0f;
+                verticalVelocity.y += -grav * Time.deltaTime;
+                float deltaY = verticalVelocity.y * Time.deltaTime;
+
+                if (currentY + deltaY <= groundY)
+                {
+                    // Tiếp đất chính xác
+                    verticalVelocity.y = -2.0f;
+                    Vector3 pos = transform.position;
+                    pos.y = groundY;
+                    transform.position = pos;
+                }
+                else
+                {
+                    SafeMove(Vector3.up * deltaY);
+                }
+            }
+            else
+            {
+                // Đang trên mặt đất: Tự động bám theo độ cao địa hình/dốc mượt mà
+                verticalVelocity.y = -2.0f;
+                Vector3 pos = transform.position;
+                pos.y = Mathf.MoveTowards(pos.y, groundY, 15f * Time.deltaTime);
+                transform.position = pos;
+            }
         }
         else
         {
-            verticalVelocity.y += -config.gravity * Time.deltaTime;
+            // Rơi tự do vào khoảng không hoặc ngoài map
+            float grav = config != null ? config.gravity : 18.0f;
+            verticalVelocity.y += -grav * Time.deltaTime;
+            SafeMove(verticalVelocity * Time.deltaTime);
         }
-        SafeMove(verticalVelocity * Time.deltaTime);
+    }
+
+    private static PumpkinGhostAI[] s_AllGhostsCache;
+    private static float s_LastGhostCacheTime = -10f;
+
+    /// <summary>
+    /// Đẩy lùi mềm bằng code giữa các con ma trong Scene để tránh 2 con ma đè dính vào nhau (Không cần Collider)
+    /// </summary>
+    private void ApplyGhostSeparation()
+    {
+        if (Time.time > s_LastGhostCacheTime + 0.8f || s_AllGhostsCache == null)
+        {
+            s_AllGhostsCache = Object.FindObjectsByType<PumpkinGhostAI>();
+            s_LastGhostCacheTime = Time.time;
+        }
+
+        if (s_AllGhostsCache == null || s_AllGhostsCache.Length <= 1) return;
+
+        for (int i = 0; i < s_AllGhostsCache.Length; i++)
+        {
+            PumpkinGhostAI other = s_AllGhostsCache[i];
+            if (other == null || other == this || !other.gameObject.activeInHierarchy) continue;
+
+            Vector3 diff = transform.position - other.transform.position;
+            diff.y = 0f;
+            float dist = diff.magnitude;
+            float minDist = 1.35f;
+
+            if (dist < minDist && dist > 0.001f)
+            {
+                Vector3 pushDir = diff / dist;
+                float strength = (1f - (dist / minDist)) * 3.5f;
+                SafeMove(pushDir * strength * Time.deltaTime);
+            }
+        }
     }
 
     private void CheckAbyssProtection()

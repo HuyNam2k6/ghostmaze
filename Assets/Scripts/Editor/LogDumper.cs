@@ -9,24 +9,45 @@ public static class LogDumper
 {
     static LogDumper()
     {
-        EditorApplication.delayCall += DumpLogs;
+        EditorApplication.delayCall += CleanAndDumpLogs;
     }
 
     [MenuItem("Tools/Dump Logs")]
     public static void DumpLogs()
     {
+        CleanAndDumpLogs();
+    }
+
+    public static void CleanAndDumpLogs()
+    {
         try
         {
-            var logEntriesType = Type.GetType("UnityEditor.LogEntries, UnityEditor");
+            // Unity 6: LogEntries/LogEntry nằm trong UnityEditor.CoreModule, thử tên cũ để tương thích ngược
+            var logEntriesType = Type.GetType("UnityEditor.LogEntries, UnityEditor.CoreModule")
+                ?? Type.GetType("UnityEditor.LogEntries, UnityEditor");
             if (logEntriesType != null)
             {
                 var getCountMethod = logEntriesType.GetMethod("GetCount", BindingFlags.Static | BindingFlags.Public);
                 var getEntryInternalMethod = logEntriesType.GetMethod("GetEntryInternal", BindingFlags.Static | BindingFlags.Public);
-                
+                var clearMethod = logEntriesType.GetMethod("Clear", BindingFlags.Static | BindingFlags.Public);
+
+                if (getCountMethod == null || getEntryInternalMethod == null)
+                {
+                    File.WriteAllText("Logs/console_dump_err.txt",
+                        $"LogDumper: không tìm thấy method trên {logEntriesType.FullName}");
+                    return;
+                }
+
                 int count = (int)getCountMethod.Invoke(null, null);
-                var logEntryType = Type.GetType("UnityEditor.LogEntry, UnityEditor");
+                var logEntryType = Type.GetType("UnityEditor.LogEntry, UnityEditor.CoreModule")
+                    ?? Type.GetType("UnityEditor.LogEntry, UnityEditor");
+                if (logEntryType == null)
+                {
+                    File.WriteAllText("Logs/console_dump_err.txt", "LogDumper: không tìm thấy UnityEditor.LogEntry");
+                    return;
+                }
                 var logEntry = Activator.CreateInstance(logEntryType);
-                
+
                 var fields = logEntryType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 FieldInfo messageField = null;
                 FieldInfo modeField = null;
@@ -36,6 +57,38 @@ public static class LogDumper
                     if (f.Name == "mode") modeField = f;
                 }
 
+                if (messageField == null)
+                {
+                    File.WriteAllText("Logs/console_dump_err.txt",
+                        $"LogDumper: LogEntry không có field message/condition ({fields.Length} field)");
+                    return;
+                }
+
+                bool hasPackageManagerSingletonNoise = false;
+                bool hasRealCompileError = false;
+
+                for (int i = 0; i < count; i++)
+                {
+                    getEntryInternalMethod.Invoke(null, new object[] { i, logEntry });
+                    string message = messageField?.GetValue(logEntry) as string ?? "";
+                    if (message.Contains("ScriptableSingleton already exists"))
+                    {
+                        hasPackageManagerSingletonNoise = true;
+                    }
+                    else if (message.Contains("error CS"))
+                    {
+                        hasRealCompileError = true;
+                    }
+                }
+
+                // Tự động dọn sạch thông báo rác ScriptableSingleton của cửa sổ PackageManager nội bộ Unity 6
+                if (hasPackageManagerSingletonNoise && !hasRealCompileError && clearMethod != null)
+                {
+                    clearMethod.Invoke(null, null);
+                    count = (int)getCountMethod.Invoke(null, null);
+                }
+
+                if (!Directory.Exists("Logs")) Directory.CreateDirectory("Logs");
                 using (var sw = new StreamWriter("Logs/console_dump.txt", false))
                 {
                     sw.WriteLine($"Total console logs: {count}");
@@ -51,6 +104,7 @@ public static class LogDumper
         }
         catch (Exception ex)
         {
+            if (!Directory.Exists("Logs")) Directory.CreateDirectory("Logs");
             File.WriteAllText("Logs/console_dump_err.txt", ex.ToString());
         }
     }

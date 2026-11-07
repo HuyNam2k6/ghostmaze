@@ -60,6 +60,44 @@ public class ThirdPersonCamera : MonoBehaviour
     [Tooltip("Layer tính là chướng ngại vật cản camera")]
     public LayerMask obstacleLayer = ~0; // Mặc định kiểm tra mọi layer ngoại trừ chính Player
 
+    [Header("Góc Nhìn Thứ Nhất (First Person) - Nhấn R để chuyển")]
+    [Tooltip("Phím chuyển đổi giữa góc nhìn thứ ba và thứ nhất")]
+    public KeyCode toggleViewKey = KeyCode.R;
+
+    [Tooltip("Bắt đầu game ở góc nhìn thứ nhất")]
+    public bool startInFirstPerson = false;
+
+    [Tooltip("Vị trí mắt so với chân nhân vật (m, theo hướng nhân vật: x = phải, y = cao, z = phía trước)")]
+    public Vector3 firstPersonEyeOffset = new Vector3(0f, 1.6f, 0.12f);
+
+    [Tooltip("Góc ngước tối thiểu ở góc nhìn thứ nhất")]
+    public float firstPersonMinPitch = -80f;
+
+    [Tooltip("Góc cúi tối đa ở góc nhìn thứ nhất")]
+    public float firstPersonMaxPitch = 80f;
+
+    [Tooltip("Tốc độ chuyển cảnh mượt giữa 2 góc nhìn (càng lớn càng nhanh)")]
+    public float viewTransitionSpeed = 10f;
+
+    [Tooltip("Ẩn mô hình nhân vật ở góc nhìn thứ nhất (vẫn giữ bóng đổ) để không bị che camera")]
+    public bool hideBodyInFirstPerson = true;
+
+    [Tooltip("Near Clip Plane khi ở góc nhìn thứ nhất (nhỏ để không bị cắt tay/vật gần)")]
+    public float firstPersonNearClip = 0.03f;
+
+    /// <summary>
+    /// Đang ở góc nhìn thứ nhất hay không (các script khác có thể đọc, ví dụ PlayerController xoay theo camera)
+    /// </summary>
+    public static bool IsFirstPerson { get; private set; }
+
+    private float viewBlend;                  // 0 = thứ ba, 1 = thứ nhất
+    private Renderer[] cachedBodyRenderers;   // Cache 1 lần, không cấp phát mỗi frame
+    private UnityEngine.Rendering.ShadowCastingMode[] cachedShadowModes;
+    private bool bodyHidden;
+    private Camera cachedCamera;
+    private float defaultNearClip;
+    private Transform rendererCacheOwner;
+
     /// <summary>
     /// Biến trạng thái toàn cục báo hiệu bảng UI / Cài đặt đang mở để giải phóng chuột và dừng xoay camera
     /// </summary>
@@ -91,13 +129,82 @@ public class ThirdPersonCamera : MonoBehaviour
         // Tự động ẩn và khóa con trỏ chuột vào giữa màn hình
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        cachedCamera = GetComponent<Camera>();
+        if (cachedCamera != null) defaultNearClip = cachedCamera.nearClipPlane;
+
+        IsFirstPerson = startInFirstPerson;
+        viewBlend = IsFirstPerson ? 1f : 0f;
+    }
+
+    private void OnDisable()
+    {
+        // Trả lại hiển thị nhân vật nếu camera bị tắt khi đang ở góc nhìn thứ nhất
+        SetBodyHidden(false);
+        IsFirstPerson = false;
     }
 
     private void Update()
     {
         // Nhấn phím Escape để mở/khóa con trỏ chuột
         HandleCursorLockToggle();
+        HandleViewToggle();
     }
+
+    /// <summary>
+    /// Nhấn R (mặc định) để chuyển qua lại giữa góc nhìn thứ ba và thứ nhất
+    /// </summary>
+    private void HandleViewToggle()
+    {
+        if (isUIPanelOpen) return; // Đang gõ chat / mở cài đặt thì không đổi góc nhìn
+
+        if (ReadToggleViewPressed())
+        {
+            IsFirstPerson = !IsFirstPerson;
+            if (!IsFirstPerson)
+            {
+                currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
+            }
+        }
+    }
+
+    private bool ReadToggleViewPressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null)
+        {
+            Key key = KeyCodeToKey(toggleViewKey);
+            if (key != Key.None && kb[key].wasPressedThisFrame) return true;
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(toggleViewKey)) return true;
+#endif
+        return false;
+    }
+
+#if ENABLE_INPUT_SYSTEM
+    private static Key KeyCodeToKey(KeyCode code)
+    {
+        if (code >= KeyCode.A && code <= KeyCode.Z) return Key.A + (code - KeyCode.A);
+        if (code >= KeyCode.Alpha0 && code <= KeyCode.Alpha9)
+        {
+            // Key.Digit1..Digit0 trong Input System
+            return code == KeyCode.Alpha0 ? Key.Digit0 : Key.Digit1 + (code - KeyCode.Alpha1);
+        }
+        if (code >= KeyCode.F1 && code <= KeyCode.F12) return Key.F1 + (code - KeyCode.F1);
+        switch (code)
+        {
+            case KeyCode.Tab: return Key.Tab;
+            case KeyCode.BackQuote: return Key.Backquote;
+            case KeyCode.CapsLock: return Key.CapsLock;
+            case KeyCode.LeftAlt: return Key.LeftAlt;
+            case KeyCode.LeftControl: return Key.LeftCtrl;
+            default: return Key.None;
+        }
+    }
+#endif
 
     private void LateUpdate()
     {
@@ -178,12 +285,15 @@ public class ThirdPersonCamera : MonoBehaviour
         currentYaw += mouseDelta.x * effectiveSensX * 0.1f;
         float pitchDelta = mouseDelta.y * effectiveSensY * 0.1f;
         currentPitch += invertY ? pitchDelta : -pitchDelta;
-        currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
+        if (IsFirstPerson)
+            currentPitch = Mathf.Clamp(currentPitch, firstPersonMinPitch, firstPersonMaxPitch);
+        else
+            currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
     }
 
     private void HandleCameraZoom()
     {
-        if (isUIPanelOpen) return;
+        if (isUIPanelOpen || IsFirstPerson) return;
 
         float scroll = ReadMouseScroll();
         if (Mathf.Abs(scroll) > 0.01f)
@@ -231,8 +341,87 @@ public class ThirdPersonCamera : MonoBehaviour
         currentDistance = Mathf.Lerp(currentDistance, targetDist, Time.deltaTime * smoothSpeed);
         Vector3 finalPos = focusPoint - (rotation * Vector3.forward * currentDistance);
 
+        // ===== Pha trộn mượt sang góc nhìn thứ nhất =====
+        float targetBlend = IsFirstPerson ? 1f : 0f;
+        viewBlend = Mathf.MoveTowards(viewBlend, targetBlend, Time.deltaTime * viewTransitionSpeed * 0.5f);
+        float smoothBlend = viewBlend * viewBlend * (3f - 2f * viewBlend); // SmoothStep
+
+        if (smoothBlend > 0.0001f)
+        {
+            // Trong góc nhìn thứ nhất: nhân vật luôn quay theo hướng camera (yaw)
+            if (IsFirstPerson)
+            {
+                target.rotation = Quaternion.Euler(0f, currentYaw, 0f);
+            }
+
+            Quaternion yawRot = Quaternion.Euler(0f, currentYaw, 0f);
+            Vector3 eyePos = target.position + yawRot * firstPersonEyeOffset;
+            finalPos = Vector3.LerpUnclamped(finalPos, eyePos, smoothBlend);
+        }
+
+        // Ẩn thân nhân vật khi camera đã gần như vào đầu (tránh nhìn xuyên mô hình)
+        SetBodyHidden(hideBodyInFirstPerson && smoothBlend > 0.6f);
+
+        if (cachedCamera != null)
+        {
+            cachedCamera.nearClipPlane = smoothBlend > 0.6f ? firstPersonNearClip : defaultNearClip;
+        }
+
         transform.position = finalPos;
         transform.rotation = rotation;
+    }
+
+    /// <summary>
+    /// Ẩn/hiện mô hình nhân vật bằng ShadowCastingMode.ShadowsOnly (vẫn giữ bóng đổ dưới chân)
+    /// </summary>
+    private void SetBodyHidden(bool hidden)
+    {
+        if (hidden == bodyHidden && rendererCacheOwner == target) return;
+
+        // Cache lại danh sách renderer khi đổi target (chỉ cấp phát 1 lần)
+        if (rendererCacheOwner != target)
+        {
+            if (bodyHidden) RestoreBodyRenderers();
+            rendererCacheOwner = target;
+            cachedBodyRenderers = target != null ? target.GetComponentsInChildren<Renderer>(true) : null;
+            cachedShadowModes = cachedBodyRenderers != null
+                ? new UnityEngine.Rendering.ShadowCastingMode[cachedBodyRenderers.Length]
+                : null;
+            bodyHidden = false;
+        }
+
+        if (cachedBodyRenderers == null) return;
+
+        if (hidden && !bodyHidden)
+        {
+            for (int i = 0; i < cachedBodyRenderers.Length; i++)
+            {
+                var r = cachedBodyRenderers[i];
+                if (r == null) continue;
+                // Bỏ qua hiệu ứng phép thuật / particle để vẫn nhìn thấy khi bắn
+                if (r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+                cachedShadowModes[i] = r.shadowCastingMode;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
+            }
+            bodyHidden = true;
+        }
+        else if (!hidden && bodyHidden)
+        {
+            RestoreBodyRenderers();
+        }
+    }
+
+    private void RestoreBodyRenderers()
+    {
+        if (cachedBodyRenderers == null) { bodyHidden = false; return; }
+        for (int i = 0; i < cachedBodyRenderers.Length; i++)
+        {
+            var r = cachedBodyRenderers[i];
+            if (r == null) continue;
+            if (r is ParticleSystemRenderer || r is TrailRenderer || r is LineRenderer) continue;
+            r.shadowCastingMode = cachedShadowModes[i];
+        }
+        bodyHidden = false;
     }
 
     private Vector2 ReadMouseDelta()
