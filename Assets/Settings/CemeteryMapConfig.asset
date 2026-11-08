@@ -41,6 +41,18 @@ MonoBehaviour:
     lanternIntensity: 5
     lanternRange: 8
     ritualFireIntensity: 14
+  humanAtmosphere:
+    enableFog: 1
+    fogColor: {r: 0.006, g: 0.010, b: 0.020, a: 1}
+    fogDensity: 0.010
+    ambientSkyColor: {r: 0.010, g: 0.014, b: 0.026, a: 1}
+    ambientEquatorColor: {r: 0.005, g: 0.007, b: 0.015, a: 1}
+    ambientGroundColor: {r: 0.002, g: 0.002, b: 0.005, a: 1}
+    moonlightColor: {r: 0.32, g: 0.44, b: 0.65, a: 1}
+    moonlightIntensity: 0.16
+    playerLanternColor: {r: 1, g: 0.68, b: 0.28, a: 1}
+    playerLanternIntensity: 3.2
+    playerLanternRange: 8.5
   layout:
     centralPlazaDiameter: 32
     cathedralIslandY: 8.5

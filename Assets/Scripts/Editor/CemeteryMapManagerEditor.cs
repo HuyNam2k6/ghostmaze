@@ -32,6 +32,20 @@ public class CemeteryMapManagerEditor : Editor
             manager.ApplyAtmosphereSettings();
         }
 
+        // Nút 2a: Test Bên Người (Tối kịch tính)
+        GUI.backgroundColor = new Color(0.25f, 0.35f, 0.55f);
+        if (GUILayout.Button("🌑 Bật Chế Độ Người: Tối Kịch Tính (Human Dark)", GUILayout.Height(28)))
+        {
+            manager.ContextSwitchToHuman();
+        }
+
+        // Nút 2b: Test Bên Ma (Sáng rõ)
+        GUI.backgroundColor = new Color(1.0f, 0.6f, 0.2f);
+        if (GUILayout.Button("🌕 Bật Chế Độ Ma: Sáng Rõ Toàn Map (Ghost Clear)", GUILayout.Height(28)))
+        {
+            manager.ContextSwitchToGhost();
+        }
+
         // Nút 3: Dựng lại toàn bộ map theo cấu hình mới
         GUI.backgroundColor = new Color(0.95f, 0.45f, 0.45f);
         if (GUILayout.Button("🔄 Dựng Lại Toàn Bộ Map Theo Config", GUILayout.Height(34)))

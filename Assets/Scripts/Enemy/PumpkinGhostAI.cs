@@ -1,9 +1,18 @@
 using System.Collections;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 // Không bắt buộc CharacterController hay bất kỳ Collider nào: Trọng lực và di chuyển được tính hoàn toàn bằng code thuần
 public class PumpkinGhostAI : MonoBehaviour
 {
+    public static readonly System.Collections.Generic.List<PumpkinGhostAI> ActiveGhosts = new System.Collections.Generic.List<PumpkinGhostAI>();
+
+    [Header("0. Điều Khiển Bởi Người Chơi (Player Controlled)")]
+    [Tooltip("Khi bật, con ma bí ngô sẽ do người chơi trực tiếp điều khiển qua WASD, Chuột trái (Cào), Space (Vồ), Chuột phải/E (Ẩn thân)")]
+    public bool isPlayerControlled = false;
+
     public enum GhostState
     {
         Patrol,         // Đi tuần tra quanh khu vực (gaminWALK / gaminIDLE)
@@ -62,11 +71,14 @@ public class PumpkinGhostAI : MonoBehaviour
     private float lastAttackTime = -10f;
     private float lastLeapTime = -5f;
     private float lastHideTime = -5f;
+    private float playerJumpBufferTimer = 0f;
 
     // Vật lý & Di chuyển
     private Vector3 verticalVelocity = Vector3.zero;
     private float currentMoveSpeed = 0f;
     private bool isLeaping = false;
+    private bool isGrounded = true;
+    public bool IsGrounded => isGrounded;
 
     // Trạng thái bị người chơi giữ chân (Block) hoặc choáng váng (Rising Wave)
     public bool isFrozen { get; private set; } = false;
@@ -100,11 +112,61 @@ public class PumpkinGhostAI : MonoBehaviour
         CacheBodyRenderers();
         spawnPosition = transform.position;
         ApplyColliderSettingsFromConfig();
+        EnsureAnimationEventForwarder();
+        AutoFindClawHand();
+    }
+
+    [Tooltip("Bàn tay/móng vuốt tấn công cào (tự động nhận diện IKhand.L theo khung xương)")]
+    [SerializeField] private Transform clawHandTransform;
+
+    private void AutoFindClawHand()
+    {
+        if (clawHandTransform == null)
+        {
+            clawHandTransform = FindBoneRecursive(transform, "IKhand.L")
+                ?? FindBoneRecursive(transform, "IKhand_L")
+                ?? FindBoneRecursive(transform, "hand.L")
+                ?? FindBoneRecursive(transform, "IKhand.R");
+            if (clawHandTransform != null)
+            {
+                Debug.Log($"<color=#FFA502>[PumpkinGhostAI] Đã tự động nhận diện bàn tay cào Frame 9: '{clawHandTransform.name}' tại {clawHandTransform.position}</color>");
+            }
+        }
+    }
+
+    private static Transform FindBoneRecursive(Transform root, string boneName)
+    {
+        if (root == null) return null;
+        if (string.Equals(root.name, boneName, System.StringComparison.OrdinalIgnoreCase)) return root;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform found = FindBoneRecursive(root.GetChild(i), boneName);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void EnsureAnimationEventForwarder()
+    {
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (animator != null && animator.gameObject != gameObject)
+        {
+            if (animator.GetComponent<GhostAnimationEventForwarder>() == null)
+            {
+                animator.gameObject.AddComponent<GhostAnimationEventForwarder>();
+            }
+        }
     }
 
     private void OnEnable()
     {
+        if (!ActiveGhosts.Contains(this)) ActiveGhosts.Add(this);
         ApplyColliderSettingsFromConfig();
+    }
+
+    private void OnDisable()
+    {
+        ActiveGhosts.Remove(this);
     }
 
     private void OnDestroy()
@@ -211,6 +273,20 @@ public class PumpkinGhostAI : MonoBehaviour
     {
         CheckAbyssProtection();
         ApplyGravity();
+
+        // Chế độ người chơi chiếm hữu điều khiển con ma bí ngô (sau khi người chơi tử trận)
+        if (isPlayerControlled)
+        {
+            UpdatePlayerControlled();
+            return;
+        }
+
+        // Chờ phòng đủ người chơi (Lobby) -> Quái ma đứng yên canh gác, chưa truy đuổi tấn công
+        if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.requireFullRoomToStart && !PhotonMultiplayerChatVoice.IsGameStarted)
+        {
+            return;
+        }
+
         ApplyGhostSeparation();
 
         // Nếu đang bị người chơi giữ chân (Block 3s) hoặc choáng đòn (RisingWave 5s)
@@ -436,13 +512,82 @@ public class PumpkinGhostAI : MonoBehaviour
     }
 
     // =========================================================================
-    // 4. ĐÒN CẬN CHIẾN (ATTACK)
+    // 4. ĐÒN CẬN CHIẾN (ATTACK) & SỰ KIỆN GÂY SÁT THƯƠNG TẠI FRAME 9
     // =========================================================================
+
+    private bool hasDealtDamageThisAttack = false;
+
+    /// <summary>
+    /// Hàm gọi trực tiếp từ Animation Event ở Frame 9 của clip tấn công (gaminArmature|gaminATTACK)
+    /// </summary>
+    public void OnAttackHit()
+    {
+        ExecuteAttackDamage();
+    }
+
+    public void OnAttackDamage()
+    {
+        ExecuteAttackDamage();
+    }
+
+    /// <summary>
+    /// Xử lý gây sát thương tại Frame 9 của đòn tấn công
+    /// </summary>
+    public void ExecuteAttackDamage()
+    {
+        if (hasDealtDamageThisAttack) return;
+        hasDealtDamageThisAttack = true;
+
+        if (targetPlayer == null)
+        {
+            FindPlayerTarget();
+        }
+
+        if (clawHandTransform == null) AutoFindClawHand();
+
+        if (targetPlayer != null)
+        {
+            RotateTowardsPosition(targetPlayer.position);
+
+            bool hitSuccess = false;
+            if (config != null && config.useRaycastAttack)
+            {
+                hitSuccess = ExecuteRaycastAttackHitCheck();
+            }
+
+            // Fallback cự ly cận chiến: Tính từ móng vuốt IKhand.L tới người chơi
+            if (!hitSuccess)
+            {
+                Vector3 originPos = clawHandTransform != null ? clawHandTransform.position : transform.position;
+                float dist = Vector3.Distance(originPos, targetPlayer.position);
+                float maxReach = config != null ? Mathf.Max(config.attackRaycastDistance, config.attackRange * 1.6f) : 2.5f;
+                if (dist <= maxReach)
+                {
+                    PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
+                    if (pHealth == null) pHealth = targetPlayer.GetComponentInChildren<PlayerHealth>();
+                    if (pHealth == null) pHealth = PlayerHealth.Instance;
+                    if (pHealth != null)
+                    {
+                        float dmg = config != null ? config.attackDamage : 20.0f;
+                        pHealth.TakeDamage(dmg, originPos);
+                        hitSuccess = true;
+                    }
+                }
+            }
+
+            if (hitSuccess)
+            {
+                string handName = clawHandTransform != null ? clawHandTransform.name : "IKhand.L";
+                Debug.Log($"<color=#FF4757>[PumpkinGhostAI - Frame 9 Event] Cào từ bàn tay '{handName}' trúng người chơi tại Frame 9! Gây sát thương (-{(config != null ? config.attackDamage : 20f):F0} HP)!</color>");
+            }
+        }
+    }
 
     private IEnumerator RoutineAttack()
     {
         currentState = GhostState.Attack;
         lastAttackTime = Time.time;
+        hasDealtDamageThisAttack = false;
         currentMoveSpeed = 0f;
         SetAnimatorSpeed(0f);
 
@@ -453,47 +598,32 @@ public class PumpkinGhostAI : MonoBehaviour
 
         if (animator != null && !string.IsNullOrEmpty(config.attackTriggerName))
         {
-            animator.SetTrigger(config.attackTriggerName);
+            animator.ResetTrigger(config.attackTriggerName);
         }
-        PlayAnimState("Attack", 0.1f, true);
+        PlayAnimState("Attack", 0.05f, true);
 
         if (audioSource != null && attackSwipeClip != null)
         {
             audioSource.PlayOneShot(attackSwipeClip);
         }
 
-        yield return new WaitForSeconds(config.attackHitDelay);
+        // Chờ đến Frame 9 (khoảng 0.375s ở 24 fps). Nếu Animation Event tại Frame 9 đã gọi OnAttackHit thì không gây sát thương đúp
+        float hitDelay = config != null ? config.attackHitDelay : 0.375f;
+        yield return new WaitForSeconds(hitDelay);
 
-        if (targetPlayer != null)
+        if (!hasDealtDamageThisAttack)
         {
-            RotateTowardsPosition(targetPlayer.position);
-
-            bool hitSuccess = false;
-            if (config.useRaycastAttack)
-            {
-                hitSuccess = ExecuteRaycastAttackHitCheck();
-            }
-
-            // Fallback cự ly cận chiến: Nếu Raycast trượt do góc quét nhưng người chơi đang ở ngay trong tầm cào
-            if (!hitSuccess)
-            {
-                float dist = Vector3.Distance(transform.position, targetPlayer.position);
-                if (dist <= config.attackRange * 1.5f)
-                {
-                    PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
-                    if (pHealth == null) pHealth = targetPlayer.GetComponentInChildren<PlayerHealth>();
-                    if (pHealth == null) pHealth = PlayerHealth.Instance;
-                    if (pHealth != null)
-                    {
-                        pHealth.TakeDamage(config.attackDamage, transform.position);
-                    }
-                }
-            }
+            ExecuteAttackDamage();
         }
 
-        float remainingAnimTime = Mathf.Max(0.05f, config.attackTotalDuration - config.attackHitDelay);
+        float totalDuration = config != null ? config.attackTotalDuration : 0.50f;
+        float remainingAnimTime = Mathf.Max(0.05f, totalDuration - hitDelay);
         yield return new WaitForSeconds(remainingAnimTime);
 
+        if (animator != null && !string.IsNullOrEmpty(config.attackTriggerName))
+        {
+            animator.ResetTrigger(config.attackTriggerName);
+        }
         currentState = GhostState.Chase;
         activeActionRoutine = null;
     }
@@ -516,7 +646,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
         if (animator != null && !string.IsNullOrEmpty(config.jumpTriggerName))
         {
-            animator.SetTrigger(config.jumpTriggerName);
+            animator.ResetTrigger(config.jumpTriggerName);
         }
         PlayAnimState("Jump", 0.1f, true);
 
@@ -534,17 +664,22 @@ public class PumpkinGhostAI : MonoBehaviour
         }
 
         isLeaping = true;
+        isGrounded = false;
         float elapsed = 0f;
         float duration = config.leapDuration;
         bool hitPlayer = false;
+        float prevArc = 0f;
 
         while (elapsed < duration)
         {
-            float verticalArc = Mathf.Sin((elapsed / duration) * Mathf.PI) * config.leapArcHeight;
-            Vector3 moveStep = (leapDir * config.leapSpeed + Vector3.up * verticalArc) * Time.deltaTime;
-            SafeMove(moveStep);
-
             elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float currentArc = Mathf.Sin(t * Mathf.PI) * config.leapArcHeight;
+            float deltaArc = currentArc - prevArc;
+            prevArc = currentArc;
+
+            Vector3 moveStep = (leapDir * config.leapSpeed) * Time.deltaTime + Vector3.up * deltaArc;
+            SafeMove(moveStep);
 
             if (!hitPlayer && targetPlayer != null)
             {
@@ -794,8 +929,9 @@ public class PumpkinGhostAI : MonoBehaviour
     private bool ExecuteRaycastAttackHitCheck()
     {
         if (targetPlayer == null) return false;
+        if (clawHandTransform == null) AutoFindClawHand();
 
-        Vector3 eyePos = transform.TransformPoint(config.visionEyeOffset);
+        Vector3 eyePos = clawHandTransform != null ? clawHandTransform.position : transform.TransformPoint(config.visionEyeOffset);
         Vector3 targetPoint = GetPlayerWorldTargetPoint();
         Vector3 swipeDir = (targetPoint - eyePos);
         float distanceToTarget = swipeDir.magnitude;
@@ -1032,12 +1168,23 @@ public class PumpkinGhostAI : MonoBehaviour
         }
     }
 
-    private void PlayAnimState(string stateName, float fadeDuration = 0.15f, bool forceReplay = false)
+    public void PlayAnimState(string stateName, float fadeDuration = 0.15f, bool forceReplay = false)
     {
         if (animator == null) return;
         if (!forceReplay && currentAnimState == stateName) return;
 
         currentAnimState = stateName;
+
+        // Reset các triggers trong Animator để tránh tình trạng AnyState lưu đệm kích hoạt đòn đánh/hành động lần 2
+        if (config != null)
+        {
+            if (!string.IsNullOrEmpty(config.attackTriggerName)) animator.ResetTrigger(config.attackTriggerName);
+            if (!string.IsNullOrEmpty(config.jumpTriggerName)) animator.ResetTrigger(config.jumpTriggerName);
+            if (!string.IsNullOrEmpty(config.stunTriggerName)) animator.ResetTrigger(config.stunTriggerName);
+            if (!string.IsNullOrEmpty(config.hideTriggerName)) animator.ResetTrigger(config.hideTriggerName);
+            if (!string.IsNullOrEmpty(config.unHideTriggerName)) animator.ResetTrigger(config.unHideTriggerName);
+        }
+
         animator.CrossFadeInFixedTime(stateName, fadeDuration, 0);
     }
 
@@ -1081,6 +1228,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
             if (currentY > groundY + 0.05f)
             {
+                isGrounded = false;
                 // Đang ở trên không: Trọng lực kéo xuống có gia tốc rơi tự do
                 float grav = config != null ? config.gravity : 18.0f;
                 verticalVelocity.y += -grav * Time.deltaTime;
@@ -1089,6 +1237,7 @@ public class PumpkinGhostAI : MonoBehaviour
                 if (currentY + deltaY <= groundY)
                 {
                     // Tiếp đất chính xác
+                    isGrounded = true;
                     verticalVelocity.y = -2.0f;
                     Vector3 pos = transform.position;
                     pos.y = groundY;
@@ -1102,6 +1251,7 @@ public class PumpkinGhostAI : MonoBehaviour
             else
             {
                 // Đang trên mặt đất: Tự động bám theo độ cao địa hình/dốc mượt mà
+                isGrounded = true;
                 verticalVelocity.y = -2.0f;
                 Vector3 pos = transform.position;
                 pos.y = Mathf.MoveTowards(pos.y, groundY, 15f * Time.deltaTime);
@@ -1110,6 +1260,7 @@ public class PumpkinGhostAI : MonoBehaviour
         }
         else
         {
+            isGrounded = false;
             // Rơi tự do vào khoảng không hoặc ngoài map
             float grav = config != null ? config.gravity : 18.0f;
             verticalVelocity.y += -grav * Time.deltaTime;
@@ -1219,7 +1370,7 @@ public class PumpkinGhostAI : MonoBehaviour
         }
     }
 
-    private void SetEyeColor(Color c)
+    public void SetEyeColor(Color c)
     {
         if (leftEyeLight != null) leftEyeLight.color = c;
         if (rightEyeLight != null) rightEyeLight.color = c;
@@ -1427,6 +1578,413 @@ public class PumpkinGhostAI : MonoBehaviour
     }
 
     // =========================================================================
+    // 9. CHẾ ĐỘ ĐIỀU KHIỂN BỞI NGƯỜI CHƠI (PLAYER-CONTROLLED GHOST)
+    // =========================================================================
+
+    /// <summary>
+    /// Chuyển Ma Bí Ngô sang chế độ điều khiển trực tiếp bởi người chơi (sau khi nhân vật người tử trận)
+    /// </summary>
+    public void TakeOverAsPlayer()
+    {
+        isPlayerControlled = true;
+
+        if (freezeRoutine != null)
+        {
+            StopCoroutine(freezeRoutine);
+            freezeRoutine = null;
+        }
+        isFrozen = false;
+        SetFreezeVFX(false);
+
+        if (activeActionRoutine != null)
+        {
+            StopCoroutine(activeActionRoutine);
+            activeActionRoutine = null;
+        }
+
+        isLeaping = false;
+        SetGhostBodyVisible(true);
+
+        // Mắt sáng rực màu cam bí ngô linh hồn uy lực
+        SetEyeColor(new Color(1f, 0.45f, 0.05f));
+        SetEyeIntensity(config != null ? config.aggroEyeIntensity * 1.25f : 3.5f);
+
+        currentMoveSpeed = 0f;
+        SetAnimatorSpeed(0f);
+        PlayAnimState("Idle", 0.2f);
+
+        Debug.Log("<color=#FF9F43>[PumpkinGhostAI] LINH HỒN ĐÃ CHIẾM HỮU MA BÍ NGÔ!\nNgười chơi đã chuyển sang điều khiển Ma Bí Ngô!\n[WASD]: Di chuyển  |  [Chuột trái]: Cào xé  |  [Space]: Nhảy vồ  |  [Chuột phải / E]: Ẩn thân bóng đêm</color>");
+    }
+
+    private void UpdatePlayerControlled()
+    {
+        // Đệm phím nhảy (Input Buffer): Bắt phím Space ngay cả khi đang bay trên không để nhảy tiếp lập tức khi vừa tiếp đất
+        if (ReadPlayerLeapInputDown() || ReadPlayerLeapInputHold())
+        {
+            playerJumpBufferTimer = 0.25f;
+        }
+        else if (playerJumpBufferTimer > 0f)
+        {
+            playerJumpBufferTimer -= Time.deltaTime;
+        }
+
+        // Khi đang thực hiện chiêu thức đặc biệt (Vồ, cào, ẩn thân), để coroutine tự quản lý di chuyển
+        if (activeActionRoutine != null)
+        {
+            return;
+        }
+
+        Vector2 input = ReadPlayerMoveInput();
+        bool isSprinting = ReadPlayerSprintInput();
+
+        Transform cam = Camera.main != null ? Camera.main.transform : null;
+        Vector3 moveDirection = Vector3.zero;
+
+        if (input.sqrMagnitude > 0.01f)
+        {
+            if (cam != null)
+            {
+                Vector3 camForward = cam.forward;
+                camForward.y = 0f;
+                camForward.Normalize();
+
+                Vector3 camRight = cam.right;
+                camRight.y = 0f;
+                camRight.Normalize();
+
+                moveDirection = (camForward * input.y + camRight * input.x).normalized;
+            }
+            else
+            {
+                moveDirection = new Vector3(input.x, 0f, input.y).normalized;
+            }
+
+            // Xoay thân ma theo hướng di chuyển mượt mà
+            RotateTowardsDirection(moveDirection);
+
+            float baseSpeed = config != null ? config.chaseSpeed : 5.5f;
+            float targetSpeed = isSprinting ? baseSpeed * 1.35f : baseSpeed;
+
+            currentMoveSpeed = Mathf.MoveTowards(currentMoveSpeed, targetSpeed, (config != null ? config.acceleration : 14f) * Time.deltaTime);
+            SafeMove(moveDirection * (currentMoveSpeed * Time.deltaTime));
+
+            SetAnimatorSpeed(currentMoveSpeed);
+            PlayAnimState("Run", 0.15f);
+        }
+        else
+        {
+            currentMoveSpeed = Mathf.MoveTowards(currentMoveSpeed, 0f, (config != null ? config.acceleration : 14f) * 1.5f * Time.deltaTime);
+            SetAnimatorSpeed(0f);
+            PlayAnimState("Idle", 0.15f);
+        }
+
+        // Kỹ năng: Chuột trái = Cào xé (Attack) - Cooldown 0.25s theo yêu cầu
+        float playerAttackCooldown = 0.25f;
+        bool wantsToAttack = ReadPlayerAttackInputDown() || ReadPlayerAttackInputHold();
+        if (wantsToAttack && Time.time >= lastAttackTime + playerAttackCooldown)
+        {
+            StartAction(RoutinePlayerControlledAttack());
+            return;
+        }
+
+        // Kỹ năng: Phím Space = Nhảy vồ
+        // BẮT BUỘC: Khi va chạm xuống đất (isGrounded) mới được nhảy tiếp, không cho nhảy trên không để tránh bay lên trời!
+        bool wantsToLeap = ReadPlayerLeapInputDown() || ReadPlayerLeapInputHold() || playerJumpBufferTimer > 0f;
+        if (wantsToLeap && isGrounded && !isLeaping && Time.time >= lastLeapTime + 0.1f)
+        {
+            playerJumpBufferTimer = 0f;
+            StartAction(RoutinePlayerControlledLeap(moveDirection));
+            return;
+        }
+
+        // Kỹ năng: Chuột phải hoặc E = Ẩn thân bóng đêm (Vanish)
+        if (ReadPlayerVanishInputDown() && Time.time >= lastHideTime + (config != null ? config.hideCooldown : 3.5f))
+        {
+            StartAction(RoutinePlayerControlledVanish());
+            return;
+        }
+    }
+
+    private IEnumerator RoutinePlayerControlledAttack()
+    {
+        lastAttackTime = Time.time;
+        hasDealtDamageThisAttack = false;
+        currentMoveSpeed = 0f;
+        SetAnimatorSpeed(0f);
+
+        if (animator != null)
+        {
+            if (config != null && !string.IsNullOrEmpty(config.attackTriggerName))
+            {
+                animator.ResetTrigger(config.attackTriggerName);
+            }
+            animator.speed = 1.8f; // Đẩy nhanh tốc độ hoạt ảnh để khớp đòn cào 0.25s
+        }
+        PlayAnimState("Attack", 0.04f, true);
+
+        if (audioSource != null && attackSwipeClip != null)
+        {
+            audioSource.PlayOneShot(attackSwipeClip);
+        }
+
+        // Ra đòn trúng đích cực nhanh ở 0.10s
+        yield return new WaitForSeconds(0.10f);
+
+        if (!hasDealtDamageThisAttack)
+        {
+            ExecuteAttackDamage();
+        }
+
+        // Hoàn tất nhịp đánh ở đúng mốc 0.25s theo yêu cầu
+        yield return new WaitForSeconds(0.15f);
+
+        if (animator != null)
+        {
+            animator.speed = 1.0f;
+            if (config != null && !string.IsNullOrEmpty(config.attackTriggerName))
+            {
+                animator.ResetTrigger(config.attackTriggerName);
+            }
+        }
+        PlayAnimState("Idle", 0.08f);
+        activeActionRoutine = null;
+    }
+
+    private IEnumerator RoutinePlayerControlledLeap(Vector3 desiredDir = default)
+    {
+        lastLeapTime = Time.time;
+        currentMoveSpeed = 0f;
+        SetAnimatorSpeed(0f);
+
+        if (animator != null && config != null && !string.IsNullOrEmpty(config.jumpTriggerName))
+        {
+            animator.ResetTrigger(config.jumpTriggerName);
+        }
+        PlayAnimState("Jump", 0.05f, true);
+
+        if (audioSource != null && leapClip != null)
+        {
+            audioSource.PlayOneShot(leapClip);
+        }
+
+        Vector3 leapDir = desiredDir.sqrMagnitude > 0.001f ? desiredDir.normalized : transform.forward;
+        RotateTowardsDirection(leapDir);
+
+        isLeaping = true;
+        isGrounded = false; // Bắt đầu nhảy: rời khỏi mặt đất
+
+        float elapsed = 0f;
+        float duration = config != null ? Mathf.Min(config.leapDuration, 0.52f) : 0.52f;
+        float speed = config != null ? config.leapSpeed : 12f;
+        float arcHeight = config != null ? config.leapArcHeight : 1.8f;
+        float prevArc = 0f;
+
+        while (elapsed < duration)
+        {
+            // Bắt đệm phím Space trong lúc đang ở trên không để khi vừa chạm đất là nhảy tiếp ngay
+            if (ReadPlayerLeapInputDown() || ReadPlayerLeapInputHold())
+            {
+                playerJumpBufferTimer = 0.25f;
+            }
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            // Parabol hoàn hảo: lên cao rồi rơi đúng về độ cao ban đầu (t=0: 0m, t=0.5: +arcHeight, t=1: 0m)
+            float currentArc = Mathf.Sin(t * Mathf.PI) * arcHeight;
+            float deltaArc = currentArc - prevArc;
+            prevArc = currentArc;
+
+            Vector3 moveStep = (leapDir * speed) * Time.deltaTime + Vector3.up * deltaArc;
+            SafeMove(moveStep);
+            yield return null;
+        }
+
+        isLeaping = false;
+
+        // Ép quái sát xuống mặt đất và cập nhật isGrounded
+        ApplyGravity();
+
+        if (animator != null && config != null && !string.IsNullOrEmpty(config.jumpTriggerName))
+        {
+            animator.ResetTrigger(config.jumpTriggerName);
+        }
+        PlayAnimState("Idle", 0.12f);
+        activeActionRoutine = null;
+    }
+
+    private IEnumerator RoutinePlayerControlledVanish()
+    {
+        lastHideTime = Time.time;
+        currentMoveSpeed = 0f;
+        SetAnimatorSpeed(0f);
+
+        if (animator != null && config != null && !string.IsNullOrEmpty(config.hideTriggerName))
+        {
+            animator.SetTrigger(config.hideTriggerName);
+        }
+        PlayAnimState("Hide", 0.15f, true);
+
+        if (audioSource != null && vanishClip != null)
+        {
+            audioSource.PlayOneShot(vanishClip);
+        }
+
+        yield return new WaitForSeconds(0.35f);
+
+        SetEyeIntensity(0f);
+        SetGhostBodyVisible(false);
+
+        float elapsed = 0f;
+        float hideDur = config != null ? Mathf.Min(2.5f, config.hideDuration) : 2.0f;
+        float dashSpeed = (config != null ? config.chaseSpeed : 5.5f) * 1.6f;
+
+        while (elapsed < hideDur)
+        {
+            Vector2 input = ReadPlayerMoveInput();
+            Transform cam = Camera.main != null ? Camera.main.transform : null;
+            Vector3 steerDir = transform.forward;
+            if (cam != null && input.sqrMagnitude > 0.01f)
+            {
+                Vector3 camFwd = cam.forward; camFwd.y = 0f; camFwd.Normalize();
+                Vector3 camRight = cam.right; camRight.y = 0f; camRight.Normalize();
+                steerDir = (camFwd * input.y + camRight * input.x).normalized;
+                RotateTowardsDirection(steerDir);
+            }
+            SafeMove(steerDir * (dashSpeed * Time.deltaTime));
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        SetGhostBodyVisible(true);
+        if (config != null)
+        {
+            SetEyeIntensity(config.aggroEyeIntensity);
+            SetEyeColor(new Color(1f, 0.45f, 0.05f));
+        }
+
+        if (animator != null && config != null && !string.IsNullOrEmpty(config.unHideTriggerName))
+        {
+            animator.SetTrigger(config.unHideTriggerName);
+        }
+        PlayAnimState("Idle", 0.15f, true);
+
+        if (audioSource != null && aggroScreechClip != null)
+        {
+            audioSource.PlayOneShot(aggroScreechClip);
+        }
+
+        yield return new WaitForSeconds(0.3f);
+        activeActionRoutine = null;
+    }
+
+    private Vector2 ReadPlayerMoveInput()
+    {
+        Vector2 input = Vector2.zero;
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null)
+        {
+            if (kb.wKey.isPressed || kb.upArrowKey.isPressed) input.y += 1f;
+            if (kb.sKey.isPressed || kb.downArrowKey.isPressed) input.y -= 1f;
+            if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) input.x -= 1f;
+            if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) input.x += 1f;
+            return input.normalized;
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        input.x = Input.GetAxisRaw("Horizontal");
+        input.y = Input.GetAxisRaw("Vertical");
+        return input.normalized;
+#else
+        return input;
+#endif
+    }
+
+    private bool ReadPlayerSprintInput()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed)) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) return true;
+#endif
+        return false;
+    }
+
+    private bool ReadPlayerAttackInputDown()
+    {
+        if (ThirdPersonCamera.isUIPanelOpen) return false;
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.wasPressedThisFrame) return true;
+        var kb = Keyboard.current;
+        if (kb != null && kb.qKey.wasPressedThisFrame) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Q)) return true;
+#endif
+        return false;
+    }
+
+    private bool ReadPlayerAttackInputHold()
+    {
+        if (ThirdPersonCamera.isUIPanelOpen) return false;
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.isPressed) return true;
+        var kb = Keyboard.current;
+        if (kb != null && kb.qKey.isPressed) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetMouseButton(0) || Input.GetKey(KeyCode.Q)) return true;
+#endif
+        return false;
+    }
+
+    private bool ReadPlayerLeapInputDown()
+    {
+        if (ThirdPersonCamera.isUIPanelOpen) return false;
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null && kb.spaceKey.wasPressedThisFrame) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.Space)) return true;
+#endif
+        return false;
+    }
+
+    private bool ReadPlayerLeapInputHold()
+    {
+        if (ThirdPersonCamera.isUIPanelOpen) return false;
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null && kb.spaceKey.isPressed) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKey(KeyCode.Space)) return true;
+#endif
+        return false;
+    }
+
+    private bool ReadPlayerVanishInputDown()
+    {
+        if (ThirdPersonCamera.isUIPanelOpen) return false;
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
+        var kb = Keyboard.current;
+        if (kb != null && (kb.eKey.wasPressedThisFrame || kb.fKey.wasPressedThisFrame)) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.F)) return true;
+#endif
+        return false;
+    }
+
+    // =========================================================================
     // VẼ GIZMOS TRỰC QUAN TRONG UNITY SCENE VIEW
     // =========================================================================
 
@@ -1479,4 +2037,36 @@ public class PumpkinGhostAI : MonoBehaviour
         }
     }
 }
+
+/// <summary>
+/// Chuyển tiếp các Animation Event từ Animator (trên đối tượng con gamin) lên PumpkinGhostAI ở đối tượng cha.
+/// Giúp bắt chính xác sự kiện gây sát thương (OnAttackHit) tại Frame 9 của hoạt ảnh gaminArmature|gaminATTACK.
+/// </summary>
+public class GhostAnimationEventForwarder : MonoBehaviour
+{
+    private PumpkinGhostAI ghostAI;
+
+    private void Awake()
+    {
+        ghostAI = GetComponentInParent<PumpkinGhostAI>();
+    }
+
+    /// <summary>
+    /// Bắt sự kiện Animation Event tại Frame 9 trên clip gaminArmature|gaminATTACK
+    /// </summary>
+    public void OnAttackHit()
+    {
+        if (ghostAI == null) ghostAI = GetComponentInParent<PumpkinGhostAI>();
+        if (ghostAI != null)
+        {
+            ghostAI.OnAttackHit();
+        }
+    }
+
+    public void OnAttackDamage()
+    {
+        OnAttackHit();
+    }
+}
+
 

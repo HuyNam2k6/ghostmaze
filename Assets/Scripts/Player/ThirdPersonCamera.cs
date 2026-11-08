@@ -5,6 +5,20 @@ using UnityEngine.InputSystem;
 
 public class ThirdPersonCamera : MonoBehaviour
 {
+    private static ThirdPersonCamera _instance;
+    public static ThirdPersonCamera Instance
+    {
+        get
+        {
+            if (_instance == null)
+            {
+                _instance = Object.FindAnyObjectByType<ThirdPersonCamera>();
+            }
+            return _instance;
+        }
+        private set => _instance = value;
+    }
+
     [Header("Mục Tiêu Theo Dõi (Target)")]
     [Tooltip("Đối tượng Player mà Camera sẽ bám theo")]
     public Transform target;
@@ -98,10 +112,27 @@ public class ThirdPersonCamera : MonoBehaviour
     private float defaultNearClip;
     private Transform rendererCacheOwner;
 
+    private static bool _manualUIPanelOpen = false;
+
     /// <summary>
     /// Biến trạng thái toàn cục báo hiệu bảng UI / Cài đặt đang mở để giải phóng chuột và dừng xoay camera
+    /// Tự động đồng bộ với Dashboard cài đặt và ô nhập Chat để chống kẹt trạng thái
     /// </summary>
-    public static bool isUIPanelOpen = false;
+    public static bool isUIPanelOpen
+    {
+        get
+        {
+            if (GameSettingsManager.Instance != null && GameSettingsManager.Instance.dashboardPanel != null && GameSettingsManager.Instance.dashboardPanel.activeSelf)
+                return true;
+            if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsTypingChat())
+                return true;
+            return _manualUIPanelOpen;
+        }
+        set
+        {
+            _manualUIPanelOpen = value;
+        }
+    }
 
     // Góc quay hiện tại
     private float currentYaw = 0f;
@@ -109,9 +140,41 @@ public class ThirdPersonCamera : MonoBehaviour
     private float currentDistance;
     private static readonly RaycastHit[] s_CameraHitBuffer = new RaycastHit[8];
 
+    private void Awake()
+    {
+        Instance = this;
+        _manualUIPanelOpen = false;
+    }
+
+    /// <summary>
+    /// Chuyển đổi mục tiêu theo dõi của Camera (ví dụ: chuyển sang PumpkinGhost khi Player tử trận)
+    /// </summary>
+    public void SetTarget(Transform newTarget, Vector3? newTargetOffset = null)
+    {
+        target = newTarget;
+        if (newTargetOffset.HasValue)
+        {
+            targetOffset = newTargetOffset.Value;
+        }
+
+        // Tự động tắt góc nhìn thứ nhất để người chơi chiêm ngưỡng nhân vật mới
+        IsFirstPerson = false;
+        viewBlend = 0f;
+        SetBodyHidden(false);
+        cachedBodyRenderers = null;
+        rendererCacheOwner = null;
+
+        if (target != null)
+        {
+            // Reset góc ngắm và khoảng cách tối ưu
+            currentDistance = distance;
+            currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
+        }
+    }
+
     private void Start()
     {
-        isUIPanelOpen = false;
+        _manualUIPanelOpen = false;
         currentDistance = distance;
 
         if (target == null && ThirdPersonPlayerController.Instance != null)
@@ -210,10 +273,18 @@ public class ThirdPersonCamera : MonoBehaviour
     {
         if (target == null)
         {
-            if (ThirdPersonPlayerController.Instance != null)
+            if (PlayerHealth.Instance != null && PlayerHealth.Instance.isDead)
+            {
+                if (PumpkinGhostAI.ActiveGhosts != null && PumpkinGhostAI.ActiveGhosts.Count > 0)
+                {
+                    target = PumpkinGhostAI.ActiveGhosts[0].transform;
+                }
+            }
+            else if (ThirdPersonPlayerController.Instance != null)
             {
                 target = ThirdPersonPlayerController.Instance.transform;
             }
+
             if (target == null) return;
         }
 

@@ -190,7 +190,7 @@ AnimatorStateTransition:
   m_Name: 
   m_Conditions: []
   m_DstStateMachine: {fileID: 0}
-  m_DstState: {fileID: 3441719808610038251}
+  m_DstState: {fileID: -8582671118496436667}
   m_Solo: 0
   m_Mute: 0
   m_IsExit: 0
@@ -406,7 +406,7 @@ AnimatorStateTransition:
   m_Name: 
   m_Conditions: []
   m_DstStateMachine: {fileID: 0}
-  m_DstState: {fileID: 3441719808610038251}
+  m_DstState: {fileID: -8582671118496436667}
   m_Solo: 0
   m_Mute: 0
   m_IsExit: 0

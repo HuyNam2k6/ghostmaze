@@ -12,6 +12,7 @@ namespace GhostMaze.Editor
     public static class PhotonFusionAutoSetup
     {
         private const string FUSION_APP_ID = "438b0f59-e83e-495b-9660-9bc8f0510c60";
+        private const string VOICE_APP_ID = "d99a4e79-137c-4371-9663-34152e3e4a08";
 
         static PhotonFusionAutoSetup()
         {
@@ -22,6 +23,42 @@ namespace GhostMaze.Editor
         public static void ForceConfigure()
         {
             TryConfigurePhotonAppId(true);
+        }
+
+        [MenuItem("Tools/GhostMaze/Tắt Tạm Thời Bảng Tạo Phòng (Prototype Network Start)")]
+        public static void DisableNetworkStartUI()
+        {
+            var allGos = Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var g in allGos)
+            {
+                if (g.name == "Prototype Network Start" && !EditorUtility.IsPersistent(g))
+                {
+                    Undo.RecordObject(g, "Disable Network Start UI");
+                    g.SetActive(false);
+                    EditorUtility.SetDirty(g);
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(g.scene);
+                    Debug.Log("<color=#FFCC00>[GhostMaze] ĐÃ TẮT Bảng Tạo Phòng (Prototype Network Start)! Bạn có thể Play game offline thoải mái mà không bị che màn hình.</color>");
+                    return;
+                }
+            }
+        }
+
+        [MenuItem("Tools/GhostMaze/Bật Lại Bảng Tạo Phòng (Prototype Network Start)")]
+        public static void EnableNetworkStartUI()
+        {
+            var allGos = Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var g in allGos)
+            {
+                if (g.name == "Prototype Network Start" && !EditorUtility.IsPersistent(g))
+                {
+                    Undo.RecordObject(g, "Enable Network Start UI");
+                    g.SetActive(true);
+                    EditorUtility.SetDirty(g);
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(g.scene);
+                    Debug.Log("<color=#00FF88>[GhostMaze] ĐÃ BẬT LẠI Bảng Tạo Phòng (Prototype Network Start) để chơi mạng 2 người!</color>");
+                    return;
+                }
+            }
         }
 
         public static void TryConfigurePhotonAppId()
@@ -82,10 +119,11 @@ namespace GhostMaze.Editor
                     int colonIndex = line.IndexOf(":", StringComparison.Ordinal);
                     string key = line.Substring(0, colonIndex).Trim();
                     string currentVal = line.Substring(colonIndex + 1).Trim();
-                    if (currentVal != FUSION_APP_ID)
+                    string targetId = (key == "AppIdRealtime" || key == "AppIdVoice" || key == "AppIdChat") ? VOICE_APP_ID : FUSION_APP_ID;
+                    if (currentVal != targetId)
                     {
                         string indent = line.Substring(0, line.IndexOf(key, StringComparison.Ordinal));
-                        lines[i] = $"{indent}{key}: {FUSION_APP_ID}";
+                        lines[i] = $"{indent}{key}: {targetId}";
                         updated = true;
                     }
                 }
@@ -95,7 +133,7 @@ namespace GhostMaze.Editor
             {
                 File.WriteAllLines(assetPath, lines);
                 AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
-                Debug.Log($"<color=#00FF88>[PhotonAutoSetup] ĐÃ TỰ ĐỘNG CẤU HÌNH THÀNH CÔNG App ID: {FUSION_APP_ID} vào {assetPath}</color>");
+                Debug.Log($"<color=#00FF88>[PhotonAutoSetup] ĐÃ TỰ ĐỘNG CẤU HÌNH THÀNH CÔNG Voice App ID: {VOICE_APP_ID} vào {assetPath}</color>");
             }
         }
 
@@ -114,10 +152,11 @@ namespace GhostMaze.Editor
                     int colonIndex = line.IndexOf(":", StringComparison.Ordinal);
                     string key = line.Substring(0, colonIndex).Trim();
                     string currentVal = line.Substring(colonIndex + 1).Trim();
-                    if (currentVal != FUSION_APP_ID)
+                    string targetId = key == "AppIdFusion" ? FUSION_APP_ID : VOICE_APP_ID;
+                    if (currentVal != targetId)
                     {
                         string indent = line.Substring(0, line.IndexOf(key, StringComparison.Ordinal));
-                        lines[i] = $"{indent}{key}: {FUSION_APP_ID}";
+                        lines[i] = $"{indent}{key}: {targetId}";
                         updated = true;
                     }
                 }
@@ -127,7 +166,7 @@ namespace GhostMaze.Editor
             {
                 File.WriteAllLines(assetPath, lines);
                 AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
-                Debug.Log($"<color=#00FF88>[PhotonFusionAutoSetup] ĐÃ TỰ ĐỘNG CẤU HÌNH THÀNH CÔNG AppIdFusion: {FUSION_APP_ID} vào {assetPath}</color>");
+                Debug.Log($"<color=#00FF88>[PhotonFusionAutoSetup] ĐÃ TỰ ĐỘNG CẤU HÌNH THÀNH CÔNG Fusion: {FUSION_APP_ID} & Voice: {VOICE_APP_ID} vào {assetPath}</color>");
             }
         }
     }

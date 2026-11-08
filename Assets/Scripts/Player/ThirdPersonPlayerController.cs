@@ -56,8 +56,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Khoảng thời gian tối thiểu giữa 2 lần nhảy (giây) tránh kích hoạt đúp hoạt ảnh nhảy")]
     [Range(0.1f, 1f)] public float jumpCooldown = 0.35f;
 
-    [Tooltip("Thời gian chờ nhún chân lấy đà trong hoạt ảnh trước khi nhân vật thực sự bật bổng lên không trung (giây) - Khớp Frame 26")]
-    [Range(0.02f, 1.5f)] public float jumpTakeoffDelay = 0.80f;
+    [Tooltip("Thời gian chờ nhún chân lấy đà trong hoạt ảnh trước khi nhân vật thực sự bật bổng lên không trung (giây) - Mặc định 0.60s khớp Frame 18")]
+    [Range(0.02f, 1.5f)] public float jumpTakeoffDelay = 0.60f;
 
     [Header("4. Kỹ Năng: Đỡ Đòn & Giữ Chân Ma (Block Skill - Freeze 3s)")]
     [Tooltip("Phím đỡ đòn (Mặc định: Chuột phải)")]
@@ -83,13 +83,22 @@ public class ThirdPersonPlayerController : MonoBehaviour
     public KeyCode magicAttackKey = KeyCode.Mouse0;
 
     [Tooltip("Thời gian hồi chiêu phóng cầu ma thuật (giây)")]
-    [Range(0.5f, 5.0f)] public float magicAttackCooldown = 1.2f;
+    [Range(0.1f, 5.0f)] public float magicAttackCooldown = 0.35f;
 
     [Tooltip("Prefab quả cầu ma thuật MagicWaveOrb")]
     public GameObject magicOrbPrefab;
 
-    [Tooltip("Tọa độ xuất phát tương đối của quả cầu từ tay/ngực nhân vật")]
-    public Vector3 magicOrbSpawnOffset = new Vector3(0f, 1.25f, 0.65f);
+    [Tooltip("★ ĐIỂM NÉM CẦU: Kéo Transform của Điểm Ném (ThrowPoint) vào đây để tự căn chỉnh vị trí xuất phát và hướng bay theo ý muốn")]
+    public Transform throwPoint;
+
+    [Tooltip("(Tùy chọn) Bàn tay phóng quả cầu ma thuật (dùng làm vị trí dự phòng nếu chưa gán throwPoint)")]
+    public Transform castHandTransform;
+
+    [Tooltip("Hướng bắn: True = Bắn thẳng vào tâm ngắm chấm trắng trên màn hình; False = Bay thẳng theo hướng mặt của Điểm Ném")]
+    public bool aimTowardsCrosshair = true;
+
+    [Tooltip("Tọa độ xuất phát tương đối của quả cầu từ nhân vật (dùng khi không có throwPoint và bàn tay)")]
+    public Vector3 magicOrbSpawnOffset = new Vector3(0.35f, 1.25f, 0.65f);
 
     [Tooltip("Tốc độ bay của quả cầu (m/s)")]
     [Range(5f, 35f)] public float magicOrbSpeed = 15.0f;
@@ -100,14 +109,28 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Thời gian làm con ma đứng im khi quả cầu bắn trúng (giây)")]
     [Range(1f, 15f)] public float magicOrbStunDuration = 5.0f;
 
-    [Tooltip("Thời gian chờ vung tay phóng cầu trong hoạt ảnh (giây) - Khớp Frame 29")]
-    [Range(0.05f, 2.0f)] public float magicOrbCastDelay = 0.895f;
+    [Tooltip("Thời gian chờ từ lúc thả chuột đến khi quả cầu phóng ra (giây) - Mặc định 0.1s")]
+    [Range(0.02f, 1.5f)] public float magicOrbCastDelay = 0.10f;
 
-    [Tooltip("Transform bàn tay phóng quả cầu ma thuật (tự động tìm xương RightHand của Prince)")]
-    public Transform castHandTransform;
+    [Tooltip("Thời gian khóa di chuyển để nhân vật hoàn tất động tác vung ném uy lực (giây)")]
+    [Range(0.1f, 3.0f)] public float magicAttackLockDuration = 1.35f;
 
     [Tooltip("Âm thanh phóng cầu ma thuật")]
     public AudioClip magicCastSound;
+
+    [Header("Hiệu Ứng Vệt Đỏ Quỹ Đạo (Red Trajectory Preview)")]
+    [Tooltip("Hiển thị vệt đỏ đường cong parabol dẫn hướng khi đang vung ném")]
+    public bool showTrajectoryPreview = true;
+
+    [Header("Tâm Ngắm & Điểm Ngắm (Reticle Dot)")]
+    [Tooltip("Kích thước chấm điểm ngắm tâm màn hình (mặc định 3.5px nhỏ gọn, sắc nét)")]
+    [Range(1.5f, 10f)] public float reticleDotSize = 3.5f;
+
+    private LineRenderer trajectoryLine;
+    private static Material s_TrajectoryLineMaterial;
+
+    private bool isAimingThrow = false;
+    private float aimStartTime = 0f;
 
     [Header("6. Hồi Sinh Rơi Vực (Abyss Fall & Respawn)")]
     [Tooltip("Độ cao Y rơi xuống vực sẽ kích hoạt hồi sinh")]
@@ -168,9 +191,15 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private static readonly RaycastHit[] s_PlayerHitBuffer = new RaycastHit[8];
     private static readonly Collider[] s_OverlapBuffer = new Collider[8];
 
+    private float magicCastStartTime = -10f;
+
     private void Awake()
     {
         Instance = this;
+        isBlocking = false;
+        isCastingMagic = false;
+        magicCastStartTime = -10f;
+
         characterController = GetComponent<CharacterController>();
         audioSource = GetComponent<AudioSource>();
 
@@ -192,19 +221,77 @@ public class ThirdPersonPlayerController : MonoBehaviour
         }
 
         ApplyPlayerScale();
+
+        // Tự động đồng bộ thông số độ trễ ném 0.1s và cooldown 0.35s tránh bị ghi đè bởi giá trị cũ trên scene/prefab
+        if (magicOrbCastDelay > 0.25f)
+        {
+            magicOrbCastDelay = 0.10f;
+        }
+        if (magicAttackCooldown > 0.6f)
+        {
+            magicAttackCooldown = 0.35f;
+        }
     }
 
     private void OnEnable()
     {
+        isBlocking = false;
+        isCastingMagic = false;
+        isAimingThrow = false;
+        isJumpAnticipating = false;
+        magicCastStartTime = -10f;
         ValidateAndRepairController();
+        EnsureAnimationEventForwarder();
     }
 
     private void Start()
     {
+        isBlocking = false;
+        isCastingMagic = false;
+        isAimingThrow = false;
+        magicCastStartTime = -10f;
         ApplyPlayerScale();
         ValidateAndRepairController();
         AutoFindCastHand();
         EnsureReticleAndNoticeUI();
+        EnsureLanternLight();
+        EnsureTrajectoryLine();
+    }
+
+    private void OnDisable()
+    {
+        if (isAimingThrow)
+        {
+            CancelMagicAim();
+        }
+        if (lanternLight != null)
+        {
+            lanternLight.enabled = false;
+        }
+    }
+
+    private void EnsureLanternLight()
+    {
+        if (lanternLight == null)
+        {
+            var lights = GetComponentsInChildren<Light>(true);
+            foreach (var l in lights)
+            {
+                if (l != null && (l.gameObject.name.Contains("Lantern") || l.type == LightType.Point))
+                {
+                    lanternLight = l;
+                    break;
+                }
+            }
+        }
+
+        if (lanternLight != null)
+        {
+            lanternLight.enabled = true;
+            lanternLight.color = new Color(1.0f, 0.68f, 0.28f);
+            lanternLight.range = 8.5f;
+            lanternLight.intensity = 3.2f;
+        }
     }
 
     private void EnsureReticleAndNoticeUI()
@@ -230,7 +317,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 rt.anchorMax = new Vector2(0.5f, 0.5f);
                 rt.pivot = new Vector2(0.5f, 0.5f);
                 rt.anchoredPosition = Vector2.zero;
-                rt.sizeDelta = new Vector2(7f, 7f);
+                rt.sizeDelta = new Vector2(reticleDotSize, reticleDotSize);
 
                 centerReticleImage = dotGo.AddComponent<Image>();
                 centerReticleImage.color = Color.white;
@@ -238,9 +325,14 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
                 // Viền bóng đen nhẹ giúp chấm trắng luôn rõ trên nền trời sáng lẫn nền đất tối
                 UnityEngine.UI.Outline outline = dotGo.AddComponent<UnityEngine.UI.Outline>();
-                outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
-                outline.effectDistance = new Vector2(1f, -1f);
+                outline.effectColor = new Color(0f, 0f, 0f, 0.75f);
+                outline.effectDistance = new Vector2(0.5f, -0.5f);
             }
+        }
+
+        if (centerReticleImage != null)
+        {
+            centerReticleImage.rectTransform.sizeDelta = new Vector2(reticleDotSize, reticleDotSize);
         }
 
         // 2. Text thông báo kỹ năng (Skill Notice)
@@ -297,14 +389,137 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private void AutoFindCastHand()
     {
-        if (castHandTransform == null)
+        EnsureAnimationEventForwarder();
+
+        Transform customShootPoint = FindCustomShootPoint(transform);
+        if (customShootPoint != null)
         {
-            castHandTransform = FindBoneRecursive(transform, "RightHand");
-            if (castHandTransform == null)
+            throwPoint = customShootPoint;
+            Debug.Log($"<color=#68D391>[ThirdPersonPlayerController] Đã tự động nhận diện điểm bắn tùy chỉnh: '{throwPoint.name}' tại {throwPoint.position}</color>");
+        }
+        else if (throwPoint == null)
+        {
+            throwPoint = FindBoneRecursive(transform, "ThrowPoint");
+            if (throwPoint == null)
             {
-                castHandTransform = FindBoneRecursive(transform, "LeftHand");
+                throwPoint = FindBoneRecursive(transform, "MagicThrowPoint");
             }
         }
+
+        if (castHandTransform == null)
+        {
+            castHandTransform = FindBoneRecursive(transform, "Ctrl_Hand_IK_Right");
+            if (castHandTransform == null)
+                castHandTransform = FindBoneRecursive(transform, "RightHand");
+            if (castHandTransform == null)
+                castHandTransform = FindBoneRecursive(transform, "LeftHand");
+        }
+
+        if (throwPoint == null)
+        {
+            CreateOrAttachThrowPoint();
+        }
+    }
+
+    public Transform FindCustomShootPoint(Transform root)
+    {
+        if (root == null) return null;
+
+        // 1. Ưu tiên kiểm tra trực tiếp cụm xương tay phải (Ctrl_Hand_IK_Right hoặc Ctrl_Hand_IK_Right_end)
+        Transform handEnd = FindBoneRecursive(transform, "Ctrl_Hand_IK_Right_end")
+            ?? FindBoneRecursive(transform, "Ctrl_Hand_IK_Right");
+        if (handEnd != null)
+        {
+            for (int i = 0; i < handEnd.childCount; i++)
+            {
+                Transform child = handEnd.GetChild(i);
+                if (child != null && IsShootPointName(child.name))
+                {
+                    return child;
+                }
+            }
+        }
+
+        // 2. Tìm kiếm đệ quy toàn bộ hierarchy với bộ lọc tên đa dạng (hỗ trợ cả có dấu tiếng Việt lẫn không dấu)
+        return FindShootPointRecursive(root);
+    }
+
+    private Transform FindShootPointRecursive(Transform current)
+    {
+        if (current == null) return null;
+        if (current != transform && IsShootPointName(current.name))
+        {
+            return current;
+        }
+
+        for (int i = 0; i < current.childCount; i++)
+        {
+            Transform found = FindShootPointRecursive(current.GetChild(i));
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static bool IsShootPointName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        string lower = name.ToLowerInvariant();
+        if (lower.Contains("điểmbắn") || lower.Contains("điểm bắn") || lower.Contains("diemban") ||
+            lower.Contains("diem_ban") || lower.Contains("diem ban") || lower.Contains("shootpoint") ||
+            lower.Contains("firepoint") || lower.Contains("throwpoint") || lower.Contains("shoot") ||
+            lower.Contains("bắn") || lower.Contains("ban"))
+        {
+            // Tránh nhầm với các xương tay chân chuẩn của rig
+            if (!lower.Contains("arm") && !lower.Contains("foot") && !lower.Contains("leg") && !lower.Contains("pole"))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void EnsureAnimationEventForwarder()
+    {
+        if (playerAnimator != null)
+        {
+            PlayerAnimationEventForwarder forwarder = playerAnimator.GetComponent<PlayerAnimationEventForwarder>();
+            if (forwarder == null)
+            {
+                forwarder = playerAnimator.gameObject.AddComponent<PlayerAnimationEventForwarder>();
+            }
+            forwarder.controller = this;
+        }
+    }
+
+    [ContextMenu("Tạo / Căn Chỉnh Điểm Ném Cầu (Throw Point)")]
+    public void CreateOrAttachThrowPoint()
+    {
+        Transform parentBone = castHandTransform != null ? castHandTransform : FindBoneRecursive(transform, "RightHand");
+        Transform existing = FindBoneRecursive(transform, "ThrowPoint");
+        if (existing != null)
+        {
+            throwPoint = existing;
+            return;
+        }
+
+        GameObject tpObj = new GameObject("ThrowPoint");
+        if (parentBone != null)
+        {
+            tpObj.transform.SetParent(parentBone, false);
+            tpObj.transform.localPosition = new Vector3(0.05f, 0.05f, 0.15f);
+            tpObj.transform.localRotation = Quaternion.identity;
+        }
+        else
+        {
+            tpObj.transform.SetParent(transform, false);
+            tpObj.transform.localPosition = magicOrbSpawnOffset;
+            tpObj.transform.localRotation = Quaternion.identity;
+        }
+
+        throwPoint = tpObj.transform;
+#if UNITY_EDITOR
+        UnityEditor.EditorUtility.SetDirty(this);
+#endif
     }
 
     private Transform FindBoneRecursive(Transform parent, string boneName)
@@ -474,6 +689,13 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 characterController.enabled = true;
             }
         }
+
+        // Tự động giải phóng trạng thái ném phép nếu bị kẹt (fail-safe chống đứng im)
+        if (isCastingMagic && Time.time >= magicCastStartTime + Mathf.Max(1.5f, magicAttackLockDuration + 0.3f))
+        {
+            isCastingMagic = false;
+        }
+
         CheckAbyssFall();
         HandleGroundCheck();
         HandleBlockInput();
@@ -481,6 +703,14 @@ public class ThirdPersonPlayerController : MonoBehaviour
         HandleMovement();
         HandleJumpAndGravity();
         UpdateSkillNoticeFade();
+        UpdateTrajectoryPreview();
+
+        // Hiệu ứng ngọn lửa đèn lồng le lói bập bùng trong sương đêm của Người
+        if (lanternLight != null && lanternLight.enabled)
+        {
+            float flicker = (Mathf.PerlinNoise(Time.time * 5.0f, 13.37f) - 0.5f) * 0.45f;
+            lanternLight.intensity = 3.2f + flicker;
+        }
     }
 
     private void UpdateSkillNoticeFade()
@@ -659,77 +889,179 @@ public class ThirdPersonPlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Xử lý tung chiêu phóng cầu ma thuật (Rising Wave): Đẩy lùi 3m và đứng im 5 giây.
-    /// Bắn thẳng về phía tâm ngắm chấm trắng ở giữa màn hình, tự động xoay thân nhân vật theo hướng bắn.
+    /// Xử lý tung chiêu ném cầu ma thuật (Rising Wave):
+    /// - Nhấn giữ chuột: Ngắm ném, hiển thị vệt đỏ parabol dẫn hướng, nhân vật lấy đà giương tay về sau.
+    /// - Thả chuột ra: Quả cầu mới chính thức được phóng ra mục tiêu!
     /// </summary>
     private void HandleMagicAttackInput()
     {
-        if (ThirdPersonCamera.isUIPanelOpen || isBlocking || isCastingMagic) return;
-
-        if (ReadMagicAttackInput())
+        if (ThirdPersonCamera.isUIPanelOpen || isBlocking)
         {
-            if (Time.time >= lastMagicAttackTime + magicAttackCooldown)
+            if (isAimingThrow) CancelMagicAim();
+            return;
+        }
+
+        // 1. Nhấn chuột (Mouse Down): Bắt đầu ngắm ném
+        if (!isAimingThrow && !isCastingMagic)
+        {
+            if (ReadMagicAttackInputDown())
             {
-                lastMagicAttackTime = Time.time;
-
-                // Tính toán hướng bắn chính xác qua tâm ngắm chấm trắng ở giữa màn hình
-                Ray aimRay = cameraTransform != null
-                    ? new Ray(cameraTransform.position, cameraTransform.forward)
-                    : (Camera.main != null ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
-                    : new Ray(transform.position + Vector3.up * 1.5f, transform.forward));
-
-                int mask = ~(1 << gameObject.layer);
-                if (Physics.Raycast(aimRay, out RaycastHit hit, 100f, mask, QueryTriggerInteraction.Ignore))
+                if (Time.time >= lastMagicAttackTime + magicAttackCooldown)
                 {
-                    currentMagicAimPoint = hit.point;
+                    StartAimingMagic();
                 }
-                else
-                {
-                    currentMagicAimPoint = aimRay.GetPoint(50f);
-                }
+            }
+        }
 
-                // Tự động xoay thân nhân vật quay đúng về hướng chấm trắng ngắm tới
-                Vector3 toAimFlat = currentMagicAimPoint - transform.position;
-                toAimFlat.y = 0f;
-                if (toAimFlat.sqrMagnitude > 0.001f)
-                {
-                    transform.rotation = Quaternion.LookRotation(toAimFlat.normalized);
-                }
+        // 2. Trong lúc đang ngắm (giữ chuột)
+        if (isAimingThrow)
+        {
+            // Nhấn chuột phải (Block) để hủy ngắm an toàn nếu đổi ý
+            if (ReadBlockInputDown())
+            {
+                CancelMagicAim();
+                return;
+            }
 
-                StartCoroutine(RoutineCastRisingWave());
+            // Cập nhật tia ngắm và điểm mục tiêu theo camera
+            UpdateAimRaycast();
+
+            // Tự động xoay thân nhân vật theo hướng tâm ngắm
+            Vector3 toAimFlat = currentMagicAimPoint - transform.position;
+            toAimFlat.y = 0f;
+            if (toAimFlat.sqrMagnitude > 0.001f)
+            {
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(toAimFlat.normalized), 20f * Time.deltaTime);
+            }
+
+            // GIỮ NGUYÊN TƯ THẾ GIƠ TAY TẠI FRAME 10 (đúng ảnh chỉ định) TRONG SUỐT THỜI GIAN GIỮ CHUỘT!
+            if (playerAnimator != null && playerAnimator.speed != 0f)
+            {
+                playerAnimator.Play("RisingWave", 0, 10f / 86f);
+                playerAnimator.speed = 0f;
+            }
+
+            // 3. KHI THẢ CHUỘT: Mới bắt đầu animation vung ném và phóng quả cầu!
+            if (ReadMagicAttackInputUp())
+            {
+                ExecuteReleaseThrow();
             }
         }
     }
 
-    private IEnumerator RoutineCastRisingWave()
+    private void StartAimingMagic()
     {
-        isCastingMagic = true;
+        isAimingThrow = true;
         hasCastOrbThisAttack = false;
+        aimStartTime = Time.time;
 
-        if (playerAnimator != null && !string.IsNullOrEmpty(risingWaveTriggerName))
+        UpdateAimRaycast();
+
+        if (trajectoryLine != null)
         {
-            playerAnimator.SetTrigger(risingWaveTriggerName);
+            trajectoryLine.enabled = true;
         }
 
-        if (audioSource != null && magicCastSound != null)
+        if (playerAnimator != null)
         {
-            audioSource.PlayOneShot(magicCastSound);
+            // Vào ngay tư thế giơ tay ngắm tại Frame 10 (đúng ảnh người dùng chỉ định)
+            playerAnimator.speed = 0f;
+            playerAnimator.Play("RisingWave", 0, 10f / 86f);
+        }
+    }
+
+    public void CancelMagicAim()
+    {
+        isAimingThrow = false;
+        if (trajectoryLine != null)
+        {
+            trajectoryLine.enabled = false;
+        }
+        if (playerAnimator != null)
+        {
+            playerAnimator.speed = 1.0f;
+            playerAnimator.Play("Idle", 0, 0f);
+        }
+    }
+
+    private void UpdateAimRaycast()
+    {
+        Ray aimRay = cameraTransform != null
+            ? new Ray(cameraTransform.position, cameraTransform.forward)
+            : (Camera.main != null ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+            : new Ray(transform.position + Vector3.up * 1.5f, transform.forward));
+
+        int mask = ~(1 << gameObject.layer);
+        if (Physics.Raycast(aimRay, out RaycastHit hit, 100f, mask, QueryTriggerInteraction.Ignore))
+        {
+            currentMagicAimPoint = hit.point;
+        }
+        else
+        {
+            currentMagicAimPoint = aimRay.GetPoint(40f);
+        }
+    }
+
+    private void ExecuteReleaseThrow()
+    {
+        isAimingThrow = false;
+        isCastingMagic = true;
+        magicCastStartTime = Time.time;
+        lastMagicAttackTime = Time.time;
+
+        if (trajectoryLine != null)
+        {
+            trajectoryLine.enabled = false;
         }
 
-        // Chờ đến đúng Frame 29 (hoặc sự kiện OnMagicOrbCastEvent kích hoạt trước)
-        yield return new WaitForSeconds(magicOrbCastDelay);
+        if (playerAnimator != null)
+        {
+            // THẢ TAY RA -> BẮT ĐẦU ANIMATION VUNG NÉM: Từ Frame 10 vung tay nhanh về trước qua Frame 26!
+            playerAnimator.speed = 2.8f;
+            playerAnimator.Play("RisingWave", 0, 10f / 86f);
+        }
+
+        StartCoroutine(RoutineFinishReleaseThrow());
+    }
+
+    private IEnumerator RoutineFinishReleaseThrow()
+    {
+        // Chờ đúng 0.10s sau khi thả chuột để vung tay và phóng quả cầu
+        float waitDelay = Mathf.Clamp(magicOrbCastDelay, 0.04f, 0.10f);
+        yield return new WaitForSeconds(waitDelay);
 
         if (!hasCastOrbThisAttack)
         {
             SpawnMagicWaveOrb();
         }
 
-        yield return new WaitForSeconds(0.40f);
+        // Hoàn tất vung tay cực nhanh 0.06s rồi mở khóa di chuyển ngay lập tức
+        yield return new WaitForSeconds(0.06f);
+
         isCastingMagic = false;
+        if (playerAnimator != null)
+        {
+            playerAnimator.speed = 1.0f;
+            Vector2 moveInp = ReadMoveInput();
+            if (moveInp.sqrMagnitude > 0.01f)
+            {
+                // Người chơi đang bấm WASD -> lập tức chuyển sang chạy (Run), không bị đứng khựng 1 giây nào!
+                playerAnimator.CrossFadeInFixedTime("Run", 0.08f);
+            }
+            else
+            {
+                playerAnimator.CrossFadeInFixedTime("Idle", 0.12f);
+            }
+        }
+    }
+
+    private IEnumerator RoutineCastRisingWave()
+    {
+        yield return RoutineFinishReleaseThrow();
     }
 
     /// <summary>
-    /// Hàm gọi trực tiếp từ Animation Event trên clip RisingWave (ở Frame 29)
+    /// Hàm gọi trực tiếp từ Animation Event trên clip RisingWave (ở Frame 25)
     /// </summary>
     public void OnMagicOrbCastEvent()
     {
@@ -737,23 +1069,69 @@ public class ThirdPersonPlayerController : MonoBehaviour
         SpawnMagicWaveOrb();
     }
 
+    public void SpawnMagicWaveOrbEvent()
+    {
+        OnMagicOrbCastEvent();
+    }
+
+    public void OnShoot()
+    {
+        OnMagicOrbCastEvent();
+    }
+
+    public void Shoot()
+    {
+        OnMagicOrbCastEvent();
+    }
+
     private void SpawnMagicWaveOrb()
     {
         hasCastOrbThisAttack = true;
 
-        Vector3 spawnPos = castHandTransform != null
-            ? castHandTransform.position
-            : transform.position + (transform.rotation * magicOrbSpawnOffset);
-
-        // Hướng bắn bay thẳng về phía tâm ngắm chấm trắng ở giữa màn hình
-        Vector3 shootDir = (currentMagicAimPoint - spawnPos);
-        if (shootDir.sqrMagnitude > 0.0001f)
+        if (throwPoint == null || throwPoint.name == "ThrowPoint")
         {
-            shootDir.Normalize();
+            Transform customShootPoint = FindCustomShootPoint(transform);
+            if (customShootPoint != null)
+            {
+                throwPoint = customShootPoint;
+            }
         }
-        else
+
+        if (audioSource != null && magicCastSound != null)
         {
-            shootDir = transform.forward;
+            audioSource.PlayOneShot(magicCastSound);
+        }
+
+        // 1. Xác định vị trí ném: Ưu tiên điểm ném (throwPoint) -> bàn tay -> offset tương đối
+        Vector3 spawnPos = throwPoint != null
+            ? throwPoint.position
+            : (castHandTransform != null
+                ? castHandTransform.position
+                : transform.position + (transform.rotation * magicOrbSpawnOffset));
+
+        // 2. Tính toán hướng bắn chính xác theo thời gian thực
+        Vector3 shootDir = (throwPoint != null) ? throwPoint.forward : transform.forward;
+        Vector3? targetPoint = null;
+
+        if (aimTowardsCrosshair)
+        {
+            Ray aimRay = cameraTransform != null
+                ? new Ray(cameraTransform.position, cameraTransform.forward)
+                : (Camera.main != null ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+                : new Ray(transform.position + Vector3.up * 1.5f, transform.forward));
+
+            int mask = ~(1 << gameObject.layer);
+            Vector3 aimTarget = Physics.Raycast(aimRay, out RaycastHit hit, 100f, mask, QueryTriggerInteraction.Ignore)
+                ? hit.point
+                : aimRay.GetPoint(40f);
+
+            targetPoint = aimTarget;
+            currentMagicAimPoint = aimTarget;
+            Vector3 toAim = aimTarget - spawnPos;
+            if (toAim.sqrMagnitude > 0.001f && Vector3.Dot(toAim.normalized, transform.forward) >= -0.2f)
+            {
+                shootDir = toAim.normalized;
+            }
         }
 
         // Đảm bảo thân nhân vật luôn quay đúng hướng mặt của đòn đánh
@@ -767,13 +1145,33 @@ public class ThirdPersonPlayerController : MonoBehaviour
         Quaternion spawnRot = Quaternion.LookRotation(shootDir);
         spawnPos += shootDir * 0.15f;
 
+        // Tắt vệt đỏ dẫn hướng khi quả cầu xuất kích
+        if (trajectoryLine != null)
+        {
+            trajectoryLine.enabled = false;
+        }
+
         MagicWaveOrb orbScript = GetOrCreatePooledOrb();
         orbScript.transform.SetPositionAndRotation(spawnPos, spawnRot);
         orbScript.speed = magicOrbSpeed;
         orbScript.knockbackDistance = magicOrbKnockback;
         orbScript.stunDuration = magicOrbStunDuration;
+        orbScript.EnsureRedVisuals();
         orbScript.gameObject.SetActive(true);
-        orbScript.Launch(shootDir);
+        orbScript.Launch(shootDir, targetPoint);
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Transform pt = throwPoint != null ? throwPoint : castHandTransform;
+        Vector3 pos = pt != null ? pt.position : transform.position + (transform.rotation * magicOrbSpawnOffset);
+
+        Gizmos.color = new Color(0f, 1f, 1f, 0.9f);
+        Gizmos.DrawWireSphere(pos, 0.18f);
+
+        Gizmos.color = Color.yellow;
+        Vector3 dir = (pt != null) ? pt.forward : transform.forward;
+        Gizmos.DrawRay(pos, dir * 1.2f);
     }
 
     private MagicWaveOrb GetOrCreatePooledOrb()
@@ -804,10 +1202,10 @@ public class ThirdPersonPlayerController : MonoBehaviour
             {
                 Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
                 runtimeFallbackOrbMaterial = new Material(urpLit);
-                Color cyanGlow = new Color(0.25f, 0.95f, 0.75f);
-                runtimeFallbackOrbMaterial.color = cyanGlow;
+                Color redGlow = new Color(1.0f, 0.15f, 0.12f);
+                runtimeFallbackOrbMaterial.color = redGlow;
                 runtimeFallbackOrbMaterial.EnableKeyword("_EMISSION");
-                runtimeFallbackOrbMaterial.SetColor("_EmissionColor", cyanGlow * 3.5f);
+                runtimeFallbackOrbMaterial.SetColor("_EmissionColor", redGlow * 4.0f);
             }
 
             MeshRenderer mr = orbObj.GetComponent<MeshRenderer>();
@@ -815,8 +1213,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
             Light orbLight = orbObj.AddComponent<Light>();
             orbLight.type = LightType.Point;
-            orbLight.color = new Color(0.25f, 0.95f, 0.75f);
-            orbLight.intensity = 2.8f;
+            orbLight.color = new Color(1.0f, 0.18f, 0.12f);
+            orbLight.intensity = 4.2f;
             orbLight.range = 6.0f;
             orbLight.shadows = LightShadows.None;
         }
@@ -826,8 +1224,112 @@ public class ThirdPersonPlayerController : MonoBehaviour
         {
             script = orbObj.AddComponent<MagicWaveOrb>();
         }
+        script.EnsureRedVisuals();
         script.SetPoolCallback(ReturnOrbToPool);
         return script;
+    }
+
+    private void EnsureTrajectoryLine()
+    {
+        if (trajectoryLine == null)
+        {
+            Transform existing = transform.Find("ThrowTrajectoryLine");
+            if (existing != null)
+            {
+                trajectoryLine = existing.GetComponent<LineRenderer>();
+            }
+            if (trajectoryLine == null)
+            {
+                GameObject lineObj = new GameObject("ThrowTrajectoryLine");
+                lineObj.transform.SetParent(transform, false);
+                trajectoryLine = lineObj.AddComponent<LineRenderer>();
+            }
+        }
+
+        if (trajectoryLine != null)
+        {
+            if (s_TrajectoryLineMaterial == null)
+            {
+                Shader s = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                    ?? Shader.Find("Universal Render Pipeline/Unlit")
+                    ?? Shader.Find("Sprites/Default");
+                s_TrajectoryLineMaterial = new Material(s);
+                Color redColor = new Color(1.0f, 0.22f, 0.18f, 0.38f);
+                s_TrajectoryLineMaterial.color = redColor;
+                if (s_TrajectoryLineMaterial.HasProperty("_BaseColor"))
+                    s_TrajectoryLineMaterial.SetColor("_BaseColor", redColor);
+            }
+
+            trajectoryLine.material = s_TrajectoryLineMaterial;
+            trajectoryLine.startWidth = 0.038f;
+            trajectoryLine.endWidth = 0.012f;
+            trajectoryLine.positionCount = 0;
+            trajectoryLine.useWorldSpace = true;
+            trajectoryLine.alignment = LineAlignment.View;
+
+            // Làm mờ vệt đỏ bán trong suốt, dịu mắt không bị chói
+            Gradient grad = new Gradient();
+            grad.SetKeys(
+                new GradientColorKey[]
+                {
+                    new GradientColorKey(new Color(1f, 0.28f, 0.20f), 0.0f),
+                    new GradientColorKey(new Color(0.85f, 0.12f, 0.10f), 1.0f)
+                },
+                new GradientAlphaKey[]
+                {
+                    new GradientAlphaKey(0.38f, 0.0f),
+                    new GradientAlphaKey(0.18f, 0.7f),
+                    new GradientAlphaKey(0.0f, 1.0f)
+                }
+            );
+            trajectoryLine.colorGradient = grad;
+            trajectoryLine.enabled = false;
+        }
+    }
+
+    private void UpdateTrajectoryPreview()
+    {
+        if (!showTrajectoryPreview || trajectoryLine == null) return;
+
+        // Chỉ hiển thị vệt đỏ dẫn hướng trong khi đang giữ chuột ngắm ném
+        if (!isAimingThrow || hasCastOrbThisAttack)
+        {
+            if (trajectoryLine.enabled)
+            {
+                trajectoryLine.enabled = false;
+            }
+            return;
+        }
+
+        Vector3 spawnPos = throwPoint != null ? throwPoint.position : (castHandTransform != null ? castHandTransform.position : transform.position + transform.rotation * magicOrbSpawnOffset);
+        Vector3 aimTarget = currentMagicAimPoint;
+
+        Vector3 toTarget = aimTarget - spawnPos;
+        Vector3 toTargetHoriz = new Vector3(toTarget.x, 0f, toTarget.z);
+        float distHoriz = Mathf.Clamp(toTargetHoriz.magnitude, 4f, 40f);
+        Vector3 dirHoriz = distHoriz > 0.01f ? toTargetHoriz.normalized : transform.forward;
+
+        float horizSpeed = Mathf.Clamp(magicOrbSpeed, 12f, 26f);
+        float flightTime = Mathf.Clamp(distHoriz / horizSpeed, 0.6f, 1.6f);
+        float gravity = 12f;
+        float upwardForce = 6.0f;
+
+        float deltaY = toTarget.y;
+        float requiredVy = (deltaY + 0.5f * gravity * flightTime * flightTime) / flightTime;
+        float initialVy = Mathf.Max(requiredVy, upwardForce);
+
+        Vector3 initialVel = dirHoriz * (distHoriz / flightTime) + Vector3.up * initialVy;
+
+        const int steps = 24;
+        trajectoryLine.positionCount = steps;
+        trajectoryLine.enabled = true;
+
+        for (int i = 0; i < steps; i++)
+        {
+            float t = (i / (float)(steps - 1)) * flightTime;
+            Vector3 pt = spawnPos + initialVel * t + 0.5f * Vector3.down * gravity * t * t;
+            trajectoryLine.SetPosition(i, pt);
+        }
     }
 
     private void ReturnOrbToPool(MagicWaveOrb orb)
@@ -843,6 +1345,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     {
         if (transform.position.y < fallThresholdY)
         {
+            isJumpAnticipating = false;
             if (characterController != null) characterController.enabled = false;
             transform.position = respawnPoint;
             verticalVelocity = Vector3.zero;
@@ -895,7 +1398,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
     /// </summary>
     private void HandleMovement()
     {
-        if (ThirdPersonCamera.isUIPanelOpen || isCastingMagic)
+        // Khóa di chuyển khi: Mở bảng UI hoặc đang nhún chân lấy đà nhảy (Frame 18)
+        if (ThirdPersonCamera.isUIPanelOpen || isJumpAnticipating)
         {
             UpdateAnimatorSpeed(0f);
             return;
@@ -909,11 +1413,43 @@ public class ThirdPersonPlayerController : MonoBehaviour
         {
             currentSpeed *= 0.25f; // Đi chậm khi đang thủ thế đỡ đòn
         }
+        else if (isAimingThrow)
+        {
+            currentSpeed *= 0.85f; // Vừa giữ ngắm giơ tay vừa có thể di chuyển linh hoạt quanh map!
+        }
+        else if (isCastingMagic)
+        {
+            // Nếu đã phóng quả cầu ra rồi mà người chơi bấm WASD -> LẬP TỨC MỞ KHÓA DI CHUYỂN 100% VÀO RUN!
+            if (hasCastOrbThisAttack && input.sqrMagnitude > 0.01f)
+            {
+                isCastingMagic = false;
+                if (playerAnimator != null)
+                {
+                    playerAnimator.speed = 1.0f;
+                    playerAnimator.CrossFadeInFixedTime("Run", 0.08f);
+                }
+            }
+            else
+            {
+                currentSpeed *= 0.75f;
+            }
+        }
 
         Vector3 moveDirection = Vector3.zero;
 
         if (input.sqrMagnitude > 0.01f)
         {
+            // Bất cứ khi nào đang di chuyển mà Animator bị kẹt ở RisingWave hoặc TakeHit -> Lập tức thoát ra Run!
+            if (!isAimingThrow && !isCastingMagic && playerAnimator != null)
+            {
+                var curState = playerAnimator.GetCurrentAnimatorStateInfo(0);
+                if ((curState.IsName("RisingWave") || curState.IsName("TakeHit")) && !playerAnimator.IsInTransition(0))
+                {
+                    playerAnimator.speed = 1.0f;
+                    playerAnimator.CrossFadeInFixedTime("Run", 0.08f);
+                }
+            }
+
             if (cameraTransform != null)
             {
                 Vector3 camForward = cameraTransform.forward;
@@ -931,8 +1467,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 moveDirection = new Vector3(input.x, 0f, input.y).normalized;
             }
 
-            // Ở góc nhìn thứ nhất, ThirdPersonCamera tự xoay nhân vật theo hướng nhìn -> không xoay theo hướng di chuyển
-            if (!ThirdPersonCamera.IsFirstPerson)
+            // Khi đang giữ ngắm, thân nhân vật tự xoay theo hướng tâm ngắm -> không xoay theo hướng bước chân
+            if (!ThirdPersonCamera.IsFirstPerson && !isAimingThrow)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
                 transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
@@ -963,7 +1499,10 @@ public class ThirdPersonPlayerController : MonoBehaviour
         }
 
         SafeMove(horizontalMove * Time.deltaTime);
-        UpdateAnimatorSpeed(horizontalMove.magnitude);
+        if (!isAimingThrow)
+        {
+            UpdateAnimatorSpeed(horizontalMove.magnitude);
+        }
     }
 
     private void UpdateAnimatorSpeed(float speedVal)
@@ -1006,14 +1545,14 @@ public class ThirdPersonPlayerController : MonoBehaviour
     {
         isJumpAnticipating = true;
 
-        // 1. Kích hoạt ngay hoạt ảnh nhún chân chuẩn bị nhảy
+        // 1. Kích hoạt ngay hoạt ảnh nhún chân chuẩn bị nhảy (vị trí bị khóa cứng trên sàn)
         if (playerAnimator != null && !string.IsNullOrEmpty(jumpTriggerName))
         {
             playerAnimator.ResetTrigger(jumpTriggerName);
             playerAnimator.SetTrigger(jumpTriggerName);
         }
 
-        // 2. Chờ đúng khoảnh khắc chân đạp đất bật người lên ở Frame 26
+        // 2. Chờ đúng khoảnh khắc chân đạp đất bật người lên ở Frame 18 (mặc định 0.60s tại 30fps)
         if (jumpTakeoffDelay > 0.001f)
         {
             yield return new WaitForSeconds(jumpTakeoffDelay);
@@ -1023,7 +1562,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     }
 
     /// <summary>
-    /// Hàm gọi trực tiếp từ Animation Event trên clip Jump (ở Frame 26)
+    /// Hàm gọi trực tiếp từ Animation Event trên clip Jump (ở Frame 18)
     /// </summary>
     public void OnJumpTakeoffEvent()
     {
@@ -1035,11 +1574,15 @@ public class ThirdPersonPlayerController : MonoBehaviour
         if (!isJumpAnticipating) return;
         isJumpAnticipating = false;
 
-        // 3. Đúng pha chân bật khỏi sàn: Truyền lực nhảy nâng bổng nhân vật lên không trung
+        // 3. Đúng pha chân bật khỏi sàn: Giải phóng khóa vị trí và truyền lực nhảy nâng bổng nhân vật lên không trung
         if (!isBlocking && !isCastingMagic)
         {
             isGrounded = false;
             verticalVelocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            if (playerAnimator != null && !string.IsNullOrEmpty(isGroundedParamName))
+            {
+                playerAnimator.SetBool(isGroundedParamName, false);
+            }
         }
     }
 
@@ -1047,7 +1590,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     // HỆ THỐNG ĐỌC INPUT TỰ ĐỘNG (TƯƠNG THÍCH MỌI PHIÊN BẢN INPUT SYSTEM)
     // =========================================================================
 
-    private Vector2 ReadMoveInput()
+    public Vector2 ReadMoveInput()
     {
         Vector2 input = Vector2.zero;
 
@@ -1132,7 +1675,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
         return false;
     }
 
-    private bool ReadMagicAttackInput()
+    private bool ReadMagicAttackInputDown()
     {
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
@@ -1146,5 +1689,77 @@ public class ThirdPersonPlayerController : MonoBehaviour
 #endif
 
         return false;
+    }
+
+    private bool ReadMagicAttackInputUp()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.wasReleasedThisFrame) return true;
+        var kb = Keyboard.current;
+        if (kb != null && kb.qKey.wasReleasedThisFrame) return true;
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyUp(magicAttackKey) || Input.GetKeyUp(KeyCode.Mouse0) || Input.GetKeyUp(KeyCode.Q)) return true;
+#endif
+
+        return false;
+    }
+
+    private bool ReadMagicAttackInput()
+    {
+        return ReadMagicAttackInputDown();
+    }
+}
+
+/// <summary>
+/// Chuyển tiếp Animation Event từ Model/Animator lên ThirdPersonPlayerController ở GameObject cha
+/// </summary>
+public class PlayerAnimationEventForwarder : MonoBehaviour
+{
+    public ThirdPersonPlayerController controller;
+
+    private void Awake()
+    {
+        ResolveController();
+    }
+
+    private void OnEnable()
+    {
+        ResolveController();
+    }
+
+    private void ResolveController()
+    {
+        if (controller == null)
+        {
+            controller = GetComponentInParent<ThirdPersonPlayerController>();
+        }
+    }
+
+    // Các tên hàm Animation Event phổ biến
+    public void OnMagicOrbCastEvent()
+    {
+        ResolveController();
+        if (controller != null) controller.OnMagicOrbCastEvent();
+    }
+
+    public void SpawnMagicWaveOrb()
+    {
+        ResolveController();
+        if (controller != null) controller.OnMagicOrbCastEvent();
+    }
+
+    public void OnShoot()
+    {
+        ResolveController();
+        if (controller != null) controller.OnMagicOrbCastEvent();
+    }
+
+    public void Shoot()
+    {
+        ResolveController();
+        if (controller != null) controller.OnMagicOrbCastEvent();
     }
 }

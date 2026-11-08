@@ -186,7 +186,7 @@ MonoBehaviour:
   jumpHeight: 1.25
   gravity: -20
   jumpCooldown: 0.35
-  jumpTakeoffDelay: 0.80
+  jumpTakeoffDelay: 0.60
   blockKey: 324
   blockRange: 3.5
   blockFacingAngleThreshold: 65
@@ -194,13 +194,17 @@ MonoBehaviour:
   blockShieldLight: {fileID: 8526041829877584745}
   blockSound: {fileID: 0}
   magicAttackKey: 323
-  magicAttackCooldown: 1.2
+  magicAttackCooldown: 0.35
   magicOrbPrefab: {fileID: 6305983932397094832, guid: dd9448b255599e5439547a538c588513, type: 3}
-  magicOrbSpawnOffset: {x: 0, y: 1.25, z: 0.65}
+  throwPoint: {fileID: 0}
+  castHandTransform: {fileID: 0}
+  aimTowardsCrosshair: 1
+  magicOrbSpawnOffset: {x: 0.35, y: 1.25, z: 0.65}
   magicOrbSpeed: 15
   magicOrbKnockback: 3
   magicOrbStunDuration: 5
-  magicOrbCastDelay: 0.895
+  magicOrbCastDelay: 0.1
+  magicAttackLockDuration: 0.4
   magicCastSound: {fileID: 0}
   fallThresholdY: -15
   respawnPoint: {x: 2.5, y: 0.45, z: 7.5}

@@ -56,8 +56,8 @@ MonoBehaviour:
   attackRange: 2
   attackDamage: 20
   attackCooldown: 1.4
-  attackHitDelay: 0.32
-  attackTotalDuration: 0.75
+  attackHitDelay: 0.375
+  attackTotalDuration: 0.5
   enableLeap: 1
   leapMinDistance: 4
   leapMaxDistance: 8.5

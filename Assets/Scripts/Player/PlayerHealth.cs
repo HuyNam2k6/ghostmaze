@@ -9,6 +9,7 @@ public class PlayerHealth : MonoBehaviour
     [Tooltip("Máu tối đa của người chơi")]
     [Range(50f, 500f)] public float maxHealth = 100f;
     public float currentHealth = 100f;
+    public bool isDead { get; private set; } = false;
 
     [Header("Thời Gian Bất Tử Ngắn Sau Khi Trúng Đòn (Invulnerability)")]
     [Tooltip("Thời gian miễn sát thương liên tiếp (giây)")]
@@ -54,10 +55,16 @@ public class PlayerHealth : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        isDead = false;
         currentHealth = maxHealth;
         displayedHealthRatio = 1f;
         characterController = GetComponent<CharacterController>();
         gameObject.tag = "Player";
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
     }
 
     private void Start()
@@ -69,7 +76,7 @@ public class PlayerHealth : MonoBehaviour
     private void Update()
     {
         // Nội suy thanh máu mượt mà
-        float targetRatio = (maxHealth > 0f) ? Mathf.Clamp01(currentHealth / maxHealth) : 0f;
+        float targetRatio = isDead ? 0f : ((maxHealth > 0f) ? Mathf.Clamp01(currentHealth / maxHealth) : 0f);
         if (!Mathf.Approximately(displayedHealthRatio, targetRatio))
         {
             displayedHealthRatio = Mathf.MoveTowards(displayedHealthRatio, targetRatio, Time.deltaTime * 3.5f);
@@ -105,6 +112,8 @@ public class PlayerHealth : MonoBehaviour
     /// </summary>
     public void TakeDamage(float amount, Vector3 attackerPos)
     {
+        if (isDead) return;
+
         ThirdPersonPlayerController playerCtrl = GetComponent<ThirdPersonPlayerController>();
         if (playerCtrl == null) playerCtrl = ThirdPersonPlayerController.Instance;
 
@@ -131,9 +140,19 @@ public class PlayerHealth : MonoBehaviour
             clawScratchImage.transform.localScale = Vector3.one * 1.15f; // Giật nảy nhẹ khi trúng đòn cào
         }
 
-        if (playerCtrl != null && playerCtrl.playerAnimator != null && !string.IsNullOrEmpty(playerCtrl.takeHitTriggerName))
+        if (playerCtrl != null && playerCtrl.playerAnimator != null)
         {
-            playerCtrl.playerAnimator.SetTrigger(playerCtrl.takeHitTriggerName);
+            bool isMoving = playerCtrl.ReadMoveInput().sqrMagnitude > 0.01f;
+            if (isMoving)
+            {
+                // NẾU ĐANG DI CHUYỂN: Chuyển ngay/giữ animation di chuyển (Run), KHÔNG đợi hết animation TakeHit mới chịu di chuyển!
+                playerCtrl.playerAnimator.CrossFadeInFixedTime("Run", 0.08f);
+            }
+            else if (!string.IsNullOrEmpty(playerCtrl.takeHitTriggerName))
+            {
+                // NẾU ĐỨNG YÊN: Mới phát giật mình TakeHit
+                playerCtrl.playerAnimator.SetTrigger(playerCtrl.takeHitTriggerName);
+            }
         }
 
         if (damageVignette != null)
@@ -166,26 +185,169 @@ public class PlayerHealth : MonoBehaviour
 
         if (currentHealth <= 0f)
         {
+            isDead = true;
+            Debug.Log("<color=#FF4757>====================================================\n[PlayerHealth] Người chơi đã tử trận! Không hồi sinh nữa.\nChuyển Camera và quyền điều khiển sang Ma Bí Ngô!\n====================================================</color>");
+
             if (playerCtrl != null && playerCtrl.playerAnimator != null && !string.IsNullOrEmpty(playerCtrl.deathTriggerName))
             {
                 playerCtrl.playerAnimator.SetTrigger(playerCtrl.deathTriggerName);
             }
-            HandlePlayerDown();
+
+            // Khóa hoàn toàn điều khiển người
+            if (playerCtrl != null)
+            {
+                playerCtrl.enabled = false;
+            }
+
+            if (characterController != null)
+            {
+                characterController.enabled = false;
+            }
+
+            // Chuyển sang điều khiển Ma Bí Ngô
+            TransferControlToPumpkinGhost();
+
+            // Thông báo cho SurvivalTimerUI kiểm tra điều kiện kết thúc trận đấu (Nếu hết người -> Ma Win!)
+            if (SurvivalTimerUI.Instance != null)
+            {
+                SurvivalTimerUI.Instance.OnPlayerDied(this);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Chuyển giao quyền điều khiển và góc quay Camera sang Ma Bí Ngô (PumpkinGhostAI)
+    /// </summary>
+    private void TransferControlToPumpkinGhost()
+    {
+        PumpkinGhostAI targetGhost = null;
+        if (PumpkinGhostAI.ActiveGhosts != null && PumpkinGhostAI.ActiveGhosts.Count > 0)
+        {
+            targetGhost = PumpkinGhostAI.ActiveGhosts[0];
+        }
+        if (targetGhost == null)
+        {
+            targetGhost = FindAnyObjectByType<PumpkinGhostAI>();
+        }
+
+        if (targetGhost != null)
+        {
+            targetGhost.TakeOverAsPlayer();
+
+            // Chuyển ánh sáng sang chế độ Bên Ma (Mắt ma soi rõ toàn map)
+            if (CemeteryMapManager.Instance != null)
+            {
+                CemeteryMapManager.Instance.SwitchToGhostLighting(1.5f);
+            }
+
+            // Chuyển Camera sang bám theo Ma Bí Ngô
+            if (ThirdPersonCamera.Instance != null)
+            {
+                ThirdPersonCamera.Instance.SetTarget(targetGhost.transform, new Vector3(0f, 1.25f, 0f));
+            }
+            else if (Camera.main != null)
+            {
+                ThirdPersonCamera cam = Camera.main.GetComponent<ThirdPersonCamera>();
+                if (cam != null)
+                {
+                    cam.SetTarget(targetGhost.transform, new Vector3(0f, 1.25f, 0f));
+                }
+            }
+
+            ShowGhostTakeoverBanner();
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerHealth] Không tìm thấy đối tượng PumpkinGhostAI nào trong Scene để chuyển giao!");
+        }
+    }
+
+    private void ShowGhostTakeoverBanner()
+    {
+        if (healthValueText != null)
+        {
+            healthValueText.text = "👻 MA BÍ NGÔ (BẤT TỬ)";
+        }
+
+        Canvas canvas = FindAnyObjectByType<Canvas>();
+        if (canvas != null)
+        {
+            GameObject bannerGo = GameObject.Find("GhostTakeoverBanner");
+            if (bannerGo == null)
+            {
+                bannerGo = new GameObject("GhostTakeoverBanner");
+                bannerGo.transform.SetParent(canvas.transform, false);
+
+                RectTransform rt = bannerGo.AddComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 0.5f);
+                rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(0f, 75f);
+                rt.sizeDelta = new Vector2(640f, 95f);
+
+                Image bg = bannerGo.AddComponent<Image>();
+                bg.color = new Color(0.08f, 0.04f, 0.02f, 0.92f);
+                bg.raycastTarget = false;
+
+                Outline outline = bannerGo.AddComponent<Outline>();
+                outline.effectColor = new Color(1f, 0.48f, 0.08f, 0.95f);
+                outline.effectDistance = new Vector2(2f, -2f);
+
+                GameObject textGo = new GameObject("BannerText");
+                textGo.transform.SetParent(bannerGo.transform, false);
+                RectTransform textRt = textGo.AddComponent<RectTransform>();
+                textRt.anchorMin = Vector2.zero;
+                textRt.anchorMax = Vector2.one;
+                textRt.offsetMin = new Vector2(10f, 5f);
+                textRt.offsetMax = new Vector2(-10f, -5f);
+
+                Text bannerText = textGo.AddComponent<Text>();
+                bannerText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (bannerText.font == null) bannerText.font = Font.CreateDynamicFontFromOSFont("Arial", 16);
+                bannerText.fontSize = 18;
+                bannerText.alignment = TextAnchor.MiddleCenter;
+                bannerText.fontStyle = FontStyle.Bold;
+                bannerText.color = new Color(1f, 0.85f, 0.35f, 1f);
+                bannerText.text = "👻 BẠN ĐÃ TỬ TRẬN! LINH HỒN ĐÃ CHIẾM HỮU MA BÍ NGÔ!\n[WASD]: Di chuyển  |  [Chuột trái]: Cào xé  |  [Space]: Nhảy vồ  |  [Chuột phải / E]: Ẩn thân";
+                bannerText.raycastTarget = false;
+
+                StartCoroutine(RoutineDismissBanner(bannerGo, 7.0f));
+            }
+            else
+            {
+                bannerGo.SetActive(true);
+                StartCoroutine(RoutineDismissBanner(bannerGo, 7.0f));
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator RoutineDismissBanner(GameObject bannerGo, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (bannerGo != null)
+        {
+            bannerGo.SetActive(false);
         }
     }
 
     public void HealFull()
     {
+        isDead = false;
         currentHealth = maxHealth;
         RefreshHealthUIImmediate();
     }
 
     private void HandlePlayerDown()
     {
-        Debug.Log("<color=#FF4757>[PlayerHealth] Bạn đã hết máu! Hồi sinh tại vị trí xuất phát và làm mới máu...</color>");
+        // Giữ lại làm hàm fallback nếu cần hồi sinh thủ công
         currentHealth = maxHealth;
         displayedHealthRatio = 1f;
         RefreshHealthUIImmediate();
+
+        if (CemeteryMapManager.Instance != null)
+        {
+            CemeteryMapManager.Instance.SwitchToHumanDarkLighting(1.2f);
+        }
 
         ThirdPersonPlayerController playerCtrl = GetComponent<ThirdPersonPlayerController>();
         if (playerCtrl != null && characterController != null)

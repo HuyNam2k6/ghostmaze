@@ -395,7 +395,9 @@ public static class PrincePlayerSetup
         controller.blockFacingAngleThreshold = 65f;
         controller.jumpCooldown = 0.35f;
         controller.jumpTakeoffDelay = 0.80f;
-        controller.magicOrbCastDelay = 0.895f;
+        controller.magicAttackLockDuration = 1.25f;
+        controller.magicOrbCastDelay = 0.85f;
+        controller.CreateOrAttachThrowPoint();
 
         // Tạo hiệu ứng ánh sáng khiên đỡ đòn (Aura Shield Light)
         GameObject shieldObj = new GameObject("BlockShieldLight");

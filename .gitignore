@@ -112,3 +112,9 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Crash recovery files & backups
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
+*.bak
+*.bak.meta

@@ -89,6 +89,33 @@ public class CemeteryMapConfig : ScriptableObject
     }
 
     [System.Serializable]
+    public class HumanDarkAtmosphereSettings
+    {
+        [Header("Sương mù đêm tối của Người (Dày hơn, bí ẩn)")]
+        public bool enableFog = true;
+        public Color fogColor = new Color(0.006f, 0.010f, 0.020f);
+        [Range(0.001f, 0.03f)]
+        public float fogDensity = 0.010f;
+
+        [Header("Ánh sáng môi trường Người (Tối kịch tính)")]
+        public Color ambientSkyColor = new Color(0.010f, 0.014f, 0.026f);
+        public Color ambientEquatorColor = new Color(0.005f, 0.007f, 0.015f);
+        public Color ambientGroundColor = new Color(0.002f, 0.002f, 0.005f);
+
+        [Header("Ánh trăng mờ le lói (Dim Moonlight)")]
+        public Color moonlightColor = new Color(0.32f, 0.44f, 0.65f);
+        [Range(0.02f, 1.0f)]
+        public float moonlightIntensity = 0.16f;
+
+        [Header("Đèn lồng cầm tay của Người (Handheld Lantern)")]
+        public Color playerLanternColor = new Color(1.0f, 0.68f, 0.28f);
+        [Range(1f, 10f)]
+        public float playerLanternIntensity = 3.2f;
+        [Range(3f, 20f)]
+        public float playerLanternRange = 8.5f;
+    }
+
+    [System.Serializable]
     public class LayoutSettings
     {
         [Header("Quy mô & Đảo nổi (Floating Islands)")]
@@ -115,7 +142,10 @@ public class CemeteryMapConfig : ScriptableObject
     }
 
     public ColliderSettings colliders = new ColliderSettings();
+    [Header("1. Khí quyển bên Ma (Sáng rõ bao quát - Ghost Hunter)")]
     public AtmosphereSettings atmosphere = new AtmosphereSettings();
+    [Header("2. Khí quyển bên Người (Tối kịch tính - Human Survivor)")]
+    public HumanDarkAtmosphereSettings humanAtmosphere = new HumanDarkAtmosphereSettings();
     public LayoutSettings layout = new LayoutSettings();
     public PropDensitySettings density = new PropDensitySettings();
 }

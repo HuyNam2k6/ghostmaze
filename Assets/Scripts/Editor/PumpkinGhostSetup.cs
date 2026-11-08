@@ -78,6 +78,94 @@ public static class PumpkinGhostSetup
             importer.clipAnimations = clips;
             importer.SaveAndReimport();
         }
+
+        EnsureAttackEventAtFrame9(importer);
+    }
+
+    [InitializeOnLoadMethod]
+    [MenuItem("Tools/Setup Pumpkin Attack Event at Frame 9")]
+    public static void SetupPumpkinAttackEventAtFrame9()
+    {
+        ModelImporter importer = AssetImporter.GetAtPath(FBX_PATH) as ModelImporter;
+        if (importer == null) return;
+        EnsureAttackEventAtFrame9(importer);
+    }
+
+    private static void EnsureAttackEventAtFrame9(ModelImporter importer)
+    {
+        if (importer == null) return;
+
+        ModelImporterClipAnimation[] clips = importer.clipAnimations;
+        if (clips == null || clips.Length == 0)
+        {
+            clips = importer.defaultClipAnimations;
+        }
+        if (clips == null) return;
+
+        bool changed = false;
+        for (int i = 0; i < clips.Length; i++)
+        {
+            if (clips[i].name == "gaminArmature|gaminATTACK")
+            {
+                if (clips[i].lastFrame != 12)
+                {
+                    clips[i].firstFrame = 0;
+                    clips[i].lastFrame = 12;
+                    changed = true;
+                }
+
+                float frameRate = 24f;
+                var allAssets = AssetDatabase.LoadAllAssetsAtPath(FBX_PATH);
+                foreach (var asset in allAssets)
+                {
+                    if (asset is AnimationClip animClip && animClip.name == "gaminArmature|gaminATTACK")
+                    {
+                        if (animClip.frameRate > 0) frameRate = animClip.frameRate;
+                        break;
+                    }
+                }
+
+                float targetTime = 9f / frameRate;
+
+                bool hasHitEvent = false;
+                if (clips[i].events != null)
+                {
+                    for (int j = 0; j < clips[i].events.Length; j++)
+                    {
+                        if (clips[i].events[j].functionName == "OnAttackHit")
+                        {
+                            hasHitEvent = true;
+                            if (Mathf.Abs(clips[i].events[j].time - targetTime) > 0.01f)
+                            {
+                                clips[i].events[j].time = targetTime;
+                                changed = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if (!hasHitEvent)
+                {
+                    var evList = new List<AnimationEvent>();
+                    if (clips[i].events != null) evList.AddRange(clips[i].events);
+                    evList.Add(new AnimationEvent
+                    {
+                        functionName = "OnAttackHit",
+                        time = targetTime
+                    });
+                    clips[i].events = evList.ToArray();
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            importer.clipAnimations = clips;
+            importer.SaveAndReimport();
+            Debug.Log("<color=#2ECC71>[PumpkinGhostSetup] Đã đồng bộ sự kiện gây sát thương OnAttackHit tại Frame 9 vào clip gaminArmature|gaminATTACK!</color>");
+        }
     }
 
     private static Material EnsureGhostMaterial()
@@ -216,10 +304,10 @@ public static class PumpkinGhostSetup
         anyToAttack.canTransitionToSelf = false;
         anyToAttack.AddCondition(AnimatorConditionMode.If, 0, "Attack");
 
-        var attackToRun = stAttack.AddTransition(stRun);
-        attackToRun.hasExitTime = true;
-        attackToRun.exitTime = 0.90f;
-        attackToRun.duration = 0.15f;
+        var attackToIdle = stAttack.AddTransition(stIdle);
+        attackToIdle.hasExitTime = true;
+        attackToIdle.exitTime = 0.90f;
+        attackToIdle.duration = 0.15f;
 
         var anyToJump = sm.AddAnyStateTransition(stJump);
         anyToJump.hasExitTime = false;
@@ -227,10 +315,10 @@ public static class PumpkinGhostSetup
         anyToJump.canTransitionToSelf = false;
         anyToJump.AddCondition(AnimatorConditionMode.If, 0, "Jump");
 
-        var jumpToRun = stJump.AddTransition(stRun);
-        jumpToRun.hasExitTime = true;
-        jumpToRun.exitTime = 0.90f;
-        jumpToRun.duration = 0.15f;
+        var jumpToIdle = stJump.AddTransition(stIdle);
+        jumpToIdle.hasExitTime = true;
+        jumpToIdle.exitTime = 0.90f;
+        jumpToIdle.duration = 0.15f;
 
         var anyToStun = sm.AddAnyStateTransition(stBreath);
         anyToStun.hasExitTime = false;
@@ -312,8 +400,8 @@ public static class PumpkinGhostSetup
         config.attackRange = 2.0f;
         config.attackDamage = 20.0f;
         config.attackCooldown = 1.4f;
-        config.attackHitDelay = 0.32f;
-        config.attackTotalDuration = 0.75f;
+        config.attackHitDelay = 0.375f;
+        config.attackTotalDuration = 0.50f;
 
         config.enableLeap = true;
         config.leapMinDistance = 4.0f;

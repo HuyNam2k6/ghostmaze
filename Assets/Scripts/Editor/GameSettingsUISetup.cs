@@ -25,18 +25,19 @@ public static class GameSettingsUISetup
             Object.DestroyImmediate(oldCanvas);
         }
 
-        // 4. Tạo Canvas chính (ScreenSpaceCamera để hỗ trợ capture và rendering chuẩn)
+        // 4. Tạo Canvas chính (ScreenSpaceOverlay siêu sắc nét, không bị mờ nhòe bởi Post-Processing)
         GameObject canvasGo = new GameObject("Canvas_GameSettings");
         Canvas canvas = canvasGo.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceCamera;
-        canvas.worldCamera = Camera.main;
-        canvas.planeDistance = 1.0f;
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.pixelPerfect = true;
         canvas.sortingOrder = 100;
 
         CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
         scaler.matchWidthOrHeight = 0.5f;
+        scaler.dynamicPixelsPerUnit = 2.5f;
+        scaler.referencePixelsPerUnit = 100f;
 
         canvasGo.AddComponent<GraphicRaycaster>();
 

@@ -5,9 +5,23 @@ public class CemeteryMapManager : MonoBehaviour
 {
     public static CemeteryMapManager Instance { get; private set; }
 
+    public enum AtmosphereViewMode
+    {
+        HumanSurvivorDark, // Bên Người: map tối mịt mù, kịch tính, sương dày, ánh trăng mờ le lói
+        GhostHunterClear   // Bên Ma: map sáng rõ bao quát, tầm nhìn xa, mắt ma soi tỏ toàn bộ nghĩa địa
+    }
+
     [Header("Map Configuration")]
     [Tooltip("Tệp cấu hình ScriptableObject chứa toàn bộ thông số Collider, Ánh sáng, Quy mô bản đồ")]
     public CemeteryMapConfig config;
+
+    [Header("Atmosphere Mode (Human vs Ghost)")]
+    [Tooltip("Chế độ ánh sáng & sương mù hiện tại")]
+    [SerializeField] private AtmosphereViewMode currentAtmosphereMode = AtmosphereViewMode.HumanSurvivorDark;
+    public AtmosphereViewMode CurrentAtmosphereMode => currentAtmosphereMode;
+
+    private Coroutine atmosphereTransitionRoutine;
+    private Light cachedMoonlight;
 
     private void Awake()
     {
@@ -15,10 +29,24 @@ public class CemeteryMapManager : MonoBehaviour
         StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
     }
 
+    private void Start()
+    {
+        if (Application.isPlaying)
+        {
+            // Khi vào game, mặc định là góc nhìn Người: áp dụng chế độ Tối kịch tính
+            SetAtmosphereMode(AtmosphereViewMode.HumanSurvivorDark, 0f);
+        }
+    }
+
     private void OnEnable()
     {
         if (Instance == null) Instance = this;
         StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
     }
 
     /// <summary>
@@ -83,53 +111,208 @@ public class CemeteryMapManager : MonoBehaviour
         Debug.Log("<color=green>[CemeteryMapManager] Đã cập nhật toàn bộ Collider theo config thành công!</color>");
     }
 
+    // =========================================================================
+    // QUẢN LÝ KHÍ QUYỂN & ÁNH SÁNG HAI BÊN (NGƯỜI VS MA)
+    // =========================================================================
+
+    /// <summary>
+    /// Tìm nguồn sáng Moonlight (Directional Light) trong bản đồ một cách an toàn và bền vững
+    /// </summary>
+    public Light FindDirectionalMoonlight()
+    {
+        if (cachedMoonlight != null) return cachedMoonlight;
+
+        var moonGo = GameObject.Find("MoonDirectionalLight");
+        if (moonGo != null && moonGo.TryGetComponent<Light>(out var ml))
+        {
+            cachedMoonlight = ml;
+            return cachedMoonlight;
+        }
+
+        var dirGo = GameObject.Find("Directional Light");
+        if (dirGo != null && dirGo.TryGetComponent<Light>(out var dl))
+        {
+            cachedMoonlight = dl;
+            return cachedMoonlight;
+        }
+
+        var allLights = Object.FindObjectsByType<Light>(FindObjectsInactive.Exclude);
+        foreach (var l in allLights)
+        {
+            if (l != null && l.type == LightType.Directional)
+            {
+                cachedMoonlight = l;
+                return cachedMoonlight;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Đổi chế độ ánh sáng giữa bên Người (Tối kịch tính) và bên Ma (Sáng rõ bao quát)
+    /// </summary>
+    public void SetAtmosphereMode(AtmosphereViewMode mode, float transitionDuration = 1.2f)
+    {
+        currentAtmosphereMode = mode;
+        if (atmosphereTransitionRoutine != null)
+        {
+            StopCoroutine(atmosphereTransitionRoutine);
+            atmosphereTransitionRoutine = null;
+        }
+
+        if (transitionDuration <= 0.01f || !Application.isPlaying)
+        {
+            ApplyAtmosphereImmediate(mode);
+        }
+        else
+        {
+            atmosphereTransitionRoutine = StartCoroutine(RoutineTransitionAtmosphere(mode, transitionDuration));
+        }
+    }
+
+    public void SwitchToHumanDarkLighting(float duration = 1.2f) => SetAtmosphereMode(AtmosphereViewMode.HumanSurvivorDark, duration);
+    public void SwitchToGhostLighting(float duration = 1.2f) => SetAtmosphereMode(AtmosphereViewMode.GhostHunterClear, duration);
+
+    /// <summary>
+    /// Áp dụng ngay lập tức các thông số ánh sáng & sương mù theo chế độ
+    /// </summary>
+    public void ApplyAtmosphereImmediate(AtmosphereViewMode mode)
+    {
+        if (config == null) return;
+
+        bool isHumanDark = (mode == AtmosphereViewMode.HumanSurvivorDark);
+        var dirLight = FindDirectionalMoonlight();
+
+        if (isHumanDark)
+        {
+            var hAtm = config.humanAtmosphere;
+            RenderSettings.fog = hAtm.enableFog;
+            RenderSettings.fogColor = hAtm.fogColor;
+            RenderSettings.fogDensity = hAtm.fogDensity;
+
+            RenderSettings.ambientSkyColor = hAtm.ambientSkyColor;
+            RenderSettings.ambientEquatorColor = hAtm.ambientEquatorColor;
+            RenderSettings.ambientGroundColor = hAtm.ambientGroundColor;
+
+            if (dirLight != null)
+            {
+                dirLight.color = hAtm.moonlightColor;
+                dirLight.intensity = hAtm.moonlightIntensity;
+            }
+        }
+        else
+        {
+            var gAtm = config.atmosphere;
+            RenderSettings.fog = gAtm.enableFog;
+            RenderSettings.fogColor = gAtm.fogColor;
+            RenderSettings.fogDensity = gAtm.fogDensity;
+
+            RenderSettings.ambientSkyColor = gAtm.ambientSkyColor;
+            RenderSettings.ambientEquatorColor = gAtm.ambientEquatorColor;
+            RenderSettings.ambientGroundColor = gAtm.ambientGroundColor;
+
+            if (dirLight != null)
+            {
+                dirLight.color = gAtm.moonlightColor;
+                dirLight.intensity = gAtm.moonlightIntensity;
+            }
+        }
+
+        // Đèn lồng & đài tế lễ trên bản đồ
+        var baseAtm = config.atmosphere;
+        foreach (var l in GetComponentsInChildren<Light>(true))
+        {
+            if (l.gameObject.name == "LanternPointLight")
+            {
+                l.color = baseAtm.lanternColor;
+                l.intensity = baseAtm.lanternIntensity;
+                l.range = baseAtm.lanternRange;
+            }
+            else if (l.gameObject.name == "AltarRitualLight")
+            {
+                l.intensity = baseAtm.ritualFireIntensity;
+            }
+        }
+    }
+
+    private System.Collections.IEnumerator RoutineTransitionAtmosphere(AtmosphereViewMode targetMode, float duration)
+    {
+        if (config == null) yield break;
+
+        var dirLight = FindDirectionalMoonlight();
+
+        // Target settings
+        bool isTargetHuman = (targetMode == AtmosphereViewMode.HumanSurvivorDark);
+        Color targetMoonColor = isTargetHuman ? config.humanAtmosphere.moonlightColor : config.atmosphere.moonlightColor;
+        float targetMoonIntensity = isTargetHuman ? config.humanAtmosphere.moonlightIntensity : config.atmosphere.moonlightIntensity;
+
+        bool targetFog = isTargetHuman ? config.humanAtmosphere.enableFog : config.atmosphere.enableFog;
+        Color targetFogColor = isTargetHuman ? config.humanAtmosphere.fogColor : config.atmosphere.fogColor;
+        float targetFogDensity = isTargetHuman ? config.humanAtmosphere.fogDensity : config.atmosphere.fogDensity;
+
+        Color targetSky = isTargetHuman ? config.humanAtmosphere.ambientSkyColor : config.atmosphere.ambientSkyColor;
+        Color targetEquator = isTargetHuman ? config.humanAtmosphere.ambientEquatorColor : config.atmosphere.ambientEquatorColor;
+        Color targetGround = isTargetHuman ? config.humanAtmosphere.ambientGroundColor : config.atmosphere.ambientGroundColor;
+
+        // Start settings
+        Color startMoonColor = dirLight != null ? dirLight.color : targetMoonColor;
+        float startMoonIntensity = dirLight != null ? dirLight.intensity : targetMoonIntensity;
+
+        Color startFogColor = RenderSettings.fogColor;
+        float startFogDensity = RenderSettings.fogDensity;
+
+        Color startSky = RenderSettings.ambientSkyColor;
+        Color startEquator = RenderSettings.ambientEquatorColor;
+        Color startGround = RenderSettings.ambientGroundColor;
+
+        RenderSettings.fog = targetFog;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+
+            if (dirLight != null)
+            {
+                dirLight.color = Color.Lerp(startMoonColor, targetMoonColor, t);
+                dirLight.intensity = Mathf.Lerp(startMoonIntensity, targetMoonIntensity, t);
+            }
+
+            RenderSettings.fogColor = Color.Lerp(startFogColor, targetFogColor, t);
+            RenderSettings.fogDensity = Mathf.Lerp(startFogDensity, targetFogDensity, t);
+
+            RenderSettings.ambientSkyColor = Color.Lerp(startSky, targetSky, t);
+            RenderSettings.ambientEquatorColor = Color.Lerp(startEquator, targetEquator, t);
+            RenderSettings.ambientGroundColor = Color.Lerp(startGround, targetGround, t);
+
+            yield return null;
+        }
+
+        ApplyAtmosphereImmediate(targetMode);
+        atmosphereTransitionRoutine = null;
+    }
+
+    [ContextMenu("Chế độ Người: Tối kịch tính (Human Dark)")]
+    public void ContextSwitchToHuman()
+    {
+        SetAtmosphereMode(AtmosphereViewMode.HumanSurvivorDark, Application.isPlaying ? 1.2f : 0f);
+    }
+
+    [ContextMenu("Chế độ Ma: Sáng rõ (Ghost Clear)")]
+    public void ContextSwitchToGhost()
+    {
+        SetAtmosphereMode(AtmosphereViewMode.GhostHunterClear, Application.isPlaying ? 1.2f : 0f);
+    }
+
     /// <summary>
     /// Cập nhật sương mù, màu sắc ánh trăng và đèn lồng trực tiếp trong Inspector hoặc khi đang chạy game
     /// </summary>
     [ContextMenu("Apply Atmosphere & Lighting")]
     public void ApplyAtmosphereSettings()
     {
-        if (config == null) return;
-        var atm = config.atmosphere;
-
-        // Fog
-        RenderSettings.fog = atm.enableFog;
-        RenderSettings.fogColor = atm.fogColor;
-        RenderSettings.fogDensity = atm.fogDensity;
-
-        // Ambient Lighting
-        RenderSettings.ambientSkyColor = atm.ambientSkyColor;
-        RenderSettings.ambientEquatorColor = atm.ambientEquatorColor;
-        RenderSettings.ambientGroundColor = atm.ambientGroundColor;
-
-        // Directional Moonlight
-        var moonLightGo = GameObject.Find("MoonDirectionalLight");
-        if (moonLightGo != null)
-        {
-            var l = moonLightGo.GetComponent<Light>();
-            if (l != null)
-            {
-                l.color = atm.moonlightColor;
-                l.intensity = atm.moonlightIntensity;
-            }
-        }
-
-        // Lanterns & Fires
-        foreach (var l in GetComponentsInChildren<Light>(true))
-        {
-            if (l.gameObject.name == "LanternPointLight")
-            {
-                l.color = atm.lanternColor;
-                l.intensity = atm.lanternIntensity;
-                l.range = atm.lanternRange;
-            }
-            else if (l.gameObject.name == "AltarRitualLight")
-            {
-                l.intensity = atm.ritualFireIntensity;
-            }
-        }
-
-        Debug.Log("<color=green>[CemeteryMapManager] Đã áp dụng thông số Ánh sáng & Khí quyển thành công!</color>");
+        ApplyAtmosphereImmediate(currentAtmosphereMode);
+        Debug.Log($"<color=green>[CemeteryMapManager] Đã áp dụng thông số Ánh sáng & Khí quyển ({currentAtmosphereMode}) thành công!</color>");
     }
 
     // =========================================================================

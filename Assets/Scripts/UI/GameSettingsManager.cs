@@ -91,12 +91,22 @@ public class GameSettingsManager : MonoBehaviour
             return;
         }
 
-        // Tự động gán Camera cho Canvas nếu dùng ScreenSpaceCamera
+        // Tối ưu hóa Canvas hiển thị siêu sắc nét (ScreenSpaceOverlay + PixelPerfect + dynamicPixelsPerUnit 2.5)
         var canvas = GetComponent<Canvas>();
-        if (canvas != null && canvas.worldCamera == null && Camera.main != null)
+        if (canvas != null)
         {
-            canvas.worldCamera = Camera.main;
-            canvas.planeDistance = 1.0f;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.pixelPerfect = true;
+        }
+
+        var scaler = GetComponent<CanvasScaler>();
+        if (scaler != null)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            scaler.dynamicPixelsPerUnit = 2.5f;
+            scaler.referencePixelsPerUnit = 100f;
         }
 
         // Mặc định áp dụng đồ họa đẹp & FPS tối đa

@@ -16,8 +16,8 @@ MonoBehaviour:
     AppIdRealtime: 
     AppIdFusion: 438b0f59-e83e-495b-9660-9bc8f0510c60
     AppIdQuantum: 
-    AppIdChat: 438b0f59-e83e-495b-9660-9bc8f0510c60
-    AppIdVoice: 438b0f59-e83e-495b-9660-9bc8f0510c60
+    AppIdChat: d99a4e79-137c-4371-9663-34152e3e4a08
+    AppIdVoice: d99a4e79-137c-4371-9663-34152e3e4a08
     AppIdVideo: 
     AppVersion: 1.0
     UseNameServer: 1

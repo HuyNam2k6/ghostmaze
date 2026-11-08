@@ -106,11 +106,11 @@ public class PumpkinGhostConfig : ScriptableObject
     [Tooltip("Thời gian chờ giữa 2 lần ra đòn (giây)")]
     [Range(0.5f, 4.0f)] public float attackCooldown = 1.4f;
 
-    [Tooltip("Thời gian chờ trong hoạt ảnh đến lúc vung móng trúng đích (giây)")]
-    [Range(0.1f, 1.0f)] public float attackHitDelay = 0.32f;
+    [Tooltip("Thời gian chờ trong hoạt ảnh đến lúc vung móng trúng đích (giây) - Khớp Frame 9 (0.375s ở 24 fps)")]
+    [Range(0.05f, 1.0f)] public float attackHitDelay = 0.375f;
 
-    [Tooltip("Tổng thời gian diễn hoạt ảnh tấn công (giây)")]
-    [Range(0.3f, 2.0f)] public float attackTotalDuration = 0.75f;
+    [Tooltip("Tổng thời gian diễn hoạt ảnh tấn công (giây) - Khớp Frame 12 (0.50s ở 24 fps)")]
+    [Range(0.15f, 2.0f)] public float attackTotalDuration = 0.50f;
 
     [Header("8. Kỹ Năng: Nhảy Vồ Áp Sát (Jumpscare Leap)")]
     [Tooltip("Bật/tắt kỹ năng nhảy vồ")]
