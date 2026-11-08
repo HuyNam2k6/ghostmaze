@@ -62,8 +62,8 @@ public class SurvivalTimerUI : MonoBehaviour
         set => huntingDuration = value;
     }
 
-    [Tooltip("Bán kính vòng tròn nhỏ an toàn ban đầu ở giữa map (m)")]
-    [Range(2f, 8f)] public float startCircleRadius = 3.8f;
+    [Tooltip("Bán kính vòng tròn an toàn trên đảo quảng trường trung tâm (m, đảo rộng 32m)")]
+    [Range(5f, 25f)] public float startCircleRadius = 15.5f;
 
     [Tooltip("Tự động bắt đầu trận đấu ngay khi vào game (nếu không dùng sảnh chờ Photon)")]
     public bool autoStart = false;
@@ -420,15 +420,15 @@ public class SurvivalTimerUI : MonoBehaviour
             ph.ResetHealth();
         }
 
-        // Dịch chuyển người chơi về tâm vòng tròn giữa map (Central Plaza)
+        // Dịch chuyển người chơi về đảo quảng trường trung tâm (Central Plaza)
         Vector3 center = ResolveMapCenter();
         if (ThirdPersonPlayerController.Instance != null)
         {
-            Vector3 randomOffset = new Vector3(Random.Range(-1.2f, 1.2f), 0f, Random.Range(-1.2f, 1.2f));
+            Vector3 randomOffset = new Vector3(Random.Range(-3.5f, 3.5f), 0f, Random.Range(-3.5f, 3.5f));
             SafeTeleport(ThirdPersonPlayerController.Instance.gameObject, center + randomOffset, Quaternion.identity);
         }
 
-        // Kích hoạt hiệu ứng rào chắn vòng tròn ma thuật
+        // Kích hoạt hiệu ứng rào chắn vòng tròn ma thuật bao quanh đảo
         EnsureStartCircleVFX();
         if (startCircleVFXRoot != null)
         {
@@ -437,11 +437,11 @@ public class SurvivalTimerUI : MonoBehaviour
 
         if (localRole == PlayerRole.Ghost)
         {
-            ShowFloatingBanner("⏳ VÒNG TRÒN AN TOÀN: BẠN LÀ MA BÍ NGÔ!\n(Tập trung trong vòng tròn 10s. Bạn sẽ thức tỉnh thành Ma sau 30s)", new Color(1f, 0.60f, 0.15f), 4.5f);
+            ShowFloatingBanner("⏳ KHU VỰC QUẢNG TRƯỜNG: BẠN LÀ MA BÍ NGÔ!\n(Di chuyển tự do trên đảo trong 10s. Bạn sẽ thức tỉnh thành Ma sau 30s)", new Color(1f, 0.60f, 0.15f), 4.5f);
         }
         else
         {
-            ShowFloatingBanner("⏳ VÒNG TRÒN AN TOÀN: BẠN LÀ NGƯỜI SỐNG SÓT!\n(Tập trung trong vòng tròn 10s. Hãy chuẩn bị tỏa ra trốn hú)", warningColor, 4.5f);
+            ShowFloatingBanner("⏳ KHU VỰC QUẢNG TRƯỜNG: BẠN LÀ NGƯỜI SỐNG SÓT!\n(Di chuyển tự do trên đảo trong 10s. Hãy chuẩn bị tỏa ra trốn hú)", warningColor, 4.5f);
         }
     }
 
@@ -548,7 +548,15 @@ public class SurvivalTimerUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Ràng buộc người chơi không thể đi ra khỏi bán kính vòng tròn trong 10s đầu
+    /// Giữ người chơi an toàn trong phạm vi đảo quảng trường trung tâm (bán kính 15.5m), không bị rơi vực
+    /// </summary>
+    public void ConstrainLocalPlayerToPlaza()
+    {
+        ConstrainLocalPlayerInsideStartCircle();
+    }
+
+    /// <summary>
+    /// Ràng buộc người chơi không thể đi ra khỏi bán kính quảng trường đảo trung tâm trong 10s đầu hoặc khi ở phòng chờ
     /// </summary>
     private void ConstrainLocalPlayerInsideStartCircle()
     {
@@ -557,7 +565,7 @@ public class SurvivalTimerUI : MonoBehaviour
         Vector3 center = ResolveMapCenter();
         Vector3 pPos = ThirdPersonPlayerController.Instance.transform.position;
         Vector2 offset = new Vector2(pPos.x - center.x, pPos.z - center.z);
-        float maxAllowedRadius = startCircleRadius - 0.25f;
+        float maxAllowedRadius = Mathf.Max(3f, startCircleRadius - 0.35f);
 
         if (offset.sqrMagnitude > maxAllowedRadius * maxAllowedRadius)
         {
@@ -568,7 +576,7 @@ public class SurvivalTimerUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Tạo hiệu ứng vòng tròn phát sáng và rào chắn hình trụ trong suốt ở giữa map
+    /// Tạo hiệu ứng vòng tròn phát sáng và rào chắn hình trụ trong suốt ở mép đảo trung tâm
     /// </summary>
     private void EnsureStartCircleVFX()
     {
@@ -580,14 +588,14 @@ public class SurvivalTimerUI : MonoBehaviour
 
         Shader shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
 
-        // 1. Vòng tròn sáng dưới mặt đất (LineRenderer xoay tròn)
+        // 1. Vòng tròn sáng dưới mặt đất (LineRenderer xoay tròn quanh đảo quảng trường)
         GameObject ringObj = new GameObject("CircleGroundRing");
         ringObj.transform.SetParent(startCircleVFXRoot.transform, false);
         circleLineRenderer = ringObj.AddComponent<LineRenderer>();
         circleLineRenderer.useWorldSpace = false;
         circleLineRenderer.loop = true;
-        circleLineRenderer.startWidth = 0.16f;
-        circleLineRenderer.endWidth = 0.16f;
+        circleLineRenderer.startWidth = 0.22f;
+        circleLineRenderer.endWidth = 0.22f;
 
         if (shader != null)
         {
@@ -597,31 +605,31 @@ public class SurvivalTimerUI : MonoBehaviour
             circleLineRenderer.sharedMaterial = lineMat;
         }
 
-        int segments = 48;
+        int segments = 64;
         circleLineRenderer.positionCount = segments;
         for (int i = 0; i < segments; i++)
         {
             float rad = (i / (float)segments) * Mathf.PI * 2f;
             float x = Mathf.Cos(rad) * startCircleRadius;
             float z = Mathf.Sin(rad) * startCircleRadius;
-            circleLineRenderer.SetPosition(i, new Vector3(x, 0.08f, z));
+            circleLineRenderer.SetPosition(i, new Vector3(x, 0.12f, z));
         }
 
-        // 2. Rào chắn ma thuật hình trụ trong suốt xung quanh (Cylinder Barrier)
+        // 2. Rào chắn ma thuật hình trụ trong suốt xung quanh bờ đảo (Cylinder Barrier)
         GameObject cyl = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         cyl.name = "TranslucentBarrierCylinder";
         cyl.transform.SetParent(startCircleVFXRoot.transform, false);
-        cyl.transform.localPosition = new Vector3(0f, 1.4f, 0f);
-        cyl.transform.localScale = new Vector3(startCircleRadius * 2f, 1.4f, startCircleRadius * 2f);
+        cyl.transform.localPosition = new Vector3(0f, 1.75f, 0f);
+        cyl.transform.localScale = new Vector3(startCircleRadius * 2f, 3.5f, startCircleRadius * 2f);
 
         Collider cylCol = cyl.GetComponent<Collider>();
-        if (cylCol != null) Destroy(cylCol);
+        if (cylCol != null) DestroyImmediate(cylCol);
 
         var mr = cyl.GetComponent<MeshRenderer>();
         if (mr != null && shader != null)
         {
             Material cylMat = new Material(shader);
-            Color barrierCol = new Color(0.12f, 0.75f, 1.0f, 0.22f);
+            Color barrierCol = new Color(0.12f, 0.75f, 1.0f, 0.18f);
             cylMat.color = barrierCol;
             if (cylMat.HasProperty("_BaseColor")) cylMat.SetColor("_BaseColor", barrierCol);
             mr.sharedMaterial = cylMat;
@@ -635,7 +643,7 @@ public class SurvivalTimerUI : MonoBehaviour
         Light ptLight = lightObj.AddComponent<Light>();
         ptLight.type = LightType.Point;
         ptLight.color = new Color(0.2f, 0.85f, 1.0f);
-        ptLight.range = 10f;
+        ptLight.range = 22f;
         ptLight.intensity = 2.5f;
     }
 

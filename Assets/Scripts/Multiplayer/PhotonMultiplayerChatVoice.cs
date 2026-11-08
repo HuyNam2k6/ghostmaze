@@ -133,6 +133,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private GameObject gameStartBannerObj;
     private Text gameStartBannerText;
     private float gameStartBannerTimer = 0f;
+    private bool isLobbyCursorUnlocked = false;
     private readonly System.Text.StringBuilder lobbySb = new System.Text.StringBuilder();
 
     private class RemotePlayerAvatar
@@ -217,11 +218,50 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             }
         }
 
-        if (!IsGameStarted && lobbyPanelObj != null && lobbyPanelObj.activeSelf)
+        if (!IsGameStarted)
         {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-            ThirdPersonCamera.isUIPanelOpen = true;
+            if (client != null && client.InRoom)
+            {
+                if (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.currentPhase == SurvivalTimerUI.MatchPhase.Lobby)
+                {
+                    SurvivalTimerUI.Instance.ConstrainLocalPlayerToPlaza();
+                }
+
+                if (ReadAltToggleDown())
+                {
+                    isLobbyCursorUnlocked = !isLobbyCursorUnlocked;
+                }
+
+                if (ReadF1KeyDown() && client.LocalPlayer != null && client.LocalPlayer.IsMasterClient && currentMatchState == MatchState.WaitingForPlayers)
+                {
+                    HostForceStartGame();
+                }
+
+                bool isTyping = IsTypingChat();
+                bool isDashboard = GameSettingsManager.Instance != null
+                    && GameSettingsManager.Instance.dashboardPanel != null
+                    && GameSettingsManager.Instance.dashboardPanel.activeSelf;
+
+                ThirdPersonCamera.isUIPanelOpen = isTyping || isDashboard;
+
+                bool shouldShowCursor = isLobbyCursorUnlocked || isTyping || isDashboard;
+                if (shouldShowCursor)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
+                else
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                }
+            }
+            else
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                ThirdPersonCamera.isUIPanelOpen = true;
+            }
         }
 
         if (currentMatchState == MatchState.CountingDown)
@@ -363,6 +403,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         int count = client.CurrentRoom != null ? client.CurrentRoom.PlayerCount : 1;
         AddSystemMessage($"Đã vào phòng [{roomName}] ({count}/{requiredPlayersToStart} người). Nhấn [Enter] để Chat, [V] để Mic, [H] để ẩn Chat!");
         CheckLobbyPlayerCount();
+        isLobbyCursorUnlocked = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        ThirdPersonCamera.isUIPanelOpen = false;
+        if (SurvivalTimerUI.Instance != null)
+        {
+            SurvivalTimerUI.Instance.KeepLocalPlayerAsHuman();
+        }
     }
 
     public void OnCreatedRoom() { }
@@ -423,6 +471,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         string nick = !string.IsNullOrEmpty(newPlayer.NickName) ? newPlayer.NickName : $"NgườiChơi_{newPlayer.ActorNumber}";
         AddSystemMessage($"🟢 {nick} đã tham gia phòng!");
         CheckLobbyPlayerCount();
+        isLobbyCursorUnlocked = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        ThirdPersonCamera.isUIPanelOpen = false;
+        if (SurvivalTimerUI.Instance != null)
+        {
+            SurvivalTimerUI.Instance.KeepLocalPlayerAsHuman();
+        }
     }
 
     public void OnPlayerLeftRoom(Player otherPlayer)
@@ -436,6 +492,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             remotePlayers.Remove(otherPlayer.ActorNumber);
         }
         CheckLobbyPlayerCount();
+        isLobbyCursorUnlocked = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        ThirdPersonCamera.isUIPanelOpen = false;
+        if (SurvivalTimerUI.Instance != null)
+        {
+            SurvivalTimerUI.Instance.KeepLocalPlayerAsHuman();
+        }
     }
 
     public void OnRoomPropertiesUpdate(PhotonHashtable propertiesThatChanged) { }
@@ -445,6 +509,30 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     // =========================================================================
     // 2. NHẮN TIN TRỰC TUYẾN (TEXT CHAT) & ĐÀM THOẠI GIỌNG NÓI (VOICE CHAT)
     // =========================================================================
+    private bool ReadAltToggleDown()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null && (kb.leftAltKey.wasPressedThisFrame || kb.rightAltKey.wasPressedThisFrame)) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.LeftAlt) || Input.GetKeyDown(KeyCode.RightAlt)) return true;
+#endif
+        return false;
+    }
+
+    private bool ReadF1KeyDown()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null && kb.f1Key.wasPressedThisFrame) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.F1)) return true;
+#endif
+        return false;
+    }
+
     private void HandleShortcuts()
     {
         bool isCurrentlyTyping = isChatInputFocused || (chatInputField != null && chatInputField.isFocused);
@@ -1053,6 +1141,10 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         currentMatchState = MatchState.GameStarted;
         IsGameStarted = true;
+        isLobbyCursorUnlocked = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        ThirdPersonCamera.isUIPanelOpen = false;
         if (lobbyPanelObj != null) lobbyPanelObj.SetActive(false);
         if (gameStartBannerObj != null)
         {
@@ -1528,8 +1620,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         lobbyRect.anchorMin = new Vector2(0.5f, 1f);
         lobbyRect.anchorMax = new Vector2(0.5f, 1f);
         lobbyRect.pivot = new Vector2(0.5f, 1f);
-        lobbyRect.anchoredPosition = new Vector2(0f, -65f);
-        lobbyRect.sizeDelta = new Vector2(520f, 195f);
+        lobbyRect.anchoredPosition = new Vector2(0f, -12f);
+        lobbyRect.sizeDelta = new Vector2(680f, 130f);
 
         Image lobbyBg = lobbyPanelObj.AddComponent<Image>();
         lobbyBg.color = new Color(0.04f, 0.07f, 0.11f, 0.90f);
@@ -1653,7 +1745,23 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         lfTxt.fontStyle = FontStyle.Bold;
         lfTxt.alignment = TextAnchor.MiddleCenter;
         lfTxt.color = Color.white;
-        lfTxt.text = "Vào Sớm ▶";
+        lfTxt.text = "Bắt Đầu ▶ [F1]";
+
+        GameObject hintObj = new GameObject("LobbyKeyHintText");
+        hintObj.transform.SetParent(lobbyPanelObj.transform, false);
+        RectTransform hintRect = hintObj.AddComponent<RectTransform>();
+        hintRect.anchorMin = new Vector2(0f, 0f);
+        hintRect.anchorMax = new Vector2(1f, 0f);
+        hintRect.pivot = new Vector2(0.5f, 0f);
+        hintRect.anchoredPosition = new Vector2(0f, 4f);
+        hintRect.sizeDelta = new Vector2(-20f, 18f);
+
+        Text hintTxt = hintObj.AddComponent<Text>();
+        hintTxt.font = defaultFont;
+        hintTxt.fontSize = 11;
+        hintTxt.alignment = TextAnchor.MiddleCenter;
+        hintTxt.color = new Color(0.65f, 0.85f, 0.95f, 0.9f);
+        hintTxt.text = "🎮 [WASD]: Chạy nhảy tự do khắp đảo  |  [F1]: Bắt đầu ngay (Host)  |  [Alt]: Mở chuột  |  [Enter]: Chat  |  [V]: Mic";
 
         lobbyPanelObj.SetActive(false); // Sẽ bật khi đã vào phòng
 
