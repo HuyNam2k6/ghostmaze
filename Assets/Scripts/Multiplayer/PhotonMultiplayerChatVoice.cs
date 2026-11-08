@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -40,7 +40,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     [Header("3. Chế Độ Phòng Chờ Đủ Người Mới Vào (Matchmaking Lobby)")]
     [Tooltip("Bật chế độ chờ đủ 4 người chơi mới mở phong ấn bắt đầu game")]
-    public bool requireFullRoomToStart = false;
+    public bool requireFullRoomToStart = true;
     [Tooltip("Số lượng người chơi cần thiết để bắt đầu game (mặc định 4 người)")]
     [Range(1, 16)] public int requiredPlayersToStart = 4;
     [Tooltip("Thời gian đếm ngược sau khi đủ người chơi (giây)")]
@@ -116,6 +116,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private RectTransform chatPanelRect;
     private Text minimizeButtonText;
     private GameObject lobbyPanelObj;
+    private GameObject lobbyMainMenuSubView;
+    private GameObject lobbyRoomWaitingSubView;
+    private InputField lobbyPlayerNameInput;
+    private InputField lobbyRoomNameInput;
+    private Text lobbyServerStatusText;
     private Text lobbyTitleText;
     private Text lobbyRoomText;
     private Text lobbyCountText;
@@ -207,6 +212,13 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 reconnectTimer = Time.unscaledTime + 5f;
                 ConnectToPhoton();
             }
+        }
+
+        if (!IsGameStarted && lobbyPanelObj != null && lobbyPanelObj.activeSelf)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            ThirdPersonCamera.isUIPanelOpen = true;
         }
 
         if (currentMatchState == MatchState.CountingDown)
@@ -307,7 +319,9 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     public bool IsTypingChat()
     {
-        return isChatInputFocused || (chatInputField != null && chatInputField.isFocused);
+        bool isChatTyping = isChatInputFocused || (chatInputField != null && chatInputField.isFocused);
+        bool isLobbyTyping = (lobbyPlayerNameInput != null && lobbyPlayerNameInput.isFocused) || (lobbyRoomNameInput != null && lobbyRoomNameInput.isFocused);
+        return isChatTyping || isLobbyTyping;
     }
 
     [Obsolete]
@@ -1723,5 +1737,94 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 speakingIndicatorText.text = "";
             }
         }
+    }
+    private InputField CreateLobbyInputField(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax, string placeholderText, string defaultText, Font font)
+    {
+        GameObject box = new GameObject(name);
+        box.transform.SetParent(parent, false);
+        RectTransform rt = box.AddComponent<RectTransform>();
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = offsetMin;
+        rt.offsetMax = offsetMax;
+
+        Image bg = box.AddComponent<Image>();
+        bg.color = new Color(0.10f, 0.15f, 0.22f, 0.95f);
+
+        InputField ifield = box.AddComponent<InputField>();
+        ifield.characterLimit = 30;
+        ifield.lineType = InputField.LineType.SingleLine;
+
+        GameObject phGo = new GameObject("Placeholder");
+        phGo.transform.SetParent(box.transform, false);
+        RectTransform phRt = phGo.AddComponent<RectTransform>();
+        phRt.anchorMin = Vector2.zero;
+        phRt.anchorMax = Vector2.one;
+        phRt.offsetMin = new Vector2(10f, 2f);
+        phRt.offsetMax = new Vector2(-10f, -2f);
+
+        Text phTxt = phGo.AddComponent<Text>();
+        phTxt.font = font;
+        phTxt.fontSize = 13;
+        phTxt.fontStyle = FontStyle.Italic;
+        phTxt.alignment = TextAnchor.MiddleLeft;
+        phTxt.color = new Color(0.6f, 0.68f, 0.78f, 0.75f);
+        phTxt.text = placeholderText;
+
+        GameObject txtGo = new GameObject("Text");
+        txtGo.transform.SetParent(box.transform, false);
+        RectTransform tRt = txtGo.AddComponent<RectTransform>();
+        tRt.anchorMin = Vector2.zero;
+        tRt.anchorMax = Vector2.one;
+        tRt.offsetMin = new Vector2(10f, 2f);
+        tRt.offsetMax = new Vector2(-10f, -2f);
+
+        Text txt = txtGo.AddComponent<Text>();
+        txt.font = font;
+        txt.fontSize = 13;
+        txt.alignment = TextAnchor.MiddleLeft;
+        txt.color = Color.white;
+        txt.supportRichText = false;
+
+        ifield.textComponent = txt;
+        ifield.placeholder = phTxt;
+        ifield.text = defaultText;
+
+        return ifield;
+    }
+
+    private Button CreateLobbyButton(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax, Color bgColor, string label, Font font, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject btnGo = new GameObject(name);
+        btnGo.transform.SetParent(parent, false);
+        RectTransform rt = btnGo.AddComponent<RectTransform>();
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.offsetMin = offsetMin;
+        rt.offsetMax = offsetMax;
+
+        Image bg = btnGo.AddComponent<Image>();
+        bg.color = bgColor;
+
+        Button btn = btnGo.AddComponent<Button>();
+        if (onClick != null) btn.onClick.AddListener(onClick);
+
+        GameObject txtGo = new GameObject("Text");
+        txtGo.transform.SetParent(btnGo.transform, false);
+        RectTransform tRt = txtGo.AddComponent<RectTransform>();
+        tRt.anchorMin = Vector2.zero;
+        tRt.anchorMax = Vector2.one;
+        tRt.offsetMin = Vector2.zero;
+        tRt.offsetMax = Vector2.zero;
+
+        Text txt = txtGo.AddComponent<Text>();
+        txt.font = font;
+        txt.fontSize = 13;
+        txt.fontStyle = FontStyle.Bold;
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.color = Color.white;
+        txt.text = label;
+
+        return btn;
     }
 }

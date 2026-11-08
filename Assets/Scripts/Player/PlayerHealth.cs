@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 public class PlayerHealth : MonoBehaviour
@@ -213,6 +213,61 @@ public class PlayerHealth : MonoBehaviour
                 SurvivalTimerUI.Instance.OnPlayerDied(this);
             }
         }
+    }
+
+    /// <summary>
+    /// Äáº·t láº¡i mÃ¡u vÃ  tráº¡ng thÃ¡i ngÆ°á»i chÆ¡i khi báº¯t Ä‘áº§u hiá»‡p/tráº­n Ä‘áº¥u má»›i
+    /// </summary>
+    public void ResetHealth()
+    {
+        isDead = false;
+        currentHealth = maxHealth;
+        displayedHealthRatio = 1f;
+        vignetteAlpha = 0f;
+        scratchAlpha = 0f;
+
+        if (damageVignette != null)
+        {
+            Color vc = damageVignette.color;
+            vc.a = 0f;
+            damageVignette.color = vc;
+        }
+
+        if (clawScratchImage != null)
+        {
+            clawScratchImage.gameObject.SetActive(false);
+        }
+
+        ThirdPersonPlayerController playerCtrl = GetComponent<ThirdPersonPlayerController>();
+        if (playerCtrl == null) playerCtrl = ThirdPersonPlayerController.Instance;
+        if (playerCtrl != null)
+        {
+            playerCtrl.enabled = true;
+            if (playerCtrl.playerAnimator != null)
+            {
+                playerCtrl.playerAnimator.speed = 1.0f;
+                playerCtrl.playerAnimator.CrossFadeInFixedTime("Idle", 0.15f);
+            }
+        }
+
+        if (characterController != null)
+        {
+            characterController.enabled = true;
+        }
+
+        // Chuyá»ƒn láº¡i Camera vá» ngÆ°á»i chÆ¡i náº¿u Ä‘ang bÃ¡m theo Ma
+        if (ThirdPersonCamera.Instance != null)
+        {
+            ThirdPersonCamera.Instance.SetTarget(transform, new Vector3(0f, 1.45f, 0f));
+        }
+
+        GameObject takeoverBanner = GameObject.Find("GhostTakeoverBanner");
+        if (takeoverBanner != null)
+        {
+            Destroy(takeoverBanner);
+        }
+
+        UpdateHealthText();
     }
 
     /// <summary>

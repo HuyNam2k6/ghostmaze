@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -58,6 +58,54 @@ public class PumpkinGhostAI : MonoBehaviour
     public Light freezeLight;
     [Tooltip("Màu ánh sáng khi bị khóa (Mặc định: Xanh lam băng giá)")]
     public Color freezeVFXColor = new Color(0.2f, 0.75f, 1.0f);
+
+    /// <summary>
+    /// Trạng thái ma được phép đi săn: Ban đầu ở sảnh và trong 30s đầu (Người đang tản ra trốn) = false.
+    /// Đúng sau 30s = true -> Ma gầm lên và bắt đầu truy lùng con người!
+    /// </summary>
+    public static bool IsGhostHunting { get; set; } = false;
+
+    public static void FreezeAllGhosts()
+    {
+        IsGhostHunting = false;
+        var ghosts = ActiveGhosts;
+        if (ghosts != null)
+        {
+            for (int i = 0; i < ghosts.Count; i++)
+            {
+                if (ghosts[i] != null)
+                {
+                    ghosts[i].isPlayerControlled = false;
+                    ghosts[i].SetFreezeVFX(true);
+                    ghosts[i].PlayAnimState("Idle", 0.2f);
+                }
+            }
+        }
+    }
+
+    public static void ReleaseAllGhostsToHunt()
+    {
+        IsGhostHunting = true;
+        var ghosts = ActiveGhosts;
+        if (ghosts != null)
+        {
+            for (int i = 0; i < ghosts.Count; i++)
+            {
+                if (ghosts[i] != null)
+                {
+                    ghosts[i].SetFreezeVFX(false);
+                    ghosts[i].SetEyeColor(Color.red);
+                    ghosts[i].SetEyeIntensity(4.5f);
+                    ghosts[i].PlayAnimState("Attack", 0.15f);
+                    if (ghosts[i].aggroScreechClip != null && ghosts[i].audioSource != null)
+                    {
+                        ghosts[i].audioSource.PlayOneShot(ghosts[i].aggroScreechClip);
+                    }
+                    ghosts[i].currentState = GhostState.Chase;
+                }
+            }
+        }
+    }
 
     // Component nội bộ
     private CharacterController controller;
@@ -277,15 +325,29 @@ public class PumpkinGhostAI : MonoBehaviour
         // Chế độ người chơi chiếm hữu điều khiển con ma bí ngô (sau khi người chơi tử trận)
         if (isPlayerControlled)
         {
+            if (!IsGhostHunting)
+        {
+            if (freezeVFXRoot != null && freezeVFXRoot.activeSelf)
+            {
+                freezeVFXRoot.transform.Rotate(0f, 100f * Time.deltaTime, 0f);
+            }
+            return;
+        }
+
             UpdatePlayerControlled();
             return;
         }
 
         // Chờ phòng đủ người chơi (Lobby) -> Quái ma đứng yên canh gác, chưa truy đuổi tấn công
-        if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.requireFullRoomToStart && !PhotonMultiplayerChatVoice.IsGameStarted)
+        if (!IsGhostHunting)
         {
+            if (freezeVFXRoot != null && freezeVFXRoot.activeSelf)
+            {
+                freezeVFXRoot.transform.Rotate(0f, 100f * Time.deltaTime, 0f);
+            }
             return;
         }
+
 
         ApplyGhostSeparation();
 
@@ -1504,7 +1566,7 @@ public class PumpkinGhostAI : MonoBehaviour
     /// <summary>
     /// Bật/tắt hiệu ứng vòng xích ma thuật và đèn phong ấn quanh thân ma
     /// </summary>
-    private void SetFreezeVFX(bool active)
+    public void SetFreezeVFX(bool active)
     {
         EnsureFreezeVFX();
         if (freezeVFXRoot != null)
