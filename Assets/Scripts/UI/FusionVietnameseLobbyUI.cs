@@ -48,10 +48,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            Destroy(this);
             return;
         }
         Instance = this;
+
+        // Ẩn bảng IMGUI tiếng Anh mặc định của Fusion, dùng giao diện tiếng Việt này thay thế
+        FusionBootstrapDebugGUI.HideDefaultGUI = true;
 
         if (bootstrap == null)
         {
@@ -61,6 +64,15 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         EnsureBackgroundTextureLoaded();
         BuildModernVietnameseUI();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+            FusionBootstrapDebugGUI.HideDefaultGUI = false;
+        }
     }
 
     private void Start()
@@ -595,7 +607,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private void UpdateConnectionStatusUI()
     {
         bool isConnected = bootstrap.CurrentStage == FusionBootstrap.Stage.AllConnected;
-        bool isStarting = bootstrap.CurrentStage == FusionBootstrap.Stage.Starting || bootstrap.CurrentStage == FusionBootstrap.Stage.Connecting;
+        bool isStarting = !isConnected && bootstrap.CurrentStage != FusionBootstrap.Stage.Disconnected;
 
         // Cập nhật text trạng thái góc trên bên trái
         if (connectionStatusBadgeText != null)

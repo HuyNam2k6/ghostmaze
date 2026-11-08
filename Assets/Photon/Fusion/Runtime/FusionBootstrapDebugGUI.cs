@@ -1,4 +1,4 @@
-﻿namespace Fusion {
+namespace Fusion {
   using System;
   using UnityEngine;
   using System.Collections.Generic;
@@ -23,8 +23,10 @@
     [InlineHelp]
     public GUISkin BaseSkin;
 
-    [Tooltip("Su dung giao dien sanh cho tieng Viet ma mi (Anh 2)")]
-    public bool UseCustomVietnameseUI = true;
+    /// <summary>
+    /// [GhostMaze] Khi = true, ẩn bảng IMGUI mặc định (dùng giao diện sảnh chờ tiếng Việt FusionVietnameseLobbyUI thay thế).
+    /// </summary>
+    public static bool HideDefaultGUI = false;
 
     FusionBootstrap _networkDebugStart;
     string _clientCount;
@@ -44,9 +46,6 @@
 
     protected virtual void OnValidate() {
       ValidateClientCount();
-      if (GetComponent<FusionVietnameseLobbyUI>() == null) {
-        gameObject.AddComponent<FusionVietnameseLobbyUI>();
-      }
     }
 
     protected void ValidateClientCount() {
@@ -70,9 +69,6 @@
       _networkDebugStart = EnsureNetworkDebugStartExists();
       _clientCount = _networkDebugStart.AutoClients.ToString();
       ValidateClientCount();
-      if (GetComponent<FusionVietnameseLobbyUI>() == null) {
-        gameObject.AddComponent<FusionVietnameseLobbyUI>();
-      }
     }
     protected virtual void Start() {
     }
@@ -163,7 +159,7 @@
         return;
       }
 
-      if (UseCustomVietnameseUI) {
+      if (HideDefaultGUI) {
         return;
       }
 
@@ -182,23 +178,10 @@
               _nicifiedStageNames = ConvertEnumToNicifiedNameLookup<FusionBootstrap.Stage>("Fusion Status: ");
             }
             string stagename;
-            switch (nds.CurrentStage)
-            {
-              case FusionBootstrap.Stage.Disconnected:
-                stagename = "Trạng thái kết nối: Chưa kết nối";
-                break;
-              case FusionBootstrap.Stage.Starting:
-                stagename = "Trạng thái kết nối: Đang khởi tạo...";
-                break;
-              case FusionBootstrap.Stage.Connecting:
-                stagename = "Trạng thái kết nối: Đang kết nối...";
-                break;
-              case FusionBootstrap.Stage.AllConnected:
-                stagename = "Trạng thái kết nối: Đã kết nối";
-                break;
-              default:
-                stagename = "Tráº¡ng thÃ¡i káº¿t ná»‘i: " + nds.CurrentStage;
-                break;
+            switch (nds.CurrentStage) {
+              case FusionBootstrap.Stage.Disconnected: stagename = "Trạng thái kết nối: Chưa kết nối"; break;
+              case FusionBootstrap.Stage.AllConnected: stagename = "Trạng thái kết nối: Đã kết nối"; break;
+              default: stagename = "Trạng thái kết nối: Đang kết nối..."; break;
             }
             GUILayout.Label(stagename, new GUIStyle(GUI.skin.label) { fontSize = (int)(GUI.skin.label.fontSize * .8f), alignment = TextAnchor.UpperLeft });
 
@@ -220,25 +203,16 @@
 
             GUILayout.BeginHorizontal();
             {
-              GUILayout.Label("ID Phòng:", GUILayout.Height(height), GUILayout.Width(width * .30f));
+              GUILayout.Label("ID Phòng:", GUILayout.Height(height), GUILayout.Width(width * .33f));
               nds.DefaultRoomName = GUILayout.TextField(nds.DefaultRoomName, 25, GUILayout.Height(height));
-              if (GUILayout.Button("Tham gia", GUILayout.Height(height), GUILayout.Width(width * .30f))) {
-                if (string.IsNullOrWhiteSpace(nds.DefaultRoomName)) {
-                  nds.DefaultRoomName = UnityEngine.Random.Range(10000, 99999).ToString();
-                }
-                nds.StartClient();
-              }
             }
             GUILayout.EndHorizontal();
 
-            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu một người chơi", GUILayout.Height(height))) {
+            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu một người chơi (I)" : "Bắt đầu một người chơi", GUILayout.Height(height))) {
               nds.StartSinglePlayer();
             }
 
-            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu chế độ nhiều người chơi", GUILayout.Height(height))) {
-              if (string.IsNullOrWhiteSpace(nds.DefaultRoomName)) {
-                nds.DefaultRoomName = UnityEngine.Random.Range(10000, 99999).ToString();
-              }
+            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu chế độ nhiều người chơi (P)" : "Bắt đầu chế độ nhiều người chơi", GUILayout.Height(height))) {
               if (IsMultiplePeerMode) {
                 StartMultipleSharedClients(nds);
               } else {
@@ -246,18 +220,16 @@
               }
             }
 
-            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu máy chủ" : "Bắt đầu máy chủ", GUILayout.Height(height))) {
+            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu máy chủ (S)" : "Bắt đầu máy chủ", GUILayout.Height(height))) {
               if (IsMultiplePeerMode) {
                 StartServerWithClients(nds);
+
               } else {
                 nds.StartServer();
               }
             }
 
-            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu làm chủ phòng", GUILayout.Height(height))) {
-              if (string.IsNullOrWhiteSpace(nds.DefaultRoomName)) {
-                nds.DefaultRoomName = UnityEngine.Random.Range(10000, 99999).ToString();
-              }
+            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu làm chủ phòng (H)" : "Bắt đầu làm chủ phòng", GUILayout.Height(height))) {
               if (IsMultiplePeerMode) {
                 StartHostWithClients(nds);
               } else {
@@ -265,10 +237,7 @@
               }
             }
 
-            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu làm khách", GUILayout.Height(height))) {
-              if (string.IsNullOrWhiteSpace(nds.DefaultRoomName)) {
-                nds.DefaultRoomName = UnityEngine.Random.Range(10000, 99999).ToString();
-              }
+            if (GUILayout.Button(EnableHotkeys ? "Bắt đầu làm khách (C)" : "Bắt đầu làm khách", GUILayout.Height(height))) {
               if (IsMultiplePeerMode) {
                 StartMultipleClients(nds);
               } else {
@@ -276,10 +245,7 @@
               }
             }
 
-            if (GUILayout.Button(EnableHotkeys ? "Tự động làm chủ hoặc làm khách", GUILayout.Height(height))) {
-              if (string.IsNullOrWhiteSpace(nds.DefaultRoomName)) {
-                nds.DefaultRoomName = UnityEngine.Random.Range(10000, 99999).ToString();
-              }
+            if (GUILayout.Button(EnableHotkeys ? "Tự động làm chủ hoặc làm khách (A)" : "Tự động làm chủ hoặc làm khách", GUILayout.Height(height))) {
               if (IsMultiplePeerMode) {
                 StartMultipleAutoClients(nds);
               } else {
@@ -298,20 +264,11 @@
                   // Remove everything but numbers from our client count string.
                   _clientCount = newcount;
                   ValidateClientCount();
-      if (GetComponent<FusionVietnameseLobbyUI>() == null) {
-        gameObject.AddComponent<FusionVietnameseLobbyUI>();
-      }
                 }
               }
               GUILayout.EndHorizontal();
             }
           } else {
-
-            GUILayout.BeginHorizontal();
-            {
-              GUILayout.Label("ID PhÃ²ng: " + (string.IsNullOrEmpty(nds.DefaultRoomName) ? "PhÃ²ng ngáº«u nhiÃªn" : nds.DefaultRoomName), GUILayout.Height(height));
-            }
-            GUILayout.EndHorizontal();
 
             if (GUILayout.Button("Ngắt kết nối / Rời phòng", GUILayout.Height(height))) {
               _networkDebugStart.ShutdownAll();
