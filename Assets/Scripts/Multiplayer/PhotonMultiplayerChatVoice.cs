@@ -67,6 +67,9 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private const byte EVENT_VOICE_PACKET = 102;
     private const byte EVENT_PLAYER_SYNC = 103;
     private const byte EVENT_MATCH_STATE = 104;
+    private const byte EVENT_ROLE_ASSIGN = 105;
+    public static readonly System.Collections.Generic.List<int> GhostActorNumbers = new System.Collections.Generic.List<int>();
+    public static bool soloTestAsGhost = false;
 
     private RealtimeClient client;
     private bool isConnectingOrConnected;
@@ -1038,6 +1041,10 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         currentMatchState = MatchState.CountingDown;
         countdownTimer = duration;
+        if (client != null && client.LocalPlayer != null && client.LocalPlayer.IsMasterClient)
+        {
+            HostAssignRandomRoles();
+        }
         AddSystemMessage($"⚡ Đã đủ {requiredPlayersToStart} người chơi! Cổng mê cung sẽ mở sau {Mathf.CeilToInt(duration)} giây!");
         UpdateLobbyUI();
     }
@@ -1059,11 +1066,62 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         AddSystemMessage("🔥 PHONG ẤN ĐÃ MỞ! HÃY TÌM ĐƯỜNG THOÁT VÀ SỐNG SÓT!");
     }
 
+    public void HostAssignRandomRoles()
+    {
+        GhostActorNumbers.Clear();
+        if (client != null && client.InRoom && client.CurrentRoom != null && client.CurrentRoom.Players != null)
+        {
+            var allActors = new System.Collections.Generic.List<int>(client.CurrentRoom.Players.Keys);
+            for (int i = 0; i < allActors.Count; i++)
+            {
+                int r = UnityEngine.Random.Range(i, allActors.Count);
+                int tmp = allActors[i];
+                allActors[i] = allActors[r];
+                allActors[r] = tmp;
+            }
+
+            int ghostCount = allActors.Count >= 4 ? 2 : (allActors.Count >= 2 ? 1 : (soloTestAsGhost ? 1 : 0));
+            for (int i = 0; i < ghostCount; i++)
+            {
+                GhostActorNumbers.Add(allActors[i]);
+            }
+
+            object[] payload = new object[GhostActorNumbers.Count];
+            for (int i = 0; i < GhostActorNumbers.Count; i++)
+            {
+                payload[i] = GhostActorNumbers[i];
+            }
+
+            RaiseEventArgs raiseArgs = new RaiseEventArgs { Receivers = ReceiverGroup.All };
+            client.OpRaiseEvent(EVENT_ROLE_ASSIGN, payload, raiseArgs, SendOptions.SendReliable);
+
+            int myActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
+            bool amIGhost = GhostActorNumbers.Contains(myActor);
+            int ghostSlot = GhostActorNumbers.IndexOf(myActor);
+            if (SurvivalTimerUI.Instance != null)
+            {
+                SurvivalTimerUI.Instance.SetLocalPlayerRole(amIGhost ? SurvivalTimerUI.PlayerRole.Ghost : SurvivalTimerUI.PlayerRole.Human, Mathf.Max(0, ghostSlot));
+            }
+        }
+        else
+        {
+            if (SurvivalTimerUI.Instance != null)
+            {
+                SurvivalTimerUI.Instance.SetLocalPlayerRole(soloTestAsGhost ? SurvivalTimerUI.PlayerRole.Ghost : SurvivalTimerUI.PlayerRole.Human, 0);
+            }
+        }
+    }
+
     public void HostForceStartGame()
     {
+        HostAssignRandomRoles();
         if (client != null && client.LocalPlayer != null && client.LocalPlayer.IsMasterClient)
         {
             BroadcastMatchState(2, 0f);
+            StartGameLocally();
+        }
+        else if (client == null || !client.InRoom)
+        {
             StartGameLocally();
         }
     }
