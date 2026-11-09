@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -68,6 +68,10 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private const byte EVENT_PLAYER_SYNC = 103;
     private const byte EVENT_MATCH_STATE = 104;
     private const byte EVENT_ROLE_ASSIGN = 105;
+    private const byte EVENT_PLAYER_READY = 106;
+    private const byte EVENT_GHOST_ATTACK = 107;
+    public static readonly System.Collections.Generic.Dictionary<int, bool> ReadyPlayerDict = new System.Collections.Generic.Dictionary<int, bool>();
+    public static bool IsLocalPlayerReady = false;
     public static readonly System.Collections.Generic.List<int> GhostActorNumbers = new System.Collections.Generic.List<int>();
     public static bool soloTestAsGhost = false;
 
@@ -76,6 +80,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private bool useFusionPlugin = false;
     private bool roomJoinBlocked = false; // Server từ chối phòng (sai loại App ID) -> ngừng thử lại liên tục
     private float reconnectTimer;
+    private bool isAutoMatchingRandomRoom = false;
+    private float nextMicRetryTime = 0f;
 
     // Trạng thái Chat
     private readonly List<string> chatMessages = new List<string>();
@@ -121,8 +127,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private GameObject lobbyPanelObj;
     private GameObject lobbyMainMenuSubView;
     private GameObject lobbyRoomWaitingSubView;
-    private InputField lobbyPlayerNameInput;
-    private InputField lobbyRoomNameInput;
+    private InputField lobbyPlayerNameInput = null;
+    private InputField lobbyRoomNameInput = null;
     private Text lobbyServerStatusText;
     private Text lobbyTitleText;
     private Text lobbyRoomText;
@@ -136,12 +142,270 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private bool isLobbyCursorUnlocked = false;
     private readonly System.Text.StringBuilder lobbySb = new System.Text.StringBuilder();
 
+    public struct RoomPlayerEntry
+    {
+        public int actorNumber;
+        public string nickName;
+        public bool isLocal;
+        public bool isMaster;
+        public bool isReady;
+    }
+
+    public void ToggleLocalPlayerReady()
+    {
+        IsLocalPlayerReady = !IsLocalPlayerReady;
+        int myActor = (client != null && client.LocalPlayer != null) ? client.LocalPlayer.ActorNumber : 1;
+        ReadyPlayerDict[myActor] = IsLocalPlayerReady;
+        if (client != null && client.InRoom)
+        {
+            object[] payload = new object[] { myActor, IsLocalPlayerReady };
+            RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.All };
+            client.OpRaiseEvent(EVENT_PLAYER_READY, payload, args, SendOptions.SendReliable);
+        }
+        CheckAllPlayersConfirmedAndStart();
+    }
+
+    public bool AreAllPlayersReady()
+    {
+        if (client == null || !client.InRoom || client.CurrentRoom == null || client.CurrentRoom.Players == null)
+        {
+            return IsLocalPlayerReady;
+        }
+        if (client.CurrentRoom.PlayerCount == 0) return false;
+
+        int localActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
+        foreach (var kvp in client.CurrentRoom.Players)
+        {
+            int actorNr = kvp.Key;
+            if (actorNr == localActor)
+            {
+                if (!IsLocalPlayerReady) return false;
+            }
+            else
+            {
+                if (!ReadyPlayerDict.TryGetValue(actorNr, out bool r) || !r) return false;
+            }
+        }
+        return true;
+    }
+
+    public int GetReadyPlayersCount()
+    {
+        int count = 0;
+        if (client != null && client.InRoom && client.CurrentRoom != null && client.CurrentRoom.Players != null)
+        {
+            int localActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
+            foreach (var kvp in client.CurrentRoom.Players)
+            {
+                int actorNr = kvp.Key;
+                if (actorNr == localActor)
+                {
+                    if (IsLocalPlayerReady) count++;
+                }
+                else if (ReadyPlayerDict.TryGetValue(actorNr, out bool r) && r)
+                {
+                    count++;
+                }
+            }
+        }
+        else
+        {
+            if (IsLocalPlayerReady) count = 1;
+        }
+        return count;
+    }
+
+    public void CheckAllPlayersConfirmedAndStart()
+    {
+        if (IsGameStarted) return;
+        if (!hasUserRequestedRoom) return;
+
+        int totalCount = CurrentRoomPlayersCount;
+        if (totalCount < 1) return;
+
+        bool allReady = AreAllPlayersReady();
+        if (allReady && (totalCount >= requiredPlayersToStart || totalCount >= 4))
+        {
+            if (client != null && client.InRoom)
+            {
+                if (client.LocalPlayer != null && client.LocalPlayer.IsMasterClient)
+                {
+                    HostAssignRandomRoles();
+                    BroadcastMatchState(2, 0f);
+                    StartGameLocally();
+                }
+            }
+            else
+            {
+                StartGameLocally();
+            }
+        }
+    }
+
+    private bool hasUserRequestedRoom = false;
+    public bool HasUserRequestedRoom => hasUserRequestedRoom;
+    public bool IsConnectedToMaster => client != null && (client.IsConnectedAndReady || client.InRoom || client.State == ClientState.ConnectedToMasterServer);
+    public bool IsInPhotonRoom => client != null && client.InRoom && client.CurrentRoom != null;
+    public bool IsLocalMaster => client == null || !client.InRoom || (client.LocalPlayer != null && client.LocalPlayer.IsMasterClient);
+    public int CurrentRoomPlayersCount => (client != null && client.InRoom && client.CurrentRoom != null) ? (int)client.CurrentRoom.PlayerCount : (hasUserRequestedRoom ? 1 : 0);
+    public float RemainingCountdown => currentMatchState == MatchState.CountingDown ? Mathf.Max(0f, countdownTimer) : -1f;
+
+    public void SetLocalPlayerNickname(string newNick)
+    {
+        if (string.IsNullOrWhiteSpace(newNick)) return;
+        playerName = newNick.Trim();
+        if (client != null && client.LocalPlayer != null)
+        {
+            client.LocalPlayer.NickName = playerName;
+        }
+    }
+
+    public void JoinRandomOrCreateRoom(string customNickName = null)
+    {
+        if (!string.IsNullOrWhiteSpace(customNickName))
+        {
+            SetLocalPlayerNickname(customNickName);
+        }
+        hasUserRequestedRoom = true;
+        isAutoMatchingRandomRoom = true;
+        IsGameStarted = false;
+        currentMatchState = MatchState.WaitingForPlayers;
+        countdownTimer = 0f;
+
+        if (client == null)
+        {
+            ConnectToPhoton();
+            return;
+        }
+
+        if (client.InRoom)
+        {
+            client.OpLeaveRoom(false);
+            return;
+        }
+
+        if (client.State == ClientState.ConnectedToMasterServer)
+        {
+            client.OpJoinRandomRoom();
+        }
+        else if (!client.IsConnected)
+        {
+            ConnectToPhoton();
+        }
+    }
+
+    public void JoinOrCreateCustomRoom(string targetRoomId, string customNickName = null)
+    {
+        if (!string.IsNullOrWhiteSpace(customNickName))
+        {
+            SetLocalPlayerNickname(customNickName);
+        }
+        if (!string.IsNullOrWhiteSpace(targetRoomId))
+        {
+            roomName = targetRoomId.Trim();
+        }
+        hasUserRequestedRoom = true;
+        isAutoMatchingRandomRoom = false;
+        IsGameStarted = false;
+        currentMatchState = MatchState.WaitingForPlayers;
+        countdownTimer = 0f;
+
+        if (client == null)
+        {
+            ConnectToPhoton();
+            return;
+        }
+
+        if (client.InRoom)
+        {
+            if (client.CurrentRoom != null && string.Equals(client.CurrentRoom.Name, roomName, StringComparison.OrdinalIgnoreCase))
+            {
+                CheckLobbyPlayerCount();
+                return;
+            }
+            client.OpLeaveRoom(false);
+            return;
+        }
+
+        if (client.State == ClientState.ConnectedToMasterServer)
+        {
+            JoinOrCreateTargetRoom();
+        }
+        else if (!client.IsConnected)
+        {
+            ConnectToPhoton();
+        }
+    }
+
+    public void LeaveRoomAndReturnToMenu()
+    {
+        hasUserRequestedRoom = false;
+        IsGameStarted = false;
+        currentMatchState = MatchState.WaitingForPlayers;
+        countdownTimer = 0f;
+        ClearRemotePlayers();
+        if (client != null && client.InRoom)
+        {
+            client.OpLeaveRoom(false);
+        }
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "LobbyScene")
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
+        }
+    }
+
+    public List<RoomPlayerEntry> GetRoomPlayersList()
+    {
+        List<RoomPlayerEntry> list = new List<RoomPlayerEntry>();
+        if (client != null && client.InRoom && client.CurrentRoom != null && client.CurrentRoom.Players != null && client.CurrentRoom.Players.Count > 0)
+        {
+            int localActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
+            foreach (var kvp in client.CurrentRoom.Players)
+            {
+                var p = kvp.Value;
+                if (p == null) continue;
+                bool isMe = (p.ActorNumber == localActor);
+                string pNick = !string.IsNullOrWhiteSpace(p.NickName) ? p.NickName : (isMe ? playerName : $"NgÆ°á»iChÆ¡i_{p.ActorNumber}");
+                bool pReady = isMe ? IsLocalPlayerReady : (ReadyPlayerDict.TryGetValue(p.ActorNumber, out bool pr) && pr);
+                list.Add(new RoomPlayerEntry
+                {
+                    actorNumber = p.ActorNumber,
+                    nickName = pNick,
+                    isLocal = isMe,
+                    isMaster = p.IsMasterClient,
+                    isReady = pReady
+                });
+            }
+            list.Sort((a, b) =>
+            {
+                if (a.isLocal != b.isLocal) return a.isLocal ? -1 : 1;
+                if (a.isMaster != b.isMaster) return a.isMaster ? -1 : 1;
+                return a.actorNumber.CompareTo(b.actorNumber);
+            });
+        }
+        else
+        {
+            // Hiá»ƒn thá»‹ ngay báº£n thÃ¢n ngÆ°á»i chÆ¡i ("TÃ´i á»Ÿ Ä‘Ã¢y") ngay khi vá»«a nháº¥n Táº¡o phÃ²ng / VÃ o phÃ²ng
+            list.Add(new RoomPlayerEntry
+            {
+                actorNumber = 1,
+                nickName = !string.IsNullOrWhiteSpace(playerName) ? playerName : "NgÆ°á»iChÆ¡i_TÃ´i",
+                isLocal = true,
+                isMaster = true,
+                isReady = IsLocalPlayerReady
+            });
+        }
+        return list;
+    }
+
     private class RemotePlayerAvatar
     {
         public GameObject rootObj;
         public Vector3 targetPos;
         public Quaternion targetRot;
         public float lastUpdateTime;
+        public bool isGhostForm;
+        public Animator animator;
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -207,6 +471,29 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     private void Update()
     {
+        // [GhostMaze] O LobbyScene: Luon mo chuot tu do (khong khoa chuot) va an toan bo Chat UI
+        bool isLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        if (isLobbyScene)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            if (chatPanelRect != null && chatPanelRect.gameObject.activeSelf)
+            {
+                chatPanelRect.gameObject.SetActive(false);
+            }
+            if (lobbyPanelObj != null && lobbyPanelObj.activeSelf)
+            {
+                lobbyPanelObj.SetActive(false);
+            }
+        }
+        else
+        {
+            if (chatPanelRect != null && !chatPanelRect.gameObject.activeSelf)
+            {
+                chatPanelRect.gameObject.SetActive(true);
+            }
+        }
+
         if (client != null)
         {
             client.Service();
@@ -220,7 +507,13 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         if (!IsGameStarted)
         {
-            if (client != null && client.InRoom)
+            if (isLobbyScene)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                ThirdPersonCamera.isUIPanelOpen = true;
+            }
+            else if (client != null && client.InRoom)
             {
                 if (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.currentPhase == SurvivalTimerUI.MatchPhase.Lobby)
                 {
@@ -270,6 +563,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             UpdateLobbyUI();
             if (countdownTimer <= 0f)
             {
+                if (client != null && client.InRoom && client.LocalPlayer != null && client.LocalPlayer.IsMasterClient)
+                {
+                    if (GhostActorNumbers.Count == 0) HostAssignRandomRoles();
+                    BroadcastMatchState(2, 0f);
+                }
                 StartGameLocally();
             }
         }
@@ -287,14 +585,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         if (chatInputField != null)
         {
             bool fieldFocused = chatInputField.isFocused;
-            if (!fieldFocused && isChatInputFocused)
-            {
-                SetChatFocus(false);
-            }
-            else if (fieldFocused && !isChatInputFocused)
-            {
-                SetChatFocus(true);
-            }
+            isChatInputFocused = fieldFocused;
         }
 
         HandleShortcuts();
@@ -315,10 +606,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             }
             client = null;
         }
-        if (!string.IsNullOrEmpty(activeMicDevice) && Microphone.IsRecording(activeMicDevice))
+        try
         {
-            Microphone.End(activeMicDevice);
+            if (!string.IsNullOrEmpty(activeMicDevice) && Microphone.IsRecording(activeMicDevice))
+            {
+                Microphone.End(activeMicDevice);
+            }
         }
+        catch { }
         if (Instance == this) Instance = null;
     }
 
@@ -372,12 +667,31 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     public void OnConnectedToMaster()
     {
+        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        if (inLobbyScene && !hasUserRequestedRoom)
+        {
+            AddSystemMessage($"Đã kết nối máy chủ Photon ({client.CurrentRegion})! Hãy Tạo phòng hoặc Tham gia phòng.");
+            return;
+        }
+
+        if (isAutoMatchingRandomRoom)
+        {
+            AddSystemMessage($"Đã kết nối Photon ({client.CurrentRegion})! Đang tìm phòng đang mở...");
+            client.OpJoinRandomRoom();
+            return;
+        }
+
         AddSystemMessage($"Đã kết nối Photon ({client.CurrentRegion})! Đang vào phòng '{roomName}'...");
         JoinOrCreateTargetRoom();
     }
 
     private void JoinOrCreateTargetRoom()
     {
+        if (string.IsNullOrWhiteSpace(roomName))
+        {
+            roomName = "88888";
+        }
+
         RoomOptions roomOptions = new RoomOptions
         {
             MaxPlayers = maxPlayersPerRoom,
@@ -398,15 +712,38 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         client.OpJoinOrCreateRoom(roomArgs);
     }
 
+    private void BroadcastLocalReadyState()
+    {
+        if (client != null && client.InRoom && client.LocalPlayer != null)
+        {
+            int myActor = client.LocalPlayer.ActorNumber;
+            ReadyPlayerDict[myActor] = IsLocalPlayerReady;
+            object[] payload = new object[] { myActor, IsLocalPlayerReady };
+            RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.All };
+            client.OpRaiseEvent(EVENT_PLAYER_READY, payload, args, SendOptions.SendReliable);
+        }
+    }
+
     public void OnJoinedRoom()
     {
+        isAutoMatchingRandomRoom = false;
+        if (client.CurrentRoom != null && !string.IsNullOrEmpty(client.CurrentRoom.Name))
+        {
+            roomName = client.CurrentRoom.Name;
+        }
         int count = client.CurrentRoom != null ? client.CurrentRoom.PlayerCount : 1;
         AddSystemMessage($"Đã vào phòng [{roomName}] ({count}/{requiredPlayersToStart} người). Nhấn [Enter] để Chat, [V] để Mic, [H] để ẩn Chat!");
+        BroadcastLocalReadyState();
         CheckLobbyPlayerCount();
-        isLobbyCursorUnlocked = false;
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-        ThirdPersonCamera.isUIPanelOpen = false;
+
+        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        if (!inLobbyScene)
+        {
+            isLobbyCursorUnlocked = false;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            ThirdPersonCamera.isUIPanelOpen = false;
+        }
         if (SurvivalTimerUI.Instance != null)
         {
             SurvivalTimerUI.Instance.KeepLocalPlayerAsHuman();
@@ -441,7 +778,16 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         AddSystemMessage($"Lỗi {action} phòng ({returnCode}): {message}");
     }
 
-    public void OnJoinRandomFailed(short returnCode, string message) { }
+    public void OnJoinRandomFailed(short returnCode, string message)
+    {
+        isAutoMatchingRandomRoom = false;
+        if (string.IsNullOrWhiteSpace(roomName) || roomName == "GhostMaze_Online")
+        {
+            roomName = "88888";
+        }
+        AddSystemMessage($"Chưa có phòng nào đang mở, tự động tạo phòng [{roomName}]...");
+        JoinOrCreateTargetRoom();
+    }
 
     public void OnLeftRoom()
     {
@@ -470,12 +816,18 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         string nick = !string.IsNullOrEmpty(newPlayer.NickName) ? newPlayer.NickName : $"NgườiChơi_{newPlayer.ActorNumber}";
         AddSystemMessage($"🟢 {nick} đã tham gia phòng!");
+        BroadcastLocalReadyState();
         CheckLobbyPlayerCount();
-        isLobbyCursorUnlocked = false;
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-        ThirdPersonCamera.isUIPanelOpen = false;
-        if (SurvivalTimerUI.Instance != null)
+
+        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        if (!inLobbyScene)
+        {
+            isLobbyCursorUnlocked = false;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            ThirdPersonCamera.isUIPanelOpen = false;
+        }
+        if (SurvivalTimerUI.Instance != null && !IsGameStarted)
         {
             SurvivalTimerUI.Instance.KeepLocalPlayerAsHuman();
         }
@@ -485,6 +837,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         string nick = !string.IsNullOrEmpty(otherPlayer.NickName) ? otherPlayer.NickName : $"NgườiChơi_{otherPlayer.ActorNumber}";
         AddSystemMessage($"🔴 {nick} đã rời phòng.");
+        ReadyPlayerDict.Remove(otherPlayer.ActorNumber);
 
         if (remotePlayers.TryGetValue(otherPlayer.ActorNumber, out var av))
         {
@@ -492,13 +845,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             remotePlayers.Remove(otherPlayer.ActorNumber);
         }
         CheckLobbyPlayerCount();
-        isLobbyCursorUnlocked = false;
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-        ThirdPersonCamera.isUIPanelOpen = false;
-        if (SurvivalTimerUI.Instance != null)
+
+        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        if (!inLobbyScene)
         {
-            SurvivalTimerUI.Instance.KeepLocalPlayerAsHuman();
+            isLobbyCursorUnlocked = false;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            ThirdPersonCamera.isUIPanelOpen = false;
         }
     }
 
@@ -577,7 +931,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 {
                     SetChatMinimized(false);
                 }
-                SetChatFocus(true);
+                SetChatFocus(false);
             }
         }
         else if (isCurrentlyTyping && escPressed)
@@ -636,16 +990,16 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             chatInputField.ActivateInputField();
-            chatInputField.Select();
+            if (EventSystem.current != null && !EventSystem.current.alreadySelecting) chatInputField.Select();
         }
         else
         {
             chatInputField.DeactivateInputField();
-            if (EventSystem.current != null && (EventSystem.current.currentSelectedGameObject == null || EventSystem.current.currentSelectedGameObject == chatInputField.gameObject))
+            if (EventSystem.current != null && !EventSystem.current.alreadySelecting && (EventSystem.current.currentSelectedGameObject == null || EventSystem.current.currentSelectedGameObject == chatInputField.gameObject))
             {
                 EventSystem.current.SetSelectedGameObject(null);
             }
-            if (!isDashboardOpen)
+            if (!isDashboardOpen && UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "LobbyScene")
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
@@ -706,50 +1060,64 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     public void ToggleMicrophone()
     {
-        // 1. Kiểm tra sự tồn tại của thiết bị Microphone trên máy tính
-        if (Microphone.devices == null || Microphone.devices.Length == 0)
+        try
         {
-            Debug.LogWarning("[PhotonVoice] Không tìm thấy thiết bị Microphone khả dụng trên hệ thống.");
-            isMicMuted = true;
-            activeMicDevice = null;
-            localSpeakingTimer = 0f;
-            localVoiceSendHangoverTimer = 0f;
-            UpdateStatusUI();
-            return;
-        }
-
-        isMicMuted = !isMicMuted;
-        if (isMicMuted)
-        {
-            localSpeakingTimer = 0f;
-            localVoiceSendHangoverTimer = 0f;
-        }
-        else
-        {
-            if (string.IsNullOrEmpty(activeMicDevice) || !Microphone.IsRecording(activeMicDevice))
+            // 1. Kiểm tra sự tồn tại của thiết bị Microphone trên máy tính
+            if (Microphone.devices == null || Microphone.devices.Length == 0)
             {
-                StartMicrophoneCapture();
+                Debug.LogWarning("[PhotonVoice] Không tìm thấy thiết bị Microphone khả dụng trên hệ thống.");
+                isMicMuted = true;
+                activeMicDevice = null;
+                localSpeakingTimer = 0f;
+                localVoiceSendHangoverTimer = 0f;
+                UpdateStatusUI();
+                return;
             }
 
-            // Đồng bộ con trỏ thu âm ngay thời điểm vừa bật để tránh nhại lại chuỗi dữ liệu cũ tích tụ
-            if (!string.IsNullOrEmpty(activeMicDevice))
+            isMicMuted = !isMicMuted;
+            if (isMicMuted)
             {
-                int currentPos = Microphone.GetPosition(activeMicDevice);
-                if (currentPos >= 0)
+                localSpeakingTimer = 0f;
+                localVoiceSendHangoverTimer = 0f;
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(activeMicDevice) || !Microphone.IsRecording(activeMicDevice))
                 {
-                    lastMicSamplePos = currentPos;
+                    StartMicrophoneCapture();
+                }
+
+                // Đồng bộ con trỏ thu âm ngay thời điểm vừa bật để tránh nhại lại chuỗi dữ liệu cũ tích tụ
+                if (!string.IsNullOrEmpty(activeMicDevice) && Microphone.IsRecording(activeMicDevice))
+                {
+                    int currentPos = Microphone.GetPosition(activeMicDevice);
+                    if (currentPos >= 0)
+                    {
+                        lastMicSamplePos = currentPos;
+                    }
                 }
             }
+            UpdateStatusUI();
         }
-        UpdateStatusUI();
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[PhotonVoice] Không thể chuyển trạng thái Microphone: {ex.Message}");
+            isMicMuted = true;
+            UpdateStatusUI();
+        }
     }
 
     private void SetupVoicePlayback()
     {
-        voicePlaybackSource = gameObject.AddComponent<AudioSource>();
+        voicePlaybackSource = gameObject.GetComponent<AudioSource>();
+        if (voicePlaybackSource == null)
+        {
+            voicePlaybackSource = gameObject.AddComponent<AudioSource>();
+        }
         voicePlaybackSource.spatialBlend = 0f; // Âm thanh Voice Chat rõ ràng toàn phòng
         voicePlaybackSource.loop = true;
         voicePlaybackSource.volume = 1.0f;
+        voicePlaybackSource.playOnAwake = true;
 
         playbackRingClip = AudioClip.Create("PhotonVoiceRing", PLAYBACK_RING_SAMPLES, 1, VOICE_SAMPLE_RATE, false);
         float[] zeroData = new float[PLAYBACK_RING_SAMPLES];
@@ -778,13 +1146,21 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
             micClip = Microphone.Start(activeMicDevice, true, 2, VOICE_SAMPLE_RATE);
             lastMicSamplePos = 0;
-            Debug.Log($"<color=#2ECC71>[PhotonVoice] Micro sẵn sàng: {activeMicDevice} ({VOICE_SAMPLE_RATE}Hz)</color>");
+            if (micClip != null)
+            {
+                Debug.Log($"<color=#2ECC71>[PhotonVoice] Micro sẵn sàng: {activeMicDevice} ({VOICE_SAMPLE_RATE}Hz)</color>");
+            }
+            else
+            {
+                nextMicRetryTime = Time.unscaledTime + 5f;
+            }
         }
         catch (Exception ex)
         {
             Debug.LogWarning($"[PhotonVoice] Lỗi khởi động Microphone: {ex.Message}");
             activeMicDevice = null;
             micClip = null;
+            nextMicRetryTime = Time.unscaledTime + 5f;
         }
     }
 
@@ -793,94 +1169,118 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     /// </summary>
     private void SafeGetMicData(AudioClip clip, float[] destBuffer, int offsetSamples, int totalClipSamples)
     {
-        if (clip == null || destBuffer == null || destBuffer.Length == 0) return;
-        int reqLen = destBuffer.Length;
-        if (offsetSamples + reqLen <= totalClipSamples)
+        if (clip == null || destBuffer == null || destBuffer.Length == 0 || totalClipSamples <= 0) return;
+        try
         {
-            clip.GetData(destBuffer, offsetSamples);
-        }
-        else
-        {
-            int part1Len = totalClipSamples - offsetSamples;
-            if (part1Len > 0)
+            int reqLen = destBuffer.Length;
+            if (offsetSamples + reqLen <= totalClipSamples)
             {
-                float[] temp1 = new float[part1Len];
-                clip.GetData(temp1, offsetSamples);
-                Array.Copy(temp1, 0, destBuffer, 0, part1Len);
+                clip.GetData(destBuffer, offsetSamples);
             }
-            int part2Len = reqLen - part1Len;
-            if (part2Len > 0)
+            else
             {
-                float[] temp2 = new float[part2Len];
-                clip.GetData(temp2, 0);
-                Array.Copy(temp2, 0, destBuffer, part1Len, part2Len);
+                int part1Len = totalClipSamples - offsetSamples;
+                if (part1Len > 0)
+                {
+                    float[] temp1 = new float[part1Len];
+                    clip.GetData(temp1, offsetSamples);
+                    Array.Copy(temp1, 0, destBuffer, 0, part1Len);
+                }
+                int part2Len = reqLen - part1Len;
+                if (part2Len > 0)
+                {
+                    float[] temp2 = new float[part2Len];
+                    clip.GetData(temp2, 0);
+                    Array.Copy(temp2, 0, destBuffer, part1Len, part2Len);
+                }
             }
         }
+        catch { }
     }
 
     private void ProcessMicrophoneAndSendVoice()
     {
-        if (isMicMuted || micClip == null || string.IsNullOrEmpty(activeMicDevice)) return;
+        if (isMicMuted) return;
 
-        if (!Microphone.IsRecording(activeMicDevice))
+        try
         {
-            StartMicrophoneCapture();
-            return;
-        }
-
-        int currentPos = Microphone.GetPosition(activeMicDevice);
-        if (currentPos < 0) return;
-
-        int clipSamples = micClip.samples;
-        int available = currentPos - lastMicSamplePos;
-        if (available < 0) available += clipSamples;
-
-        // Nếu bị lag khung hình hoặc giật quá 3 gói (300ms), nhảy cóc về gói mới nhất để chống trễ và chống flood mạng
-        if (available > VOICE_CHUNK_SAMPLES * 3)
-        {
-            lastMicSamplePos = (currentPos - VOICE_CHUNK_SAMPLES + clipSamples) % clipSamples;
-            available = VOICE_CHUNK_SAMPLES;
-        }
-
-        while (available >= VOICE_CHUNK_SAMPLES)
-        {
-            SafeGetMicData(micClip, micSampleBuffer, lastMicSamplePos, clipSamples);
-            lastMicSamplePos = (lastMicSamplePos + VOICE_CHUNK_SAMPLES) % clipSamples;
-            available -= VOICE_CHUNK_SAMPLES;
-
-            // Kiểm tra cường độ âm thanh (Voice Activity Detection - VAD)
-            float sumSq = 0f;
-            for (int i = 0; i < micSampleBuffer.Length; i++)
+            if (micClip == null || string.IsNullOrEmpty(activeMicDevice) || !Microphone.IsRecording(activeMicDevice))
             {
-                sumSq += micSampleBuffer[i] * micSampleBuffer[i];
-            }
-            float rms = Mathf.Sqrt(sumSq / micSampleBuffer.Length);
-
-            bool isVoiceDetected = rms > 0.008f;
-            if (isVoiceDetected)
-            {
-                // Giữ trạng thái nói ổn định 0.45s chống nhấp nháy đèn mic và UI
-                localSpeakingTimer = Time.unscaledTime + 0.45f;
-                localVoiceSendHangoverTimer = Time.unscaledTime + 0.20f;
-            }
-
-            // Gửi gói tin nếu có tiếng nói hoặc trong khoảng thời gian đệm (hangover) để tránh nuốt đuôi chữ
-            if ((isVoiceDetected || Time.unscaledTime < localVoiceSendHangoverTimer) && !isMicMuted)
-            {
-                if (client != null && client.InRoom)
+                if (Time.unscaledTime >= nextMicRetryTime)
                 {
-                    byte[] encoded = EncodeMuLaw(micSampleBuffer);
-                    object[] voicePayload = new object[] { playerName, encoded };
-                    RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
-                    client.OpRaiseEvent(EVENT_VOICE_PACKET, voicePayload, args, SendOptions.SendUnreliable);
+                    nextMicRetryTime = Time.unscaledTime + 5f;
+                    StartMicrophoneCapture();
+                }
+                return;
+            }
+
+            int currentPos = Microphone.GetPosition(activeMicDevice);
+            if (currentPos < 0) return;
+
+            int clipSamples = micClip.samples;
+            if (clipSamples <= 0) return;
+
+            int available = currentPos - lastMicSamplePos;
+            if (available < 0) available += clipSamples;
+
+            // Nếu bị lag khung hình hoặc giật quá 3 gói (300ms), nhảy cóc về gói mới nhất để chống trễ và chống flood mạng
+            if (available > VOICE_CHUNK_SAMPLES * 3)
+            {
+                lastMicSamplePos = (currentPos - VOICE_CHUNK_SAMPLES + clipSamples) % clipSamples;
+                available = VOICE_CHUNK_SAMPLES;
+            }
+
+            while (available >= VOICE_CHUNK_SAMPLES)
+            {
+                SafeGetMicData(micClip, micSampleBuffer, lastMicSamplePos, clipSamples);
+                lastMicSamplePos = (lastMicSamplePos + VOICE_CHUNK_SAMPLES) % clipSamples;
+                available -= VOICE_CHUNK_SAMPLES;
+
+                // Kiểm tra cường độ âm thanh (Voice Activity Detection - VAD)
+                float sumSq = 0f;
+                for (int i = 0; i < micSampleBuffer.Length; i++)
+                {
+                    sumSq += micSampleBuffer[i] * micSampleBuffer[i];
+                }
+                float rms = Mathf.Sqrt(sumSq / micSampleBuffer.Length);
+
+                bool isVoiceDetected = rms > 0.008f;
+                if (isVoiceDetected)
+                {
+                    // Giữ trạng thái nói ổn định 0.45s chống nhấp nháy đèn mic và UI
+                    localSpeakingTimer = Time.unscaledTime + 0.45f;
+                    localVoiceSendHangoverTimer = Time.unscaledTime + 0.20f;
+                }
+
+                // Gửi gói tin nếu có tiếng nói hoặc trong khoảng thời gian đệm (hangover) để tránh nuốt đuôi chữ
+                if ((isVoiceDetected || Time.unscaledTime < localVoiceSendHangoverTimer) && !isMicMuted)
+                {
+                    if (client != null && client.InRoom)
+                    {
+                        byte[] encoded = EncodeMuLaw(micSampleBuffer);
+                        object[] voicePayload = new object[] { playerName, encoded };
+                        RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
+                        client.OpRaiseEvent(EVENT_VOICE_PACKET, voicePayload, args, SendOptions.SendUnreliable);
+                    }
                 }
             }
         }
+        catch { }
     }
 
     private void PlayReceivedVoicePacket(string speaker, byte[] encodedBytes)
     {
-        if (encodedBytes == null || encodedBytes.Length == 0 || playbackRingClip == null) return;
+        if (encodedBytes == null || encodedBytes.Length == 0) return;
+
+        if (voicePlaybackSource == null || playbackRingClip == null)
+        {
+            SetupVoicePlayback();
+        }
+        if (voicePlaybackSource != null && !voicePlaybackSource.isPlaying)
+        {
+            voicePlaybackSource.Play();
+        }
+        if (playbackRingClip == null || voicePlaybackSource == null) return;
 
         remoteSpeakerName = speaker;
         remoteSpeakingTimer = Time.unscaledTime + 0.35f;
@@ -1001,6 +1401,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             if (photonEvent.CustomData is object[] arr && arr.Length >= 1)
             {
                 byte stateCode = Convert.ToByte(arr[0]);
+                // Nhận danh sách Ma Bí Ngô được đính kèm trực tiếp trong gói MatchState
+                if (arr.Length >= 3 && arr[2] is int[] ghostInts)
+                {
+                    GhostActorNumbers.Clear();
+                    GhostActorNumbers.AddRange(ghostInts);
+                    SyncRoleWithSurvivalTimer();
+                }
+
                 if (stateCode == 1)
                 {
                     float dur = arr.Length > 1 ? Convert.ToSingle(arr[1]) : countdownDuration;
@@ -1016,6 +1424,58 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                     countdownTimer = 0f;
                     AddSystemMessage("⚠️ Người chơi rời phòng khiến không còn đủ người. Đã hủy đếm ngược!");
                     UpdateLobbyUI();
+                }
+            }
+        }
+        else if (code == EVENT_ROLE_ASSIGN)
+        {
+            GhostActorNumbers.Clear();
+            if (photonEvent.CustomData is object[] gArr)
+            {
+                for (int i = 0; i < gArr.Length; i++)
+                {
+                    GhostActorNumbers.Add(Convert.ToInt32(gArr[i]));
+                }
+            }
+            else if (photonEvent.CustomData is int[] gInts)
+            {
+                GhostActorNumbers.AddRange(gInts);
+            }
+            SyncRoleWithSurvivalTimer();
+        }
+        else if (code == EVENT_PLAYER_READY)
+        {
+            if (photonEvent.CustomData is object[] rArr && rArr.Length >= 2)
+            {
+                int actorNr = Convert.ToInt32(rArr[0]);
+                bool rState = Convert.ToBoolean(rArr[1]);
+                ReadyPlayerDict[actorNr] = rState;
+                CheckAllPlayersConfirmedAndStart();
+                UpdateLobbyUI();
+            }
+        }
+        else if (code == EVENT_GHOST_ATTACK)
+        {
+            if (photonEvent.CustomData is object[] atkArr && atkArr.Length >= 5)
+            {
+                int targetActor = Convert.ToInt32(atkArr[0]);
+                float dmg = Convert.ToSingle(atkArr[1]);
+                float ox = Convert.ToSingle(atkArr[2]);
+                float oy = Convert.ToSingle(atkArr[3]);
+                float oz = Convert.ToSingle(atkArr[4]);
+
+                int myActor = (client != null && client.LocalPlayer != null) ? client.LocalPlayer.ActorNumber : -1;
+                if (targetActor == -1 || targetActor == myActor)
+                {
+                    bool amIGhost = (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.localRole == SurvivalTimerUI.PlayerRole.Ghost);
+                    if (!amIGhost && PlayerHealth.Instance != null && !PlayerHealth.Instance.isDead)
+                    {
+                        Vector3 attackOrigin = new Vector3(ox, oy, oz);
+                        if (Vector3.Distance(PlayerHealth.Instance.transform.position, attackOrigin) <= 3.6f)
+                        {
+                            PlayerHealth.Instance.TakeDamage(dmg, attackOrigin);
+                        }
+                    }
                 }
             }
         }
@@ -1040,23 +1500,63 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 float py = Convert.ToSingle(syncArr[2]);
                 float pz = Convert.ToSingle(syncArr[3]);
                 float ry = Convert.ToSingle(syncArr[4]);
+                bool isGhostForm = syncArr.Length >= 6 && Convert.ToBoolean(syncArr[5]);
 
-                UpdateOrCreateRemoteAvatar(senderActor, rName, new Vector3(px, py, pz), Quaternion.Euler(0f, ry, 0f));
+                UpdateOrCreateRemoteAvatar(senderActor, rName, new Vector3(px, py, pz), Quaternion.Euler(0f, ry, 0f), isGhostForm);
             }
         }
+    }
+
+    public void TrySendGhostAttackHit(Vector3 originPos, float maxReach, float damage)
+    {
+        if (client == null || !client.InRoom) return;
+
+        foreach (var kvp in remotePlayers)
+        {
+            int actorNr = kvp.Key;
+            var av = kvp.Value;
+            if (av == null || av.rootObj == null || av.isGhostForm) continue;
+
+            float dist = Vector3.Distance(originPos, av.rootObj.transform.position);
+            if (dist <= maxReach + 0.6f)
+            {
+                object[] payload = new object[] { actorNr, damage, originPos.x, originPos.y, originPos.z };
+                RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
+                client.OpRaiseEvent(EVENT_GHOST_ATTACK, payload, args, SendOptions.SendReliable);
+            }
+        }
+    }
+
+    private bool IsLocalPlayerInGhostForm(out Transform activeTransform)
+    {
+        if (SurvivalTimerUI.Instance != null
+            && SurvivalTimerUI.Instance.CachedGhostVessel != null
+            && SurvivalTimerUI.Instance.CachedGhostVessel.gameObject.activeInHierarchy
+            && SurvivalTimerUI.Instance.CachedGhostVessel.isPlayerControlled)
+        {
+            activeTransform = SurvivalTimerUI.Instance.CachedGhostVessel.transform;
+            return true;
+        }
+        if (ThirdPersonPlayerController.Instance != null)
+        {
+            activeTransform = ThirdPersonPlayerController.Instance.transform;
+            return false;
+        }
+        activeTransform = null;
+        return false;
     }
 
     private void UpdateRemotePlayersInterpolation()
     {
         if (client != null && client.InRoom && Time.unscaledTime >= nextSyncTime)
         {
-            nextSyncTime = Time.unscaledTime + 0.10f; // Đồng bộ 10 lần/giây
-            if (ThirdPersonPlayerController.Instance != null)
+            nextSyncTime = Time.unscaledTime + 0.08f; // Đồng bộ 12.5 lần/giây mượt mà
+            bool isGhostForm = IsLocalPlayerInGhostForm(out Transform pt);
+            if (pt != null)
             {
-                Transform pt = ThirdPersonPlayerController.Instance.transform;
                 Vector3 p = pt.position;
                 float ry = pt.eulerAngles.y;
-                object[] syncData = new object[] { playerName, p.x, p.y, p.z, ry };
+                object[] syncData = new object[] { playerName, p.x, p.y, p.z, ry, isGhostForm };
                 RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
                 client.OpRaiseEvent(EVENT_PLAYER_SYNC, syncData, args, SendOptions.SendUnreliable);
             }
@@ -1066,33 +1566,103 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         {
             var av = kvp.Value;
             if (av.rootObj == null) continue;
-            av.rootObj.transform.position = Vector3.Lerp(av.rootObj.transform.position, av.targetPos, Time.deltaTime * 12f);
+
+            Vector3 prevPos = av.rootObj.transform.position;
+            av.rootObj.transform.position = Vector3.Lerp(prevPos, av.targetPos, Time.deltaTime * 12f);
             av.rootObj.transform.rotation = Quaternion.Slerp(av.rootObj.transform.rotation, av.targetRot, Time.deltaTime * 12f);
+
+            // Đồng bộ kích thước avatar từ xa khớp 100% với kích thước người chơi thực tế trong Scene
+            Vector3 expectedScale = av.isGhostForm
+                ? ((SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null) ? SurvivalTimerUI.Instance.CachedGhostVessel.transform.lossyScale : Vector3.one)
+                : ((ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.transform.lossyScale.sqrMagnitude > 0.0001f) ? ThirdPersonPlayerController.Instance.transform.lossyScale : new Vector3(0.1f, 0.1f, 0.1f));
+            av.rootObj.transform.localScale = expectedScale;
+
+            if (av.animator != null)
+            {
+                float moveSpeed = Vector3.Distance(prevPos, av.targetPos) * 5.0f;
+                try
+                {
+                    av.animator.SetFloat("Speed", moveSpeed);
+                }
+                catch { }
+            }
         }
     }
 
-    private void UpdateOrCreateRemoteAvatar(int actorNr, string nickName, Vector3 pos, Quaternion rot)
+    private void UpdateOrCreateRemoteAvatar(int actorNr, string nickName, Vector3 pos, Quaternion rot, bool isGhostForm = false)
     {
-        if (!remotePlayers.TryGetValue(actorNr, out var av) || av.rootObj == null)
+        if (!remotePlayers.TryGetValue(actorNr, out var av) || av.rootObj == null || av.isGhostForm != isGhostForm)
         {
-            GameObject root = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            root.name = $"RemotePlayer_{actorNr}_{nickName}";
-            Collider col = root.GetComponent<Collider>();
-            if (col != null) Destroy(col);
+            bool isFirstSpawn = (av == null || av.rootObj == null);
+            if (av != null && av.rootObj != null)
+            {
+                Destroy(av.rootObj);
+            }
 
-            root.transform.localScale = new Vector3(0.45f, 0.75f, 0.45f);
+            GameObject root = new GameObject($"RemotePlayer_{actorNr}_{nickName}_{(isGhostForm ? "Ghost" : "Human")}");
             root.transform.position = pos;
             root.transform.rotation = rot;
 
-            var mr = root.GetComponent<MeshRenderer>();
-            if (mr != null)
+            Vector3 targetScale = isGhostForm
+                ? ((SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null) ? SurvivalTimerUI.Instance.CachedGhostVessel.transform.lossyScale : Vector3.one)
+                : ((ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.transform.lossyScale.sqrMagnitude > 0.0001f) ? ThirdPersonPlayerController.Instance.transform.lossyScale : new Vector3(0.1f, 0.1f, 0.1f));
+            root.transform.localScale = targetScale;
+
+            Animator clonedAnim = null;
+            bool modelCloned = false;
+
+            if (isGhostForm && SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null)
             {
-                Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                if (sh != null)
+                Animator srcGhostAnim = SurvivalTimerUI.Instance.CachedGhostVessel.GetComponentInChildren<Animator>(true);
+                if (srcGhostAnim != null)
                 {
-                    Material mat = new Material(sh);
-                    mat.color = new Color(0.2f, 0.85f, 0.65f, 1f);
-                    mr.sharedMaterial = mat;
+                    GameObject visualClone = Instantiate(srcGhostAnim.gameObject, root.transform);
+                    visualClone.SetActive(true);
+                    visualClone.transform.localPosition = srcGhostAnim.transform.localPosition;
+                    visualClone.transform.localRotation = srcGhostAnim.transform.localRotation;
+                    visualClone.transform.localScale = srcGhostAnim.transform.localScale;
+                    var forwarder = visualClone.GetComponent<GhostAnimationEventForwarder>();
+                    if (forwarder != null) Destroy(forwarder);
+                    clonedAnim = visualClone.GetComponent<Animator>();
+                    modelCloned = true;
+                }
+            }
+            else if (!isGhostForm && ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.playerAnimator != null)
+            {
+                GameObject srcHumanVisual = ThirdPersonPlayerController.Instance.playerAnimator.gameObject;
+                if (srcHumanVisual != ThirdPersonPlayerController.Instance.gameObject)
+                {
+                    GameObject visualClone = Instantiate(srcHumanVisual, root.transform);
+                    visualClone.SetActive(true);
+                    visualClone.transform.localPosition = srcHumanVisual.transform.localPosition;
+                    visualClone.transform.localRotation = srcHumanVisual.transform.localRotation;
+                    visualClone.transform.localScale = srcHumanVisual.transform.localScale;
+                    var forwarder = visualClone.GetComponent<PlayerAnimationEventForwarder>();
+                    if (forwarder != null) Destroy(forwarder);
+                    clonedAnim = visualClone.GetComponent<Animator>();
+                    modelCloned = true;
+                }
+            }
+
+            if (!modelCloned)
+            {
+                GameObject cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+                cap.transform.SetParent(root.transform, false);
+                cap.transform.localPosition = new Vector3(0f, 0.75f, 0f);
+                cap.transform.localScale = new Vector3(0.45f, 0.75f, 0.45f);
+                Collider col = cap.GetComponent<Collider>();
+                if (col != null) Destroy(col);
+
+                var mr = cap.GetComponent<MeshRenderer>();
+                if (mr != null)
+                {
+                    Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                    if (sh != null)
+                    {
+                        Material mat = new Material(sh);
+                        mat.color = isGhostForm ? new Color(1.0f, 0.38f, 0.08f, 1f) : new Color(0.2f, 0.85f, 0.65f, 1f);
+                        mr.sharedMaterial = mat;
+                    }
                 }
             }
 
@@ -1101,9 +1671,20 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 rootObj = root,
                 targetPos = pos,
                 targetRot = rot,
-                lastUpdateTime = Time.unscaledTime
+                lastUpdateTime = Time.unscaledTime,
+                isGhostForm = isGhostForm,
+                animator = clonedAnim
             };
             remotePlayers[actorNr] = av;
+
+            if (isFirstSpawn)
+            {
+                AppendChatLine($"<color=#00FF9D><b>⚡ [TRẬN ĐẤU] Người chơi [{nickName}] đã vào trận!</b></color>");
+            }
+            else if (isGhostForm)
+            {
+                AppendChatLine($"<color=#FFA502><b>🎃 [CẢNH BÁO] Người chơi [{nickName}] đã hóa thân thành MA BÍ NGÔ!</b></color>");
+            }
         }
         else
         {
@@ -1151,11 +1732,39 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             gameStartBannerObj.SetActive(true);
             gameStartBannerTimer = 4.5f;
         }
+        SyncRoleWithSurvivalTimer();
         if (SurvivalTimerUI.Instance != null)
         {
             SurvivalTimerUI.Instance.ResetTimer(true);
         }
-        AddSystemMessage("🔥 PHONG ẤN ĐÃ MỞ! HÃY TÌM ĐƯỜNG THOÁT VÀ SỐNG SÓT!");
+        string curPName = !string.IsNullOrWhiteSpace(playerName) ? playerName : "Người chơi";
+        AppendChatLine($"<color=#00FF9D><b>⚡ [TRẬN ĐẤU] Người chơi [{curPName}] đã vào trận!</b></color>");
+        if (gameStartBannerText != null)
+        {
+            gameStartBannerText.text = $"🎮 Người chơi [{curPName}] đã vào trận! 🔥";
+        }
+
+        // [GhostMaze] Khi bắt đầu trận đấu ở LobbyScene -> Tất cả máy cùng tự động chuyển sang SampleScene (Map thi đấu gameplay)
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("SampleScene");
+        }
+    }
+
+    public void SyncRoleWithSurvivalTimer()
+    {
+        if (SurvivalTimerUI.Instance == null) return;
+
+        if (client != null && client.InRoom && client.LocalPlayer != null && GhostActorNumbers.Count > 0)
+        {
+            int myActor = client.LocalPlayer.ActorNumber;
+            bool amIGhost = GhostActorNumbers.Contains(myActor);
+            int ghostSlot = Mathf.Max(0, GhostActorNumbers.IndexOf(myActor));
+            SurvivalTimerUI.Instance.SetLocalPlayerRole(
+                amIGhost ? SurvivalTimerUI.PlayerRole.Ghost : SurvivalTimerUI.PlayerRole.Human,
+                ghostSlot
+            );
+        }
     }
 
     public void HostAssignRandomRoles()
@@ -1172,6 +1781,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 allActors[r] = tmp;
             }
 
+            // Trong 4 người chơi: Random đúng 2 người làm Ma Bí Ngô, 2 người làm Con Người để chạy và hú!
             int ghostCount = allActors.Count >= 4 ? 2 : (allActors.Count >= 2 ? 1 : (soloTestAsGhost ? 1 : 0));
             for (int i = 0; i < ghostCount; i++)
             {
@@ -1186,14 +1796,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
             RaiseEventArgs raiseArgs = new RaiseEventArgs { Receivers = ReceiverGroup.All };
             client.OpRaiseEvent(EVENT_ROLE_ASSIGN, payload, raiseArgs, SendOptions.SendReliable);
-
-            int myActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
-            bool amIGhost = GhostActorNumbers.Contains(myActor);
-            int ghostSlot = GhostActorNumbers.IndexOf(myActor);
-            if (SurvivalTimerUI.Instance != null)
-            {
-                SurvivalTimerUI.Instance.SetLocalPlayerRole(amIGhost ? SurvivalTimerUI.PlayerRole.Ghost : SurvivalTimerUI.PlayerRole.Human, Mathf.Max(0, ghostSlot));
-            }
+            SyncRoleWithSurvivalTimer();
         }
         else
         {
@@ -1207,12 +1810,12 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     public void HostForceStartGame()
     {
         HostAssignRandomRoles();
-        if (client != null && client.LocalPlayer != null && client.LocalPlayer.IsMasterClient)
+        if (client != null && client.InRoom)
         {
             BroadcastMatchState(2, 0f);
             StartGameLocally();
         }
-        else if (client == null || !client.InRoom)
+        else
         {
             StartGameLocally();
         }
@@ -1221,7 +1824,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private void BroadcastMatchState(byte stateCode, float duration)
     {
         if (client == null || !client.InRoom) return;
-        object[] content = new object[] { stateCode, duration };
+        object[] content = new object[] { stateCode, duration, GhostActorNumbers.ToArray() };
         RaiseEventArgs raiseEventOptions = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
         client.OpRaiseEvent(EVENT_MATCH_STATE, content, raiseEventOptions, SendOptions.SendReliable);
     }

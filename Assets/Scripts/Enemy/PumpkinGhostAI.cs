@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -319,26 +319,14 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private void Update()
     {
+        if (!isPlayerControlled)
+        {
+            return;
+        }
+
         CheckAbyssProtection();
         ApplyGravity();
 
-        // Chế độ người chơi chiếm hữu điều khiển con ma bí ngô (sau khi người chơi tử trận)
-        if (isPlayerControlled)
-        {
-            if (!IsGhostHunting)
-        {
-            if (freezeVFXRoot != null && freezeVFXRoot.activeSelf)
-            {
-                freezeVFXRoot.transform.Rotate(0f, 100f * Time.deltaTime, 0f);
-            }
-            return;
-        }
-
-            UpdatePlayerControlled();
-            return;
-        }
-
-        // Chờ phòng đủ người chơi (Lobby) -> Quái ma đứng yên canh gác, chưa truy đuổi tấn công
         if (!IsGhostHunting)
         {
             if (freezeVFXRoot != null && freezeVFXRoot.activeSelf)
@@ -348,10 +336,6 @@ public class PumpkinGhostAI : MonoBehaviour
             return;
         }
 
-
-        ApplyGhostSeparation();
-
-        // Nếu đang bị người chơi giữ chân (Block 3s) hoặc choáng đòn (RisingWave 5s)
         if (isFrozen)
         {
             if (freezeVFXRoot != null && freezeVFXRoot.activeSelf)
@@ -361,29 +345,7 @@ public class PumpkinGhostAI : MonoBehaviour
             return;
         }
 
-        if (targetPlayer == null)
-        {
-            FindPlayerTarget();
-        }
-
-        switch (currentState)
-        {
-            case GhostState.Patrol:
-                UpdatePatrol();
-                break;
-            case GhostState.Suspicious:
-                UpdateSuspicious();
-                break;
-            case GhostState.Chase:
-                UpdateChase();
-                break;
-            case GhostState.Attack:
-            case GhostState.Leap:
-            case GhostState.OutOfBreath:
-            case GhostState.VanishHide:
-                // Được điều khiển mượt mà qua Coroutine chuyên biệt
-                break;
-        }
+        UpdatePlayerControlled();
     }
 
     // =========================================================================
@@ -600,12 +562,24 @@ public class PumpkinGhostAI : MonoBehaviour
         if (hasDealtDamageThisAttack) return;
         hasDealtDamageThisAttack = true;
 
+        if (clawHandTransform == null) AutoFindClawHand();
+
+        if (isPlayerControlled)
+        {
+            Vector3 originPos = clawHandTransform != null ? clawHandTransform.position : transform.position;
+            float maxReach = config != null ? Mathf.Max(config.attackRaycastDistance, config.attackRange * 1.6f, 2.8f) : 2.8f;
+            float dmg = config != null ? config.attackDamage : 20.0f;
+            if (PhotonMultiplayerChatVoice.Instance != null)
+            {
+                PhotonMultiplayerChatVoice.Instance.TrySendGhostAttackHit(originPos, maxReach, dmg);
+            }
+            return;
+        }
+
         if (targetPlayer == null)
         {
             FindPlayerTarget();
         }
-
-        if (clawHandTransform == null) AutoFindClawHand();
 
         if (targetPlayer != null)
         {

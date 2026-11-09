@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using UnityEditor;
 #endif
 
-[ExecuteAlways]
 [DefaultExecutionOrder(-100)]
 public class StairRampSmoother : MonoBehaviour
 {
@@ -24,7 +23,7 @@ public class StairRampSmoother : MonoBehaviour
     private void Awake()
     {
         Instance = this;
-        if (autoSmoothOnStart)
+        if (Application.isPlaying && autoSmoothOnStart)
         {
             SmoothAllStaircases();
         }
@@ -33,7 +32,7 @@ public class StairRampSmoother : MonoBehaviour
     private void OnEnable()
     {
         Instance = this;
-        if (autoSmoothOnStart)
+        if (Application.isPlaying && autoSmoothOnStart)
         {
             SmoothAllStaircases();
         }

@@ -190,8 +190,16 @@ public class ThirdPersonCamera : MonoBehaviour
         }
 
         // Tự động ẩn và khóa con trỏ chuột vào giữa màn hình
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+                if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+        else
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
 
         cachedCamera = GetComponent<Camera>();
         if (cachedCamera != null) defaultNearClip = cachedCamera.nearClipPlane;
@@ -271,6 +279,7 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene") return;
         if (target == null)
         {
             if (PlayerHealth.Instance != null && PlayerHealth.Instance.isDead)
@@ -295,6 +304,12 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void HandleCursorLockToggle()
     {
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            return;
+        }
         // Khi bảng UI/Cài đặt đang mở, luôn giữ chuột mở tự do để thao tác button
         if (isUIPanelOpen)
         {

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -561,7 +561,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [SerializeField] private float desiredWorldStepHeight = 0.22f;
 
 #if UNITY_EDITOR
-    [UnityEditor.InitializeOnLoadMethod]
+    // [UnityEditor.InitializeOnLoadMethod]
     private static void EditorAutoRepairAllControllers()
     {
         UnityEditor.EditorApplication.delayCall += () =>
@@ -572,7 +572,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
             {
                 if (ctrl != null) ctrl.ValidateAndRepairController();
             }
-            StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
+            // StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
         };
     }
 #endif
@@ -694,6 +694,14 @@ public class ThirdPersonPlayerController : MonoBehaviour
         if (isCastingMagic && Time.time >= magicCastStartTime + Mathf.Max(1.5f, magicAttackLockDuration + 0.3f))
         {
             isCastingMagic = false;
+        }
+
+        if (!PhotonMultiplayerChatVoice.IsGameStarted)
+        {
+            if (isAimingThrow) CancelMagicAim();
+            if (isBlocking) CancelBlock();
+            UpdateAnimatorSpeed(0f);
+            return;
         }
 
         CheckAbyssFall();

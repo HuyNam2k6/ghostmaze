@@ -6,7 +6,7 @@ using UnityEngine.Rendering.Universal;
 using System.Collections.Generic;
 using System.IO;
 
-[InitializeOnLoad]
+// [GhostMaze Lock] Đã vô hiệu hóa tự động dựng lại map để bảo toàn vĩnh viễn map do người dùng đã sắp xếp
 public static class HorrorCemeteryBuilder
 {
     private const string BUILD_VERSION_KEY = "GhostMaze_HorrorMap_v10";
@@ -22,25 +22,27 @@ public static class HorrorCemeteryBuilder
         }
     }
 
-    static HorrorCemeteryBuilder()
-    {
-        EditorApplication.delayCall += () =>
-        {
-            if (SessionState.GetString("LastBuiltVersion", "") != BUILD_VERSION_KEY)
-            {
-                SessionState.SetString("LastBuiltVersion", BUILD_VERSION_KEY);
-                BuildHorrorCemeteryMap();
-            }
-        };
-    }
+    // ĐÃ VÔ HIỆU HÓA HOÀN TOÀN TỰ ĐỘNG REBUILD KHI LOAD EDITOR
+    // static HorrorCemeteryBuilder() { ... }
 
-    [MenuItem("Tools/Rebuild Horror Cemetery Map")]
+    [MenuItem("Tools/Rebuild Horror Cemetery Map (Cảnh Báo: Ghi Đè Map)")]
     public static void ScheduleRebuild()
     {
-        EditorApplication.delayCall += () => BuildHorrorCemeteryMap();
+        if (EditorUtility.DisplayDialog("CẢNH BÁO: DỰNG LẠI MAP", 
+            "Bản đồ hiện tại đã được bạn sắp xếp và khóa cố định!\nNếu dựng lại, toàn bộ vị trí sắp xếp hiện tại sẽ bị ghi đè.\n\nBạn có THỰC SỰ muốn dựng lại không?", 
+            "Tiếp tục dựng lại", "Hủy bỏ (Giữ nguyên map hiện tại)"))
+        {
+            EditorApplication.delayCall += () => BuildHorrorCemeteryMap();
+        }
     }
 
     public static void BuildHorrorCemeteryMap(CemeteryMapConfig config = null)
+    {
+        Debug.LogWarning("[Bảo Vệ Map] Đã khóa vĩnh viễn chức năng tự sinh map bằng code để bảo vệ 100% map người dùng đã sắp xếp trong Scene!");
+        return;
+    }
+
+    private static void UnusedOldBuild(CemeteryMapConfig config = null)
     {
         try
         {

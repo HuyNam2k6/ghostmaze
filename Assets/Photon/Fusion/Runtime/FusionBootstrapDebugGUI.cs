@@ -148,6 +148,10 @@ namespace Fusion {
     }
 
     protected virtual void OnGUI() {
+      // [GhostMaze] Tuyet doi khong ve bang xam nay trong SampleScene (trang game gameplay)
+      if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "LobbyScene") {
+        return;
+      }
 
       var nds = EnsureNetworkDebugStartExists();
       if (!nds.ShouldShowGUI) {

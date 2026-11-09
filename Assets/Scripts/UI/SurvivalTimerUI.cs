@@ -106,11 +106,17 @@ public class SurvivalTimerUI : MonoBehaviour
     private readonly Color ghostWinColor   = new Color(1.00f, 0.28f, 0.34f, 1f);
     private readonly Color circleLineColor = new Color(0.10f, 0.85f, 1.00f, 0.95f);
 
+    private PumpkinGhostAI cachedGhostVessel;
+    public PumpkinGhostAI CachedGhostVessel => cachedGhostVessel;
+
     private void Awake()
     {
         Instance = this;
+        autoStart = false;
+        isRunning = false;
         remainingTime = huntingDuration;
         currentPhase = MatchPhase.Lobby;
+        CacheAndHideSceneGhostVessel();
     }
 
     private void OnDestroy()
@@ -118,28 +124,66 @@ public class SurvivalTimerUI : MonoBehaviour
         if (Instance == this) Instance = null;
     }
 
+    /// <summary>
+    /// Xóa bỏ hoàn toàn AI Ma Bí Ngô tự động trên map.
+    /// Chỉ giữ lại 1 thân xác Ma ẩn đi để khi người chơi được random làm Ma Bí Ngô (sau 30s) mới hóa thân vào điều khiển!
+    /// </summary>
+    public void CacheAndHideSceneGhostVessel()
+    {
+        PumpkinGhostAI[] allGhosts = Object.FindObjectsByType<PumpkinGhostAI>(FindObjectsInactive.Include);
+        if (allGhosts != null && allGhosts.Length > 0)
+        {
+            if (cachedGhostVessel == null)
+            {
+                cachedGhostVessel = allGhosts[0];
+            }
+            for (int i = 0; i < allGhosts.Length; i++)
+            {
+                if (allGhosts[i] == null) continue;
+                if (allGhosts[i] != cachedGhostVessel)
+                {
+                    Destroy(allGhosts[i].gameObject);
+                }
+                else
+                {
+                    allGhosts[i].isPlayerControlled = false;
+                    allGhosts[i].gameObject.SetActive(false);
+                }
+            }
+        }
+    }
+
     private void Start()
     {
         AutoBindReferencesIfNeeded();
+        CacheAndHideSceneGhostVessel();
+        autoStart = false;
+        isRunning = false;
+        currentPhase = MatchPhase.Lobby;
 
-        if (autoStart)
+        if (PhotonMultiplayerChatVoice.Instance != null)
         {
-            StartMatchSequence();
+            PhotonMultiplayerChatVoice.Instance.SyncRoleWithSurvivalTimer();
         }
-        else
+
+        // Nếu trận đấu đã được kích hoạt từ Sảnh chờ phòng (LobbyScene) -> Tự động khởi chạy trận đấu
+        if (PhotonMultiplayerChatVoice.IsGameStarted)
         {
-            // Ban đầu đóng băng ma trước khi trận đấu kích hoạt
-            PumpkinGhostAI.FreezeAllGhosts();
-            if (timerLabelText != null)
-            {
-                timerLabelText.text = "⚔️ ĐANG CHỜ TRẬN ĐẤU BẮT ĐẦU";
-                timerLabelText.color = new Color(0.75f, 0.85f, 1.0f, 0.95f);
-            }
-            if (timerDigitsText != null)
-            {
-                timerDigitsText.text = "--:--";
-                timerDigitsText.color = normalColor;
-            }
+            ResetTimer(true);
+            return;
+        }
+
+        // Ban đầu đóng băng ma trước khi tất cả người chơi bấm xác nhận
+        PumpkinGhostAI.FreezeAllGhosts();
+        if (timerLabelText != null)
+        {
+            timerLabelText.text = "⚔️ ĐANG CHỜ PHÒNG XÁC NHẬN BẮT ĐẦU";
+            timerLabelText.color = new Color(0.75f, 0.85f, 1.0f, 0.95f);
+        }
+        if (timerDigitsText != null)
+        {
+            timerDigitsText.text = "--:--";
+            timerDigitsText.color = normalColor;
         }
     }
 
@@ -168,16 +212,13 @@ public class SurvivalTimerUI : MonoBehaviour
         if (!isRunning) return;
 
         // =========================================================================
-        // PHA 1: 10 GIÂY ĐẦU - Ở TRONG VÒNG TRÒN GIỮA MAP, MA NGỦ SAY
+        // PHA 1: 10 GIÂY ĐẦU - Ở TRONG VÒNG TRÒN GIỮA MAP, TẤT CẢ 4 NGƯỜI TẬP TRUNG
         // =========================================================================
         if (currentPhase == MatchPhase.CircleWait_10s)
         {
             phaseTimer -= Time.deltaTime;
 
-            // Đảm bảo ma tiếp tục bị phong ấn
-            PumpkinGhostAI.FreezeAllGhosts();
-
-            // Ràng buộc vị trí người chơi không được vượt ra ngoài bán kính vòng tròn
+            // Giữ cả 4 người chơi bên trong vòng tròn quảng trường trung tâm trong 10s đầu
             ConstrainLocalPlayerInsideStartCircle();
 
             // Hiển thị đếm ngược 10s
@@ -194,12 +235,12 @@ public class SurvivalTimerUI : MonoBehaviour
                 {
                     if (localRole == PlayerRole.Ghost)
                     {
-                        timerLabelText.text = "🎃 BẠN LÀ MA BÍ NGÔ! THỨC TỈNH SAU:";
+                        timerLabelText.text = "🎃 BẠN ĐƯỢC RANDOM LÀM MA BÍ NGÔ! CHỜ TRONG VÒNG TRÒN:";
                         timerLabelText.color = new Color(1f, 0.65f, 0.15f);
                     }
                     else
                     {
-                        timerLabelText.text = "⏳ CHUẨN BỊ XUẤT PHÁT (TRONG VÒNG TRÒN)";
+                        timerLabelText.text = "⏳ CHUẨN BỊ XUẤT PHÁT CHẠY TRỐN (TRONG VÒNG TRÒN)";
                         timerLabelText.color = warningColor;
                     }
                 }
@@ -213,39 +254,40 @@ public class SurvivalTimerUI : MonoBehaviour
 
             if (phaseTimer <= 0f)
             {
-                // Hết 10s -> Chuyển sang Pha 2: Mở vòng tròn cho người chơi chạy trốn!
+                // Hết 10s -> Chuyển sang Pha 2: Mở vòng tròn cho 2 Người Sống Sót chạy trốn!
                 currentPhase = MatchPhase.Hide_20s;
                 phaseTimer = hideDuration;
                 lastDisplayedSecond = -1;
 
-                // Tắt rào chắn ma thuật
-                if (startCircleVFXRoot != null)
-                {
-                    startCircleVFXRoot.SetActive(false);
-                }
-
                 if (localRole == PlayerRole.Ghost)
                 {
-                    ShowFloatingBanner("🎃 BẠN ĐÃ ĐƯỢC CHỌN LÀM MA BÍ NGÔ!\nSẽ thức tỉnh thành Ma sau 20s! Hãy chuẩn bị đi săn!", new Color(1f, 0.45f, 0.10f), 4.5f);
+                    // 2 Người làm Ma tiếp tục đứng trong vòng tròn chờ 20s để 2 Người kia đi trốn
+                    if (startCircleVFXRoot != null) startCircleVFXRoot.SetActive(true);
+                    ShowFloatingBanner("🎃 BẠN ĐƯỢC CHỌN LÀM MA BÍ NGÔ!\nHãy đợi trong vòng tròn 20s để 2 Người chạy trốn trước khi hóa Ma đi săn!", new Color(1f, 0.45f, 0.10f), 4.5f);
                 }
                 else
                 {
-                    ShowFloatingBanner("🏃 VÒNG TRÒN ĐÃ MỞ! HÃY TỎA RA TÌM CHỖ TRỐN HÚ!\n(2 Ma Bí Ngô sẽ tỉnh giấc sau 20s)", new Color(0.15f, 0.95f, 0.75f), 4.5f);
+                    // Tắt rào chắn cho 2 Người Sống Sót chạy ra mê cung trốn hú!
+                    if (startCircleVFXRoot != null) startCircleVFXRoot.SetActive(false);
+                    ShowFloatingBanner("🏃 VÒNG TRÒN ĐÃ MỞ! HÃY TỎA RA MÊ CUNG CHẠY & TRỐN HÚ!\n(2 Người chơi Ma Bí Ngô sẽ hóa thân đi săn sau 20s)", new Color(0.15f, 0.95f, 0.75f), 4.5f);
                 }
-                Debug.Log("<color=#2ECC71>====================================================\n🏃 [GIAI ĐOẠN 2] VÒNG TRÒN ĐÃ MỞ! NGƯỜI CHƠI CÓ 20 GIÂY ĐỂ TRỐN HÚ!\n====================================================</color>");
+                Debug.Log("<color=#2ECC71>====================================================\n🏃 [GIAI ĐOẠN 2] VÒNG TRÒN ĐÃ MỞ! 2 NGƯỜI SỐNG SÓT CÓ 20 GIÂY ĐỂ TRỐN HÚ!\n====================================================</color>");
             }
             return;
         }
 
         // =========================================================================
-        // PHA 2: 20 GIÂY TIẾP THEO (TỪ 10s -> 30s) - TỎA RA TRỐN HÚ, MA VẪN NGỦ SAY
+        // PHA 2: 20 GIÂY TIẾP THEO (TỪ 10s -> 30s) - 2 NGƯỜI TỎA RA TRỐN HÚ, 2 MA ĐỢI TRONG VÒNG TRÒN
         // =========================================================================
         if (currentPhase == MatchPhase.Hide_20s)
         {
             phaseTimer -= Time.deltaTime;
 
-            // Ma vẫn tiếp tục bị khóa cứng trong 20s này
-            PumpkinGhostAI.FreezeAllGhosts();
+            // Giữ 2 người chơi được chọn làm Ma Bí Ngô ở trong vòng tròn trong lúc 2 người kia đang đi trốn
+            if (localRole == PlayerRole.Ghost)
+            {
+                ConstrainLocalPlayerInsideStartCircle();
+            }
 
             int sec = Mathf.CeilToInt(Mathf.Max(0f, phaseTimer));
             if (sec != lastDisplayedSecond)
@@ -260,12 +302,12 @@ public class SurvivalTimerUI : MonoBehaviour
                 {
                     if (localRole == PlayerRole.Ghost)
                     {
-                        timerLabelText.text = "🎃 BẠN SẼ HÓA THÂN THÀNH MA SAU:";
+                        timerLabelText.text = "🎃 BẠN SẼ HÓA THÂN THÀNH MA BÍ NGÔ SAU:";
                         timerLabelText.color = new Color(1f, 0.55f, 0.15f);
                     }
                     else
                     {
-                        timerLabelText.text = "🏃 VÒNG TRÒN ĐÃ MỞ! MA TỈNH GIẤC SAU:";
+                        timerLabelText.text = "🏃 HÃY CHẠY TRỐN! 2 MA BÍ NGÔ XUẤT HIỆN SAU:";
                         timerLabelText.color = new Color(0.2f, 0.92f, 0.95f, 1f);
                     }
                 }
@@ -279,15 +321,19 @@ public class SurvivalTimerUI : MonoBehaviour
 
             if (phaseTimer <= 0f)
             {
-                // Hết 30s (10s + 20s) -> Chuyển sang Pha 3: 2 MA TỈNH GIẤC ĐI SĂN!
+                // Hết 30s (10s + 20s) -> Chuyển sang Pha 3: 2 NGƯỜI CHƠI MA HÓA THÂN ĐI SĂN!
                 currentPhase = MatchPhase.Hunting_3Min;
                 remainingTime = huntingDuration;
                 lastDisplayedSecond = -1;
 
-                // Thả ma ra săn người!
-                PumpkinGhostAI.ReleaseAllGhostsToHunt();
+                if (startCircleVFXRoot != null)
+                {
+                    startCircleVFXRoot.SetActive(false);
+                }
 
-                // 2 Người chơi được random chọn làm Ma Bí Ngô sẽ hóa thân thành Ma!
+                PumpkinGhostAI.IsGhostHunting = true;
+
+                // 2 Người chơi được random chọn làm Ma Bí Ngô hóa thân thành Ma!
                 if (localRole == PlayerRole.Ghost)
                 {
                     TransformLocalPlayerToGhost(localGhostSlot);
@@ -297,13 +343,13 @@ public class SurvivalTimerUI : MonoBehaviour
                     KeepLocalPlayerAsHuman();
                 }
 
-                Debug.Log("<color=#FF4757>====================================================\n🔥 [GIAI ĐOẠN 3] HẾT 30 GIÂY: 2 MA BÍ NGÔ ĐÃ THỨC TỈNH! BẮT ĐẦU SĂN LÙNG NGƯỜI TRONG 3 PHÚT!\n====================================================</color>");
+                Debug.Log("<color=#FF4757>====================================================\n🔥 [GIAI ĐOẠN 3] HẾT 30 GIÂY: 2 NGƯỜI CHƠI MA BÍ NGÔ ĐÃ HÓA THÂN! BẮT ĐẦU SĂN 2 NGƯỜI SỐNG SÓT TRONG 3 PHÚT!\n====================================================</color>");
             }
             return;
         }
 
         // =========================================================================
-        // PHA 3: 3 PHÚT SINH TỒN (180s) - 2 MA ĐI SĂN 2 NGƯỜI
+        // PHA 3: 3 PHÚT SINH TỒN (180s) - 2 NGƯỜI CHƠI MA ĐI SĂN 2 NGƯỜI SỐNG SÓT
         // =========================================================================
         if (currentPhase == MatchPhase.Hunting_3Min)
         {
@@ -375,14 +421,14 @@ public class SurvivalTimerUI : MonoBehaviour
 
     /// <summary>
     /// Kích hoạt chuỗi trận đấu:
-    /// 1. Dịch chuyển người chơi về vòng tròn an toàn ở giữa map.
-    /// 2. Bật hiệu ứng rào chắn ma thuật vòng tròn.
-    /// 3. Khóa chân ma bí ngô.
+    /// 1. Ẩn toàn bộ AI Ma Bí Ngô (vì game là 4 người chơi thật: 2 người làm Ma, 2 người làm Người).
+    /// 2. Đồng bộ vai trò Random từ Photon.
+    /// 3. Dịch chuyển người chơi về vòng tròn an toàn ở giữa map.
     /// 4. Đếm ngược 10s đầu tiên.
     /// </summary>
     public void StartMatchSequence()
     {
-        Debug.Log("<color=#48C5FF>====================================================\n⚔️ [TRẬN ĐẤU BẮT ĐẦU] BẮT ĐẦU CHUỖI TRẬN ĐẤU:\n- Pha 1 (10s đầu): Tập trung trong vòng tròn giữa map.\n- Pha 2 (20s trốn hú): Vòng tròn mở, tản ra tìm chỗ nấp.\n- Pha 3 (Sau 30s): 2 Ma Bí Ngô thức tỉnh đi săn trong 3 phút!\n====================================================</color>");
+        Debug.Log("<color=#48C5FF>====================================================\n⚔️ [TRẬN ĐẤU BẮT ĐẦU] BẮT ĐẦU CHUỖI TRẬN ĐẤU 4 NGƯỜI (2 MA BÍ NGÔ vs 2 NGƯỜI):\n- Pha 1 (10s đầu): Cả 4 người tập trung trong vòng tròn giữa map.\n- Pha 2 (20s trốn hú): 2 Người Sống Sót tỏa ra tìm chỗ nấp, 2 Ma đợi trong vòng tròn.\n- Pha 3 (Sau 30s): 2 Người chơi Ma hóa thân thành Ma Bí Ngô đi săn trong 3 phút!\n====================================================</color>");
 
         isFinished = false;
         isRunning = true;
@@ -396,13 +442,17 @@ public class SurvivalTimerUI : MonoBehaviour
             Destroy(endResultBannerObj);
         }
 
-        // Đảm bảo trong game có 2 con Ma Bí Ngô cho 2 người chơi Ma
-        EnsureTwoGhostsExist();
+        // Xóa bỏ hoàn toàn AI Ma Bí Ngô tự động trên map, ẩn thân xác Ma chờ đến giây 30
+        CacheAndHideSceneGhostVessel();
+        PumpkinGhostAI.IsGhostHunting = false;
 
-        // Khóa toàn bộ quái ma bí ngô
-        PumpkinGhostAI.FreezeAllGhosts();
+        // Đồng bộ vai trò (2 Ma Bí Ngô / 2 Người Sống Sót) đã được Host random
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.SyncRoleWithSurvivalTimer();
+        }
 
-        // Đảm bảo nhân vật người hiển thị
+        // Đảm bảo nhân vật người hiển thị lúc đầu trận
         if (ThirdPersonPlayerController.Instance != null)
         {
             ThirdPersonPlayerController.Instance.gameObject.SetActive(true);
@@ -435,66 +485,48 @@ public class SurvivalTimerUI : MonoBehaviour
             startCircleVFXRoot.SetActive(true);
         }
 
+        string pName = PhotonMultiplayerChatVoice.Instance != null && !string.IsNullOrWhiteSpace(PhotonMultiplayerChatVoice.Instance.playerName)
+            ? PhotonMultiplayerChatVoice.Instance.playerName
+            : "Bạn";
+
         if (localRole == PlayerRole.Ghost)
         {
-            ShowFloatingBanner("⏳ KHU VỰC QUẢNG TRƯỜNG: BẠN LÀ MA BÍ NGÔ!\n(Di chuyển tự do trên đảo trong 10s. Bạn sẽ thức tỉnh thành Ma sau 30s)", new Color(1f, 0.60f, 0.15f), 4.5f);
+            ShowFloatingBanner($"<color=#00FF9D>🎮 Người chơi [{pName}] đã vào trận!</color>\n<color=#FFA502>(BẠN ĐƯỢC RANDOM LÀM MA BÍ NGÔ - Hóa Ma đi săn sau 30s)</color>", new Color(0f, 1f, 0.62f), 5.0f);
         }
         else
         {
-            ShowFloatingBanner("⏳ KHU VỰC QUẢNG TRƯỜNG: BẠN LÀ NGƯỜI SỐNG SÓT!\n(Di chuyển tự do trên đảo trong 10s. Hãy chuẩn bị tỏa ra trốn hú)", warningColor, 4.5f);
+            ShowFloatingBanner($"<color=#00FF9D>🎮 Người chơi [{pName}] đã vào trận!</color>\n<color=#7BED9F>(BẠN LÀ NGƯỜI SỐNG SÓT - Chuẩn bị tỏa ra chạy và trốn hú)</color>", new Color(0f, 1f, 0.62f), 5.0f);
         }
     }
 
     /// <summary>
-    /// Đảm bảo luôn có 2 con Ma Bí Ngô trong Scene cho 2 người chơi Ma
+    /// Giữ hàm rỗng tương thích ngược - Không còn nhân bản AI Ma Bí Ngô tự động
     /// </summary>
     public static void EnsureTwoGhostsExist()
     {
-        var ghosts = PumpkinGhostAI.ActiveGhosts;
-        int count = ghosts != null ? ghosts.Count : 0;
-        if (count >= 2) return;
-
-        PumpkinGhostAI source = null;
-        if (count > 0 && ghosts[0] != null) source = ghosts[0];
-        if (source == null) source = Object.FindAnyObjectByType<PumpkinGhostAI>();
-
-        if (source != null)
+        if (Instance != null)
         {
-            Vector3 spawnPos = source.transform.position + new Vector3(3.5f, 0f, 0f);
-            GameObject clone = Object.Instantiate(source.gameObject, spawnPos, source.transform.rotation);
-            clone.name = "PumpkinGhost_Enemy_2";
-            Debug.Log("<color=#FFA502>[PumpkinGhostAI] Đã khởi tạo thêm Ma Bí Ngô thứ 2 để đủ 2 Ma cho trận đấu!</color>");
+            Instance.CacheAndHideSceneGhostVessel();
         }
     }
 
     /// <summary>
-    /// Hóa thân người chơi thành Ma Bí Ngô khi hết 30s (Pha săn bắt đầu)
+    /// Hóa thân người chơi được chọn làm Ma Bí Ngô khi hết 30s (Pha săn bắt đầu)
     /// </summary>
     public void TransformLocalPlayerToGhost(int ghostSlot)
     {
-        EnsureTwoGhostsExist();
-
-        var ghosts = PumpkinGhostAI.ActiveGhosts;
-        PumpkinGhostAI targetGhost = null;
-        if (ghosts != null)
+        if (cachedGhostVessel == null)
         {
-            if (ghostSlot >= 0 && ghostSlot < ghosts.Count && ghosts[ghostSlot] != null)
-            {
-                targetGhost = ghosts[ghostSlot];
-            }
-            else if (ghosts.Count > 0 && ghosts[0] != null)
-            {
-                targetGhost = ghosts[0];
-            }
+            PumpkinGhostAI[] all = Object.FindObjectsByType<PumpkinGhostAI>(FindObjectsInactive.Include);
+            if (all != null && all.Length > 0) cachedGhostVessel = all[0];
         }
 
-        if (targetGhost == null)
-        {
-            targetGhost = Object.FindAnyObjectByType<PumpkinGhostAI>();
-        }
-
+        PumpkinGhostAI targetGhost = cachedGhostVessel;
         if (targetGhost != null)
         {
+            targetGhost.gameObject.SetActive(true);
+            PumpkinGhostAI.IsGhostHunting = true;
+
             // 1. Dịch chuyển Ma tới vị trí hiện tại của người chơi
             if (ThirdPersonPlayerController.Instance != null)
             {
@@ -526,15 +558,20 @@ public class SurvivalTimerUI : MonoBehaviour
                 CemeteryMapManager.Instance.SwitchToGhostLighting(1.5f);
             }
 
-            ShowFloatingBanner("🎃 BẠN ĐÃ THỨC TỈNH THÀNH MA BÍ NGÔ!\n[WASD]: Di chuyển  |  [Chuột Trái]: Cào xé  |  [Space]: Nhảy vồ  |  [E]: Ẩn thân", new Color(1f, 0.45f, 0.05f), 5.5f);
+            ShowFloatingBanner("🎃 BẠN ĐÃ HÓA THÂN THÀNH MA BÍ NGÔ!\n[WASD]: Di chuyển  |  [Chuột Trái]: Cào xé  |  [Space]: Nhảy vồ  |  [E]: Ẩn thân", new Color(1f, 0.45f, 0.05f), 5.5f);
         }
     }
 
     /// <summary>
-    /// Giữ nguyên người chơi ở dạng Con Người sống sót
+    /// Giữ nguyên người chơi ở dạng Con Người sống sót (và đảm bảo không có AI Ma trên máy của Người)
     /// </summary>
     public void KeepLocalPlayerAsHuman()
     {
+        if (cachedGhostVessel != null && !cachedGhostVessel.isPlayerControlled)
+        {
+            cachedGhostVessel.gameObject.SetActive(false);
+        }
+
         if (ThirdPersonPlayerController.Instance != null)
         {
             ThirdPersonPlayerController.Instance.gameObject.SetActive(true);
@@ -544,7 +581,7 @@ public class SurvivalTimerUI : MonoBehaviour
             }
         }
 
-        ShowFloatingBanner("🔥 2 MA BÍ NGÔ ĐÃ THỨC TỈNH! BẠN LÀ NGƯỜI SỐNG SÓT!\nHãy trốn và dùng ngọc phép để sống sót trong 3 phút!", new Color(0.2f, 0.95f, 0.65f), 5.5f);
+        ShowFloatingBanner("🔥 2 NGƯỜI CHƠI MA BÍ NGÔ ĐÃ XUẤT HIỆN! BẠN LÀ NGƯỜI SỐNG SÓT!\nHãy chạy trốn, hú và dùng ngọc phép để sống sót trong 3 phút!", new Color(0.2f, 0.95f, 0.65f), 5.5f);
     }
 
     /// <summary>
