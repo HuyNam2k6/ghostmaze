@@ -52,6 +52,23 @@ public static class MultiplayerTestLauncher
 
     private static bool BuildStandaloneTestPlayer()
     {
+        try
+        {
+            foreach (var proc in Process.GetProcessesByName("GhostMaze"))
+            {
+                try
+                {
+                    if (!proc.HasExited)
+                    {
+                        proc.Kill();
+                        proc.WaitForExit(1500);
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
         if (!Directory.Exists(BUILD_DIR))
         {
             Directory.CreateDirectory(BUILD_DIR);

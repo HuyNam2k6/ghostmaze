@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -384,7 +384,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
             skillNoticeText.color = c;
             skillNoticeTimer = 1.6f;
         }
-        Debug.LogWarning($"<color=#FF6B6B>[Kỹ Năng E] {msg}</color>");
+        Debug.Log($"<color=#FF6B6B>[Kỹ Năng E] {msg}</color>");
     }
 
     private void AutoFindCastHand()
@@ -1595,8 +1595,60 @@ public class ThirdPersonPlayerController : MonoBehaviour
     }
 
     // =========================================================================
-    // HỆ THỐNG ĐỌC INPUT TỰ ĐỘNG (TƯƠNG THÍCH MỌI PHIÊN BẢN INPUT SYSTEM)
+    // HỆ THỐNG ĐỌC INPUT TỰ ĐỘNG & VIRTUAL TOUCH / JOYSTICK
     // =========================================================================
+
+    [Header("Virtual / Mobile Touch Input")]
+    public Vector2 virtualJoystickInput = Vector2.zero;
+    private bool virtualJumpTriggered = false;
+    private bool virtualAttackPressed = false;
+    private bool virtualAttackReleased = false;
+    private bool virtualBlockHeld = false;
+    private bool virtualSprintHeld = false;
+
+    public void SetVirtualJoystick(Vector2 dir)
+    {
+        virtualJoystickInput = Vector2.ClampMagnitude(dir, 1f);
+    }
+
+    public void TriggerVirtualJump()
+    {
+        virtualJumpTriggered = true;
+    }
+
+    public void SetVirtualAttack(bool isDown)
+    {
+        if (isDown)
+        {
+            virtualAttackPressed = true;
+        }
+        else
+        {
+            virtualAttackReleased = true;
+        }
+    }
+
+    public void TriggerVirtualAttackTap()
+    {
+        StartCoroutine(RoutineVirtualAttackTap());
+    }
+
+    private IEnumerator RoutineVirtualAttackTap()
+    {
+        virtualAttackPressed = true;
+        yield return null;
+        virtualAttackReleased = true;
+    }
+
+    public void SetVirtualBlock(bool isHeld)
+    {
+        virtualBlockHeld = isHeld;
+    }
+
+    public void SetVirtualSprint(bool isHeld)
+    {
+        virtualSprintHeld = isHeld;
+    }
 
     public Vector2 ReadMoveInput()
     {
@@ -1610,28 +1662,37 @@ public class ThirdPersonPlayerController : MonoBehaviour
             if (kb.sKey.isPressed || kb.downArrowKey.isPressed) input.y -= 1f;
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) input.x -= 1f;
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) input.x += 1f;
-            return input.normalized;
         }
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        input.x = Input.GetAxisRaw("Horizontal");
-        input.y = Input.GetAxisRaw("Vertical");
-        return input.normalized;
-#else
-        return input;
+        input.x += Input.GetAxisRaw("Horizontal");
+        input.y += Input.GetAxisRaw("Vertical");
 #endif
+
+        if (virtualJoystickInput.sqrMagnitude > 0.001f)
+        {
+            input += virtualJoystickInput;
+        }
+
+        return Vector2.ClampMagnitude(input, 1f);
     }
 
     private bool ReadJumpInput()
     {
+        if (virtualJumpTriggered)
+        {
+            virtualJumpTriggered = false;
+            return true;
+        }
+
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb != null && kb.spaceKey.wasPressedThisFrame) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetButtonDown("Jump")) return true;
+        if (Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.Space)) return true;
 #endif
 
         return false;
@@ -1639,6 +1700,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private bool ReadSprintInput()
     {
+        if (virtualSprintHeld) return true;
+
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed)) return true;
@@ -1651,17 +1714,29 @@ public class ThirdPersonPlayerController : MonoBehaviour
         return false;
     }
 
+    private bool AllowDesktopMouseAction()
+    {
+        // Trên Android / Mobile hoặc khi đang mở chuột bấm nút HUD ảo: KHÔNG kích hoạt chuột trái/phải để ném cầu hay đỡ đòn
+        if (Application.isMobilePlatform) return false;
+        if (Cursor.lockState != CursorLockMode.Locked) return false;
+        if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return false;
+        return true;
+    }
+
     private bool ReadBlockInput()
     {
+        if (virtualBlockHeld) return true;
+
+        bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (mouse != null && mouse.rightButton.isPressed) return true;
+        if (allowMouse && mouse != null && mouse.rightButton.isPressed) return true;
         var kb = Keyboard.current;
         if (kb != null && (kb.fKey.isPressed || kb.eKey.isPressed)) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKey(blockKey) || Input.GetKey(KeyCode.Mouse1) || Input.GetKey(KeyCode.F) || Input.GetKey(KeyCode.E)) return true;
+        if (Input.GetKey(blockKey) || (allowMouse && Input.GetKey(KeyCode.Mouse1)) || Input.GetKey(KeyCode.F) || Input.GetKey(KeyCode.E)) return true;
 #endif
 
         return false;
@@ -1669,15 +1744,18 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private bool ReadBlockInputDown()
     {
+        if (virtualBlockHeld) return true;
+
+        bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
+        if (allowMouse && mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
         var kb = Keyboard.current;
         if (kb != null && (kb.fKey.wasPressedThisFrame || kb.eKey.wasPressedThisFrame)) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(blockKey) || Input.GetKeyDown(KeyCode.Mouse1) || Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.E)) return true;
+        if (Input.GetKeyDown(blockKey) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse1)) || Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.E)) return true;
 #endif
 
         return false;
@@ -1685,15 +1763,22 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private bool ReadMagicAttackInputDown()
     {
+        if (virtualAttackPressed)
+        {
+            virtualAttackPressed = false;
+            return true;
+        }
+
+        bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (mouse != null && mouse.leftButton.wasPressedThisFrame) return true;
+        if (allowMouse && mouse != null && mouse.leftButton.wasPressedThisFrame) return true;
         var kb = Keyboard.current;
         if (kb != null && kb.qKey.wasPressedThisFrame) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(magicAttackKey) || Input.GetKeyDown(KeyCode.Mouse0) || Input.GetKeyDown(KeyCode.Q)) return true;
+        if (Input.GetKeyDown(magicAttackKey) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse0)) || Input.GetKeyDown(KeyCode.Q)) return true;
 #endif
 
         return false;
@@ -1701,15 +1786,22 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private bool ReadMagicAttackInputUp()
     {
+        if (virtualAttackReleased)
+        {
+            virtualAttackReleased = false;
+            return true;
+        }
+
+        bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (mouse != null && mouse.leftButton.wasReleasedThisFrame) return true;
+        if (allowMouse && mouse != null && mouse.leftButton.wasReleasedThisFrame) return true;
         var kb = Keyboard.current;
         if (kb != null && kb.qKey.wasReleasedThisFrame) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyUp(magicAttackKey) || Input.GetKeyUp(KeyCode.Mouse0) || Input.GetKeyUp(KeyCode.Q)) return true;
+        if (Input.GetKeyUp(magicAttackKey) || (allowMouse && Input.GetKeyUp(KeyCode.Mouse0)) || Input.GetKeyUp(KeyCode.Q)) return true;
 #endif
 
         return false;

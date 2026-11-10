@@ -231,11 +231,19 @@ public class ThirdPersonCamera : MonoBehaviour
 
         if (ReadToggleViewPressed())
         {
-            IsFirstPerson = !IsFirstPerson;
-            if (!IsFirstPerson)
-            {
-                currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
-            }
+            TogglePerspective();
+        }
+    }
+
+    /// <summary>
+    /// Chuyển đổi giữa góc nhìn thứ 1 (FPP) và góc nhìn thứ 3 (TPP) kiểu PUBG
+    /// </summary>
+    public void TogglePerspective()
+    {
+        IsFirstPerson = !IsFirstPerson;
+        if (!IsFirstPerson)
+        {
+            currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
         }
     }
 
@@ -304,6 +312,9 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void HandleCursorLockToggle()
     {
+        // Trên thiết bị di động (Android / iOS): Không dùng cơ chế khóa chuột của PC
+        if (Application.isMobilePlatform) return;
+
         if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
         {
             Cursor.lockState = CursorLockMode.None;
@@ -360,10 +371,15 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void HandleCameraRotation()
     {
-        // Không xoay camera khi đang mở bảng UI hoặc khi con trỏ chuột đang tự do
-        if (isUIPanelOpen || Cursor.lockState != CursorLockMode.Locked) return;
+        // Không xoay camera khi đang mở bảng UI
+        if (isUIPanelOpen) return;
+
+        // Trên Android/Mobile: Camera xoay bằng cảm ứng đa điểm (AddTouchLookDelta), bỏ qua Mouse delta để tránh xoay khi kéo Joystick
+        if (Application.isMobilePlatform) return;
+        if (Cursor.lockState != CursorLockMode.Locked) return;
 
         Vector2 mouseDelta = ReadMouseDelta();
+        if (mouseDelta.sqrMagnitude < 0.0001f) return;
 
         float effectiveSensX = sensitivityX * mouseSensitivityMultiplier;
         float effectiveSensY = sensitivityY * mouseSensitivityMultiplier;
@@ -371,6 +387,30 @@ public class ThirdPersonCamera : MonoBehaviour
         currentYaw += mouseDelta.x * effectiveSensX * 0.1f;
         float pitchDelta = mouseDelta.y * effectiveSensY * 0.1f;
         currentPitch += invertY ? pitchDelta : -pitchDelta;
+        if (IsFirstPerson)
+            currentPitch = Mathf.Clamp(currentPitch, firstPersonMinPitch, firstPersonMaxPitch);
+        else
+            currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
+    }
+
+    /// <summary>
+    /// Xoay camera từ cảm ứng vuốt màn hình (Touch Look Swipe trên Android)
+    /// </summary>
+    public void AddTouchLookDelta(Vector2 delta)
+    {
+        if (isUIPanelOpen) return;
+
+        float effectiveSensX = sensitivityX * mouseSensitivityMultiplier;
+        float effectiveSensY = sensitivityY * mouseSensitivityMultiplier;
+
+        // Chuẩn hóa theo DPI trên Android để vuốt mượt mà trên mọi loại màn hình (FHD+, 2K, AMOLED)
+        float dpiScale = Screen.dpi > 100f ? (160f / Screen.dpi) : 1f;
+        float touchScale = 0.085f * dpiScale;
+
+        currentYaw += delta.x * effectiveSensX * touchScale;
+        float pitchDelta = delta.y * effectiveSensY * touchScale;
+        currentPitch += invertY ? pitchDelta : -pitchDelta;
+
         if (IsFirstPerson)
             currentPitch = Mathf.Clamp(currentPitch, firstPersonMinPitch, firstPersonMaxPitch);
         else

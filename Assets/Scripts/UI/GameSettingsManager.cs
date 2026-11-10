@@ -109,9 +109,23 @@ public class GameSettingsManager : MonoBehaviour
             scaler.referencePixelsPerUnit = 100f;
         }
 
-        // Mặc định áp dụng đồ họa đẹp & FPS tối đa
-        ApplyMaxFPS();
-        ApplyGraphicsUltra();
+        // Tránh quá tải GPU/VRAM gây D3D11 device reset khi chạy Android hoặc mở 4 cửa sổ test song song
+        bool isPopupTestWindow = !Application.isEditor
+            && (Screen.width <= 1024 || System.Array.Exists(System.Environment.GetCommandLineArgs(),
+                a => string.Equals(a, "-popupwindow", System.StringComparison.OrdinalIgnoreCase)));
+
+        if (isPopupTestWindow)
+        {
+            Apply60FPS();
+            ApplyGraphicsLow();
+        }
+        else
+        {
+            Apply60FPS();
+            ApplyGraphicsMedium();
+        }
+
+        EnsureCameraRenderSafety();
 
         if (dashboardPanel != null)
         {
@@ -119,10 +133,33 @@ public class GameSettingsManager : MonoBehaviour
         }
     }
 
+    private void EnsureCameraRenderSafety()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return;
+        var urpCam = cam.GetComponent<UniversalAdditionalCameraData>();
+        if (urpCam != null && urpCam.renderPostProcessing)
+        {
+            Shader uber = Shader.Find("Hidden/Universal Render Pipeline/UberPost");
+            if (uber == null || !uber.isSupported)
+            {
+                // Khi build standalone bị strip UberPost, tắt post-processing trên Main Camera để URP FinalBlit vẽ 3D ra màn hình bình thường
+                urpCam.renderPostProcessing = false;
+            }
+        }
+    }
+
     private void Start()
     {
         // Gắn sự kiện mở/đóng
-        if (gearCornerButton != null) gearCornerButton.onClick.AddListener(ToggleDashboard);
+        if (gearCornerButton != null)
+        {
+            gearCornerButton.onClick.AddListener(ToggleDashboard);
+            if (GhostMaze.UI.MiniMapManager.Instance != null)
+            {
+                gearCornerButton.gameObject.SetActive(false);
+            }
+        }
         if (closeDashboardButton != null) closeDashboardButton.onClick.AddListener(CloseDashboard);
 
         // Gắn sự kiện chuyển Tab
@@ -140,6 +177,9 @@ public class GameSettingsManager : MonoBehaviour
         if (mouseSensitivitySlider != null) mouseSensitivitySlider.onValueChanged.AddListener(OnSensitivityChanged);
         if (invertYButton != null) invertYButton.onClick.AddListener(ToggleInvertY);
 
+        // Tự động bổ sung mục Cài Đặt Bố Cục Nút Bấm (kéo thả như Free Fire) vào Tab Điều Khiển
+        InjectCustomHUDSettingsSection();
+
         // Khởi tạo Tab đầu tiên
         SwitchTab(0);
         UpdateAudioLabels();
@@ -155,11 +195,12 @@ public class GameSettingsManager : MonoBehaviour
 
     private void HandleShortcutInput()
     {
+        bool allowF1Settings = PhotonMultiplayerChatVoice.Instance == null;
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb != null)
         {
-            if (kb.f1Key.wasPressedThisFrame || kb.tabKey.wasPressedThisFrame)
+            if (kb.tabKey.wasPressedThisFrame || (allowF1Settings && kb.f1Key.wasPressedThisFrame))
             {
                 ToggleDashboard();
             }
@@ -171,7 +212,7 @@ public class GameSettingsManager : MonoBehaviour
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(KeyCode.F1) || Input.GetKeyDown(KeyCode.Tab))
+        if (Input.GetKeyDown(KeyCode.Tab) || (allowF1Settings && Input.GetKeyDown(KeyCode.F1)))
         {
             ToggleDashboard();
         }
@@ -216,8 +257,11 @@ public class GameSettingsManager : MonoBehaviour
     {
         if (dashboardPanel != null) dashboardPanel.SetActive(true);
         ThirdPersonCamera.isUIPanelOpen = true;
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
+        if (!Application.isMobilePlatform)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
 
         UpdateStatusLabels();
         UpdateAudioLabels();
@@ -227,9 +271,14 @@ public class GameSettingsManager : MonoBehaviour
     public void CloseDashboard()
     {
         if (dashboardPanel != null) dashboardPanel.SetActive(false);
-        ThirdPersonCamera.isUIPanelOpen = false;
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        bool typing = PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsTypingChat();
+        bool editingHUD = VirtualJoystickTouchUI.Instance != null && VirtualJoystickTouchUI.Instance.IsEditingHUDLayout;
+        ThirdPersonCamera.isUIPanelOpen = typing || editingHUD;
+        if (!Application.isMobilePlatform && !editingHUD)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
     }
 
     // =========================================================================
@@ -440,9 +489,159 @@ public class GameSettingsManager : MonoBehaviour
     private void UpdateControlLabels()
     {
         if (mouseSensitivityLabel != null)
-            mouseSensitivityLabel.text = $"Độ Nhạy Chuột: {mouseSensitivity:F1}x";
+            mouseSensitivityLabel.text = Application.isMobilePlatform
+                ? $"Độ Nhạy Xoay Camera: {mouseSensitivity:F1}x"
+                : $"Độ Nhạy Chuột / Cảm Ứng: {mouseSensitivity:F1}x";
 
         if (invertYButtonLabel != null)
-            invertYButtonLabel.text = isInvertY ? "🔄 Đảo Trục Y: ĐANG BẬT" : "🔄 Đảo Trục Y: ĐANG TẮT";
+            invertYButtonLabel.text = isInvertY ? "Đảo Trục Y: ĐANG BẬT" : "Đảo Trục Y: ĐANG TẮT";
+    }
+
+    // =========================================================================
+    // 4. TÙY CHỈNH GIAO DIỆN NÚT BẤM (CUSTOM HUD KIỂU FREE FIRE)
+    // =========================================================================
+
+    private void InjectCustomHUDSettingsSection()
+    {
+        if (tabControlsContent == null) return;
+        Transform tRoot = tabControlsContent.transform;
+        if (tRoot.Find("Btn_CustomizeHUD") != null) return;
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Font.CreateDynamicFontFromOSFont("Arial", 14);
+
+        // Đẩy nhóm hướng dẫn bàn phím / cảm ứng xuống dưới để nhường chỗ cho mục Tùy Chỉnh Nút
+        Transform divC = tRoot.Find("DividerC");
+        if (divC != null)
+        {
+            var r = divC.GetComponent<RectTransform>();
+            if (r != null) r.anchoredPosition = new Vector2(0f, -178f);
+        }
+        Transform keysHeader = tRoot.Find("C_KeysHeader");
+        if (keysHeader != null)
+        {
+            var r = keysHeader.GetComponent<RectTransform>();
+            if (r != null) r.anchoredPosition = new Vector2(0f, -365f);
+            var ht = keysHeader.GetComponent<Text>();
+            if (ht != null && Application.isMobilePlatform) ht.text = "HƯỚNG DẪN CẢM ỨNG (ANDROID)";
+        }
+        Transform keysBody = tRoot.Find("C_KeysBody");
+        if (keysBody != null)
+        {
+            var r = keysBody.GetComponent<RectTransform>();
+            if (r != null) r.anchoredPosition = new Vector2(0f, -402f);
+            var bt = keysBody.GetComponent<Text>();
+            if (bt != null && Application.isMobilePlatform)
+            {
+                bt.text = "• Joystick (Góc trái): Kéo 360° để di chuyển\n" +
+                          "• Nửa màn hình phải: Vuốt để xoay góc nhìn 360°\n" +
+                          "• Nút FPP/TPP: Đổi góc nhìn thứ 1 & thứ 3\n" +
+                          "• Nút Nhảy / Đấm: Thực hiện hành động theo vai trò\n" +
+                          "• Thanh Chat / Voice: Bấm Mic [V] hoặc 🔊 Voice để chỉnh";
+            }
+        }
+        Transform cHeader = tRoot.Find("C_Header");
+        if (cHeader != null)
+        {
+            var ct = cHeader.GetComponent<Text>();
+            if (ct != null && Application.isMobilePlatform) ct.text = "ĐỘ NHẠY XOAY CAMERA (CẢM ỨNG)";
+        }
+
+        // Tiêu đề mục Tùy Chỉnh Nút Bấm
+        CreateControlLabel(tRoot, "HUD_CustomHeader", new Vector2(0f, -196f), 26f,
+            "TÙY CHỈNH NÚT BẤM (KIỂU FREE FIRE)", 15, FontStyle.Bold, new Color(1.0f, 0.84f, 0.28f), font);
+
+        // Nút chính mở chế độ Kéo Thả Tùy Chỉnh Nút
+        CreateControlActionButton(tRoot, "Btn_CustomizeHUD", new Vector2(0f, -228f), new Vector2(460f, 48f),
+            "TÙY CHỈNH VỊ TRÍ & CỠ NÚT (KÉO THẢ)", 14,
+            new Color(0.12f, 0.56f, 0.42f, 0.96f), new Color(0.28f, 0.92f, 0.85f, 0.9f), font, OpenHUDCustomizationEditor);
+
+        // Nút phụ Khôi phục nhanh vị trí mặc định
+        CreateControlActionButton(tRoot, "Btn_ResetHUDQuick", new Vector2(0f, -284f), new Vector2(460f, 36f),
+            "KHÔI PHỤC BỐ CỤC NÚT MẶC ĐỊNH", 12,
+            new Color(0.18f, 0.25f, 0.36f, 0.95f), new Color(0.35f, 0.52f, 0.72f, 0.7f), font, ResetHUDLayoutToDefault);
+
+        // Mô tả hướng dẫn ngắn gọn
+        CreateControlLabel(tRoot, "HUD_CustomHint", new Vector2(0f, -326f), 28f,
+            "Vào giao diện kéo thả từng nút (Joystick, Nhảy, Đấm, FPP, Chat) cho vừa tay bạn.", 12, FontStyle.Italic, new Color(0.75f, 0.86f, 0.96f), font);
+    }
+
+    public void OpenHUDCustomizationEditor()
+    {
+        if (VirtualJoystickTouchUI.Instance == null)
+        {
+            Debug.LogWarning("[GameSettingsManager] Không tìm thấy VirtualJoystickTouchUI trong scene!");
+            return;
+        }
+        CloseDashboard();
+        VirtualJoystickTouchUI.Instance.EnterHUDCustomizationMode();
+    }
+
+    public void ResetHUDLayoutToDefault()
+    {
+        if (VirtualJoystickTouchUI.Instance != null)
+        {
+            VirtualJoystickTouchUI.Instance.ResetSavedHUDLayoutToDefault();
+        }
+    }
+
+    private void CreateControlLabel(Transform parent, string name, Vector2 pos, float height, string txt, int fontSize, FontStyle style, Color color, Font font)
+    {
+        GameObject go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        RectTransform rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = new Vector2(0f, height);
+
+        Text t = go.AddComponent<Text>();
+        t.font = font;
+        t.text = txt;
+        t.fontSize = fontSize;
+        t.fontStyle = style;
+        t.alignment = TextAnchor.MiddleLeft;
+        t.color = color;
+        t.raycastTarget = false;
+    }
+
+    private void CreateControlActionButton(Transform parent, string name, Vector2 pos, Vector2 size, string label, int fontSize, Color bgColor, Color outlineColor, Font font, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        RectTransform rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = size;
+
+        Image bg = go.AddComponent<Image>();
+        bg.color = bgColor;
+
+        Outline ol = go.AddComponent<Outline>();
+        ol.effectColor = outlineColor;
+        ol.effectDistance = new Vector2(1.5f, -1.5f);
+
+        Button btn = go.AddComponent<Button>();
+        btn.onClick.AddListener(onClick);
+
+        GameObject txtGo = new GameObject("Text");
+        txtGo.transform.SetParent(go.transform, false);
+        RectTransform trt = txtGo.AddComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero;
+        trt.anchorMax = Vector2.one;
+        trt.offsetMin = Vector2.zero;
+        trt.offsetMax = Vector2.zero;
+
+        Text t = txtGo.AddComponent<Text>();
+        t.font = font;
+        t.text = label;
+        t.fontSize = fontSize;
+        t.fontStyle = FontStyle.Bold;
+        t.alignment = TextAnchor.MiddleCenter;
+        t.color = Color.white;
+        t.raycastTarget = false;
     }
 }

@@ -15,14 +15,14 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.012, g: 0.018, b: 0.045, a: 1}
+  m_FogColor: {r: 0.006, g: 0.01, b: 0.02, a: 1}
   m_FogMode: 3
-  m_FogDensity: 0.0038
+  m_FogDensity: 0.01
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.032, g: 0.046, b: 0.105, a: 1}
-  m_AmbientEquatorColor: {r: 0.018, g: 0.025, b: 0.058, a: 1}
-  m_AmbientGroundColor: {r: 0.005, g: 0.007, b: 0.018, a: 1}
+  m_AmbientSkyColor: {r: 0.01, g: 0.014, b: 0.026, a: 1}
+  m_AmbientEquatorColor: {r: 0.005, g: 0.007, b: 0.015, a: 1}
+  m_AmbientGroundColor: {r: 0.002, g: 0.002, b: 0.005, a: 1}
   m_AmbientIntensity: 1
   m_AmbientMode: 1
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
@@ -474,9 +474,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 6
-  m_Range: 9
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -2823,7 +2823,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -3488,7 +3488,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -5483,7 +5483,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -5758,7 +5758,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -6028,7 +6028,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -9236,59 +9236,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 50520288}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &50710661
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 50710662}
-  - component: {fileID: 50710663}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_9_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &50710662
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 50710661}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.030033045, y: 0.9418143, z: -0.0875324, w: -0.32314378}
-  m_LocalPosition: {x: 20.263271, y: -1.895, z: -22.947224}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &50710663
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 50710661}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.641823}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &50922547
 GameObject:
   m_ObjectHideFlags: 0
@@ -10332,45 +10279,45 @@ Transform:
   - {fileID: 1616147417}
   - {fileID: 1750830265}
   - {fileID: 579845225}
-  - {fileID: 1666459720}
-  - {fileID: 169017089}
-  - {fileID: 1134011210}
-  - {fileID: 357368543}
-  - {fileID: 1298438525}
-  - {fileID: 634228788}
-  - {fileID: 1999910658}
-  - {fileID: 682499070}
-  - {fileID: 1822460971}
-  - {fileID: 1002250951}
-  - {fileID: 1432437894}
-  - {fileID: 906905748}
-  - {fileID: 2119513065}
-  - {fileID: 1887684130}
-  - {fileID: 335416914}
-  - {fileID: 648927191}
-  - {fileID: 826799099}
-  - {fileID: 595070172}
-  - {fileID: 2063201258}
-  - {fileID: 264439772}
-  - {fileID: 2057111049}
-  - {fileID: 224038998}
-  - {fileID: 806927089}
-  - {fileID: 1162218918}
-  - {fileID: 583712578}
-  - {fileID: 505707382}
-  - {fileID: 868801642}
-  - {fileID: 1694518641}
-  - {fileID: 1371385334}
-  - {fileID: 50710662}
-  - {fileID: 1745339179}
-  - {fileID: 257391554}
-  - {fileID: 1708582800}
-  - {fileID: 1419247569}
-  - {fileID: 2080597664}
-  - {fileID: 1450677152}
-  - {fileID: 488999616}
-  - {fileID: 1412399718}
-  - {fileID: 613534208}
+  - {fileID: 1955986557}
+  - {fileID: 1555820686}
+  - {fileID: 1404931285}
+  - {fileID: 802804758}
+  - {fileID: 1162717560}
+  - {fileID: 338913090}
+  - {fileID: 1702047088}
+  - {fileID: 1780485057}
+  - {fileID: 1525771204}
+  - {fileID: 63856616}
+  - {fileID: 257951629}
+  - {fileID: 770945624}
+  - {fileID: 1748380176}
+  - {fileID: 1148787581}
+  - {fileID: 1941578085}
+  - {fileID: 938368476}
+  - {fileID: 464976567}
+  - {fileID: 1051797696}
+  - {fileID: 1237432889}
+  - {fileID: 1018304732}
+  - {fileID: 2082154297}
+  - {fileID: 1738671268}
+  - {fileID: 362545991}
+  - {fileID: 1692697002}
+  - {fileID: 1942818291}
+  - {fileID: 1933586848}
+  - {fileID: 1077290997}
+  - {fileID: 1163545759}
+  - {fileID: 603225899}
+  - {fileID: 1352432423}
+  - {fileID: 2071970524}
+  - {fileID: 1224071094}
+  - {fileID: 1228363163}
+  - {fileID: 1472171773}
+  - {fileID: 794004822}
+  - {fileID: 197214274}
+  - {fileID: 2032985927}
+  - {fileID: 1288084050}
+  - {fileID: 317114903}
   m_Father: {fileID: 56281557}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &54729154
@@ -10820,7 +10767,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -13196,6 +13143,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 63233522}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &63856615
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 63856616}
+  - component: {fileID: 63856617}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_3_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &63856616
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 63856615}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.056203984, y: 0.7048696, z: 0.056203984, w: 0.70486957}
+  m_LocalPosition: {x: 19.95, y: 1.1800001, z: -1.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &63856617
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 63856615}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 8.453658}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &64426599
 GameObject:
   m_ObjectHideFlags: 0
@@ -14379,7 +14379,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -15732,7 +15732,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -20485,7 +20485,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -20725,7 +20725,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -23374,7 +23374,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -26061,7 +26061,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -27055,7 +27055,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -27550,7 +27550,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -28482,7 +28482,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -35901,59 +35901,6 @@ Transform:
   - {fileID: 1854982711}
   m_Father: {fileID: 1586006650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &169017088
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 169017089}
-  - component: {fileID: 169017090}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_0_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &169017089
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 169017088}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.08769881, y: 0.31787747, z: 0.029543594, w: 0.9436048}
-  m_LocalPosition: {x: 7.7739, y: 0.30499998, z: 12.544605}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &169017090
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 169017088}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 7.3500004, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &169391287
 GameObject:
   m_ObjectHideFlags: 0
@@ -37180,7 +37127,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -38441,7 +38388,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -41271,7 +41218,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -42207,7 +42154,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -42516,6 +42463,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 197084393}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &197214273
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 197214274}
+  - component: {fileID: 197214275}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_11_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &197214274
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 197214273}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.0128356125, y: 0.9860846, z: -0.09164683, w: -0.13810624}
+  m_LocalPosition: {x: -33.829666, y: -3.395, z: -44.65383}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &197214275
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 197214273}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.6, y: 0.4, z: 2.6418252}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &198183168
 GameObject:
   m_ObjectHideFlags: 0
@@ -45713,7 +45713,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -46402,7 +46402,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -47888,7 +47888,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -49456,7 +49456,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -49583,7 +49583,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -50862,59 +50862,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 223814346}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &224038997
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 224038998}
-  - component: {fileID: 224038999}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_7_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &224038998
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 224038997}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.12268514, y: 0.69638234, z: 0.12268514, w: 0.69638234}
-  m_LocalPosition: {x: -1.5, y: 6.83, z: 38}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &224038999
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 224038997}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.75, y: 0.4, z: 11.9546995}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &224215652
 GameObject:
   m_ObjectHideFlags: 0
@@ -55482,7 +55429,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -58400,7 +58347,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -58527,7 +58474,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -58849,59 +58796,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 257359984}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &257391553
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 257391554}
-  - component: {fileID: 257391555}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_10_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &257391554
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 257391553}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.01651169, y: 0.97973126, z: 0.09105641, w: 0.17765932}
-  m_LocalPosition: {x: -33.42135, y: 1.105, z: -6.876405}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &257391555
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 257391553}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.6418238}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &257463108
 GameObject:
   m_ObjectHideFlags: 0
@@ -59015,6 +58909,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 257463108}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &257951628
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 257951629}
+  - component: {fileID: 257951630}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_3_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &257951629
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 257951628}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.06543665, y: 0.7040725, z: 0.06543665, w: 0.7040725}
+  m_LocalPosition: {x: 14.7, y: 0.30499998, z: -1.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &257951630
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 257951628}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.55, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &257956981
 GameObject:
   m_ObjectHideFlags: 0
@@ -59986,7 +59933,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -60496,59 +60443,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 264266979}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &264439771
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 264439772}
-  - component: {fileID: 264439773}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_6_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &264439772
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 264439771}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.08857063, y: 0.28854045, z: 0.026817007, w: 0.9529851}
-  m_LocalPosition: {x: -31.66564, y: 1.105, z: 17.00154}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &264439773
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 264439771}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.6418235}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &264562839
 GameObject:
   m_ObjectHideFlags: 0
@@ -61350,7 +61244,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -66153,7 +66047,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -70749,7 +70643,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -71172,6 +71066,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 317090577}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &317114902
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 317114903}
+  - component: {fileID: 317114904}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_12_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &317114903
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 317114902}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.02126164, y: 0.96907264, z: -0.090065755, w: -0.228767}
+  m_LocalPosition: {x: -1.5366564, y: -6.395, z: -57.07331}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &317114904
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 317114902}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.9500003, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &317190512
 GameObject:
   m_ObjectHideFlags: 0
@@ -71305,9 +71252,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 6.5
-  m_Range: 10
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -76780,59 +76727,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 335371417}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &335416913
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 335416914}
-  - component: {fileID: 335416915}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_4_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &335416914
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 335416913}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.02012015, y: 0.97189015, z: -0.090327635, w: 0.21648493}
-  m_LocalPosition: {x: 7.0093207, y: -1.895, z: -23.086552}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &335416915
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 335416913}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 6.9500003, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &336651623
 GameObject:
   m_ObjectHideFlags: 0
@@ -77663,6 +77557,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 338737214}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &338913089
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 338913090}
+  - component: {fileID: 338913091}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_1_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &338913090
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 338913089}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.09035756, y: -0.21503496, z: 0.019985387, w: 0.97221196}
+  m_LocalPosition: {x: -14.006077, y: 4.605, z: 28.088066}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &338913091
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 338913089}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &338964615
 GameObject:
   m_ObjectHideFlags: 0
@@ -79778,7 +79725,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -80498,7 +80445,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -81977,7 +81924,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -82175,59 +82122,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 357125313}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &357368542
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 357368543}
-  - component: {fileID: 357368544}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_1_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &357368543
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 357368542}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.14277852, y: -0.21364026, z: -0.031579915, w: 0.96590626}
-  m_LocalPosition: {x: -10.5, y: 2.6799998, z: 20.55}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &357368544
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 357368542}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.9500003, y: 0.4, z: 15.112704}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &357479065
 GameObject:
   m_ObjectHideFlags: 0
@@ -82361,7 +82255,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -83776,6 +83670,59 @@ Transform:
   - {fileID: 1289088733}
   m_Father: {fileID: 1586006650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &362545990
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 362545991}
+  - component: {fileID: 362545992}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_7_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &362545991
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 362545990}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.06543662, y: 0.7040725, z: 0.06543662, w: 0.7040725}
+  m_LocalPosition: {x: -8.2, y: 4.605, z: 38}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &362545992
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 362545990}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &362555739
 GameObject:
   m_ObjectHideFlags: 0
@@ -88991,7 +88938,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -93352,7 +93299,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -96378,7 +96325,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -96505,7 +96452,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -97367,9 +97314,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 6.5
-  m_Range: 10
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -97902,7 +97849,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -98141,7 +98088,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -104258,7 +104205,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -105080,7 +105027,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -105164,6 +105111,59 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &464976566
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 464976567}
+  - component: {fileID: 464976568}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_5_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &464976567
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 464976566}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.043666378, y: 0.87789124, z: 0.081591375, w: -0.4698331}
+  m_LocalPosition: {x: -9.501539, y: 0.30499998, z: -11.33436}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &464976568
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 464976566}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.55, y: 0.4, z: 2.641823}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &465461445
 GameObject:
   m_ObjectHideFlags: 0
@@ -105712,7 +105712,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -109102,7 +109102,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -109341,7 +109341,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -109982,59 +109982,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 488230236}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &488999615
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 488999616}
-  - component: {fileID: 488999617}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_12_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &488999616
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 488999615}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.043690138, y: 0.95549, z: -0.18507439, w: -0.2255606}
-  m_LocalPosition: {x: 1.5, y: -3.92, z: -51}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &488999617
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 488999615}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.55, y: 0.4, z: 12.3019705}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &489020659
 GameObject:
   m_ObjectHideFlags: 0
@@ -112743,7 +112690,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -112992,59 +112939,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 505276059}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &505707381
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 505707382}
-  - component: {fileID: 505707383}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_8_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &505707382
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 505707381}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.0925414, y: -0, z: -0, w: 0.9957089}
-  m_LocalPosition: {x: 36, y: 1.605, z: 11.8}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &505707383
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 505707381}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &506101687
 GameObject:
   m_ObjectHideFlags: 0
@@ -118694,7 +118588,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -123416,7 +123310,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -127985,59 +127879,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 583595623}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &583712577
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 583712578}
-  - component: {fileID: 583712579}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_8_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &583712578
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 583712577}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.2444677, y: -0, z: -0, w: 0.9696575}
-  m_LocalPosition: {x: 36, y: 5.33, z: 19.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &583712579
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 583712577}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.9500003, y: 0.4, z: 15.014823}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &583917936
 GameObject:
   m_ObjectHideFlags: 0
@@ -128193,7 +128034,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -130669,59 +130510,6 @@ Transform:
   - {fileID: 467774959}
   m_Father: {fileID: 1586006650}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &595070171
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 595070172}
-  - component: {fileID: 595070173}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_5_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &595070172
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 595070171}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.043666393, y: 0.8778911, z: -0.08159136, w: -0.46983337}
-  m_LocalPosition: {x: -17.49846, y: -1.895, z: -16.66564}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &595070173
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 595070171}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.55, y: 0.4, z: 2.6418235}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &596723914
 GameObject:
   m_ObjectHideFlags: 0
@@ -132948,6 +132736,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 603178225}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &603225898
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 603225899}
+  - component: {fileID: 603225900}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_9_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &603225899
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 603225898}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.030033052, y: 0.9418143, z: 0.08753242, w: -0.32314378}
+  m_LocalPosition: {x: 28.736729, y: 1.605, z: -12.052777}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &603225900
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 603225898}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.641823}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &603809073
 GameObject:
   m_ObjectHideFlags: 0
@@ -136079,7 +135920,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -136163,59 +136004,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &613534207
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 613534208}
-  - component: {fileID: 613534209}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_12_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &613534208
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 613534207}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.02126164, y: 0.96907264, z: -0.090065755, w: -0.228767}
-  m_LocalPosition: {x: -1.5366564, y: -6.395, z: -57.07331}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &613534209
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 613534207}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.9500003, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &614180570
 GameObject:
   m_ObjectHideFlags: 0
@@ -139525,7 +139313,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -141232,59 +141020,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 633718496}
   m_CullTransparentMesh: 1
---- !u!1 &634228787
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 634228788}
-  - component: {fileID: 634228789}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_1_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &634228788
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 634228787}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.09035756, y: -0.21503496, z: 0.019985387, w: 0.97221196}
-  m_LocalPosition: {x: -14.006077, y: 4.605, z: 28.088066}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &634228789
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 634228787}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &634264746
 GameObject:
   m_ObjectHideFlags: 0
@@ -141620,7 +141355,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -143988,59 +143723,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 648694602}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &648927190
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 648927191}
-  - component: {fileID: 648927192}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_5_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &648927191
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 648927190}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.06960725, y: 0.8720286, z: -0.13006233, w: -0.46669558}
-  m_LocalPosition: {x: -13.5, y: -0.57, z: -14}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &648927192
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 648927190}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 7.789231}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &649058175
 GameObject:
   m_ObjectHideFlags: 0
@@ -144807,7 +144489,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -145751,7 +145433,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -147500,7 +147182,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -147952,7 +147634,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -148335,7 +148017,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -149636,7 +149318,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -150760,7 +150442,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -152125,59 +151807,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 682456247}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &682499069
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 682499070}
-  - component: {fileID: 682499071}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_2_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &682499070
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 682499069}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.06543662, y: -0.7040725, z: -0.06543662, w: 0.7040725}
-  m_LocalPosition: {x: -14.5, y: 0.30499998, z: 3}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &682499071
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 682499069}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.55, y: 0.4, z: 2.6418238}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &682592300
 GameObject:
   m_ObjectHideFlags: 0
@@ -152447,7 +152076,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -165159,7 +164788,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -168290,7 +167919,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -170059,7 +169688,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -170860,9 +170489,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 6.5
-  m_Range: 10
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -171313,6 +170942,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 770244618}
   m_Mesh: {fileID: 7447534520612549447, guid: 7b47d053517c8b544a7d61575e4df06c, type: 3}
+--- !u!1 &770945623
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 770945624}
+  - component: {fileID: 770945625}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_3_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &770945624
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 770945623}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.065436654, y: 0.7040725, z: -0.065436654, w: 0.7040725}
+  m_LocalPosition: {x: 25.2, y: 1.605, z: -1.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &770945625
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 770945623}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.55, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &770968302
 GameObject:
   m_ObjectHideFlags: 0
@@ -176936,6 +176618,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 792808788}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &794004821
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 794004822}
+  - component: {fileID: 794004823}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_11_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &794004822
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 794004821}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.012835576, y: 0.98608464, z: 0.091646835, w: -0.13810587}
+  m_LocalPosition: {x: -32.170334, y: -1.895, z: -38.84617}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &794004823
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 794004821}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.6, y: 0.4, z: 2.6418247}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &794042802
 GameObject:
   m_ObjectHideFlags: 0
@@ -178394,7 +178129,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -178981,6 +178716,59 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.65, y: 1.6, z: 0.65}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &802804757
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 802804758}
+  - component: {fileID: 802804759}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_1_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &802804758
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802804757}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.14277852, y: -0.21364026, z: -0.031579915, w: 0.96590626}
+  m_LocalPosition: {x: -10.5, y: 2.6799998, z: 20.55}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &802804759
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802804757}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.9500003, y: 0.4, z: 15.112704}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &803802849
 GameObject:
   m_ObjectHideFlags: 0
@@ -179407,59 +179195,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 806244187}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &806927088
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 806927089}
-  - component: {fileID: 806927090}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_7_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &806927089
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 806927088}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.06543662, y: 0.7040725, z: 0.06543662, w: 0.7040725}
-  m_LocalPosition: {x: -8.2, y: 4.605, z: 38}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &806927090
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 806927088}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &808218180
 GameObject:
   m_ObjectHideFlags: 0
@@ -183058,7 +182793,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -183450,59 +183185,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 826749783}
   m_Mesh: {fileID: 4082046404321970722, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
---- !u!1 &826799098
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 826799099}
-  - component: {fileID: 826799100}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_5_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &826799099
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 826799098}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.043666378, y: 0.87789124, z: 0.081591375, w: -0.4698331}
-  m_LocalPosition: {x: -9.501539, y: 0.30499998, z: -11.33436}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &826799100
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 826799098}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.55, y: 0.4, z: 2.641823}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &827228782
 GameObject:
   m_ObjectHideFlags: 0
@@ -187570,7 +187252,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -193230,59 +192912,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 868793915}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &868801641
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 868801642}
-  - component: {fileID: 868801643}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_8_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &868801642
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 868801641}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.09254135, y: -0, z: -0, w: 0.9957089}
-  m_LocalPosition: {x: 36, y: 8.605, z: 27.2}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &868801643
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 868801641}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &869001911
 GameObject:
   m_ObjectHideFlags: 0
@@ -194040,7 +193669,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -202168,59 +201797,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 906521853}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &906905747
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 906905748}
-  - component: {fileID: 906905749}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_3_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &906905748
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 906905747}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.065436654, y: 0.7040725, z: -0.065436654, w: 0.7040725}
-  m_LocalPosition: {x: 25.2, y: 1.605, z: -1.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &906905749
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 906905747}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.55, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &907374221
 GameObject:
   m_ObjectHideFlags: 0
@@ -203775,7 +203351,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -207331,7 +206907,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -207572,7 +207148,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -209160,6 +208736,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 938359603}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &938368475
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 938368476}
+  - component: {fileID: 938368477}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_5_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &938368476
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 938368475}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.06960725, y: 0.8720286, z: -0.13006233, w: -0.46669558}
+  m_LocalPosition: {x: -13.5, y: -0.57, z: -14}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &938368477
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 938368475}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 7.789231}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &938369684
 GameObject:
   m_ObjectHideFlags: 0
@@ -210962,7 +210591,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -212459,7 +212088,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -213140,7 +212769,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -213267,7 +212896,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -216505,7 +216134,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -217813,7 +217442,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -223187,59 +222816,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1002196440}
   m_Mesh: {fileID: 1615188911994587084, guid: 380cb18fec345d64c8c2aea3639751af, type: 3}
---- !u!1 &1002250950
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1002250951}
-  - component: {fileID: 1002250952}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_3_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1002250951
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1002250950}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.056203984, y: 0.7048696, z: 0.056203984, w: 0.70486957}
-  m_LocalPosition: {x: 19.95, y: 1.1800001, z: -1.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1002250952
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1002250950}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 8.453658}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1002792490
 GameObject:
   m_ObjectHideFlags: 0
@@ -224454,7 +224030,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -224581,7 +224157,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -225098,7 +224674,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -226266,7 +225842,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -226664,6 +226240,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1018015727}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1018304731
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1018304732}
+  - component: {fileID: 1018304733}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_6_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1018304732
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1018304731}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.08857063, y: 0.28854045, z: 0.026817007, w: 0.9529851}
+  m_LocalPosition: {x: -31.66564, y: 1.105, z: 17.00154}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1018304733
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1018304731}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.6418235}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1018316616
 GameObject:
   m_ObjectHideFlags: 0
@@ -227988,7 +227617,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -230065,7 +229694,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -232467,8 +232096,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 1
-  m_Color: {r: 0.68, g: 0.82, b: 1, a: 1}
-  m_Intensity: 0.95
+  m_Color: {r: 0.32, g: 0.44, b: 0.65, a: 1}
+  m_Intensity: 0.16
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -233999,6 +233628,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1051593750}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1051797695
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1051797696}
+  - component: {fileID: 1051797697}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_5_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1051797696
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1051797695}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.043666393, y: 0.8778911, z: -0.08159136, w: -0.46983337}
+  m_LocalPosition: {x: -17.49846, y: -1.895, z: -16.66564}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1051797697
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1051797695}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.55, y: 0.4, z: 2.6418235}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1051821297
 GameObject:
   m_ObjectHideFlags: 0
@@ -239381,6 +239063,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1077257184}
   m_Mesh: {fileID: 4082046404321970722, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
+--- !u!1 &1077290996
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1077290997}
+  - component: {fileID: 1077290998}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_8_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1077290997
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1077290996}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.09254135, y: -0, z: -0, w: 0.9957089}
+  m_LocalPosition: {x: 36, y: 8.605, z: 27.2}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1077290998
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1077290996}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1077545359
 GameObject:
   m_ObjectHideFlags: 0
@@ -245761,7 +245496,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -246112,7 +245847,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -247134,7 +246869,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -247314,7 +247049,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -250276,7 +250011,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -252792,59 +252527,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1133835678}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1134011209
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1134011210}
-  - component: {fileID: 1134011211}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_0_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1134011210
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1134011209}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.08769878, y: 0.31787747, z: -0.02954358, w: 0.9436048}
-  m_LocalPosition: {x: 18.7261, y: 8.605, z: 26.955395}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1134011211
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1134011209}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 7.3500004, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1134091510
 GameObject:
   m_ObjectHideFlags: 0
@@ -254343,7 +254025,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -255137,7 +254819,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -256273,6 +255955,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1148227055}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1148787580
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1148787581}
+  - component: {fileID: 1148787582}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_4_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1148787581
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1148787580}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.020120153, y: 0.97189015, z: 0.09032765, w: 0.21648493}
+  m_LocalPosition: {x: 2.9906793, y: 0.30499998, z: -14.51345}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1148787582
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1148787580}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 6.9500003, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1149749718
 GameObject:
   m_ObjectHideFlags: 0
@@ -258135,7 +257870,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -260114,59 +259849,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1162121252}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1162218917
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1162218918}
-  - component: {fileID: 1162218919}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_7_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1162218918
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1162218917}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.0654366, y: 0.7040725, z: -0.0654366, w: 0.7040725}
-  m_LocalPosition: {x: 5.2, y: 8.605, z: 38}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1162218919
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1162218917}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1162220081
 GameObject:
   m_ObjectHideFlags: 0
@@ -260405,6 +260087,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1162594908}
   m_Mesh: {fileID: 4082046404321970722, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
+--- !u!1 &1162717559
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1162717560}
+  - component: {fileID: 1162717561}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_1_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1162717560
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1162717559}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.09035759, y: -0.21503504, z: -0.019985402, w: 0.97221196}
+  m_LocalPosition: {x: -6.993923, y: 0.30499998, z: 13.011935}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1162717561
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1162717559}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1163021501
 GameObject:
   m_ObjectHideFlags: 0
@@ -260855,6 +260590,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1163468280}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1163545758
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1163545759}
+  - component: {fileID: 1163545760}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_9_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1163545759
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1163545758}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.0481514, y: 0.93540424, z: -0.14033902, w: -0.32094446}
+  m_LocalPosition: {x: 24.5, y: 0.08000004, z: -17.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1163545760
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1163545758}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.75, y: 0.4, z: 12.176861}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1163629215
 GameObject:
   m_ObjectHideFlags: 0
@@ -262063,7 +261851,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -262226,7 +262014,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -267746,7 +267534,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -274470,6 +274258,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1223271443}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1224071093
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1224071094}
+  - component: {fileID: 1224071095}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_10_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1224071094
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1224071093}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.01651169, y: 0.97973126, z: 0.09105641, w: 0.17765932}
+  m_LocalPosition: {x: -33.42135, y: 1.105, z: -6.876405}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1224071095
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1224071093}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.6418238}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1224371310
 GameObject:
   m_ObjectHideFlags: 0
@@ -275355,6 +275196,59 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.68, y: 1.9, z: 0.68}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &1228363162
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1228363163}
+  - component: {fileID: 1228363164}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_10_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1228363163
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1228363162}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.016511686, y: 0.97973126, z: -0.09105639, w: 0.17765932}
+  m_LocalPosition: {x: -29.578651, y: -1.895, z: -17.123596}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1228363164
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1228363162}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.6418238}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1228467735
 GameObject:
   m_ObjectHideFlags: 0
@@ -276965,6 +276859,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1236397637}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1237432888
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1237432889}
+  - component: {fileID: 1237432890}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_6_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1237432889
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1237432888}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.14914711, y: 0.286244, z: 0.04515811, w: 0.9453996}
+  m_LocalPosition: {x: -28, y: 3.08, z: 22.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1237432890
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1237432888}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.75, y: 0.4, z: 11.618817}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1237675787
 GameObject:
   m_ObjectHideFlags: 0
@@ -277210,7 +277157,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -278010,7 +277957,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -284562,7 +284509,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -285304,9 +285251,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 6.5
-  m_Range: 10
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -288914,7 +288861,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -289645,6 +289592,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1287379729}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1288084049
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1288084050}
+  - component: {fileID: 1288084051}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_12_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1288084050
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1288084049}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.021261645, y: 0.96907264, z: 0.09006578, w: -0.228767}
+  m_LocalPosition: {x: 4.5366564, y: -1.895, z: -44.92669}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1288084051
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1288084049}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.9500003, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1288587514
 GameObject:
   m_ObjectHideFlags: 0
@@ -289868,7 +289868,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -292010,59 +292010,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1298405201}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1298438524
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1298438525}
-  - component: {fileID: 1298438526}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_1_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1298438525
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1298438524}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.09035759, y: -0.21503504, z: -0.019985402, w: 0.97221196}
-  m_LocalPosition: {x: -6.993923, y: 0.30499998, z: 13.011935}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1298438526
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1298438524}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1299067452 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6707904473875315896, guid: 621829da5645ddd4ab634b71b30a1008, type: 3}
@@ -294786,7 +294733,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -296921,7 +296868,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -297215,7 +297162,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -301247,7 +301194,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -301869,7 +301816,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -302764,6 +302711,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1350293597}
   m_Mesh: {fileID: 4082046404321970722, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
+--- !u!1 &1352432422
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1352432423}
+  - component: {fileID: 1352432424}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_9_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1352432423
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1352432422}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.030033045, y: 0.9418143, z: -0.0875324, w: -0.32314378}
+  m_LocalPosition: {x: 20.263271, y: -1.895, z: -22.947224}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1352432424
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1352432422}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.641823}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1352558644
 GameObject:
   m_ObjectHideFlags: 0
@@ -303632,7 +303632,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -307022,59 +307022,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1370969560}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1371385333
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1371385334}
-  - component: {fileID: 1371385335}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_9_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1371385334
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1371385333}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.030033052, y: 0.9418143, z: 0.08753242, w: -0.32314378}
-  m_LocalPosition: {x: 28.736729, y: 1.605, z: -12.052777}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1371385335
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1371385333}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.641823}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1372052687
 GameObject:
   m_ObjectHideFlags: 0
@@ -309441,7 +309388,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -312523,7 +312470,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -313279,7 +313226,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -314099,6 +314046,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1404777491}
   m_Mesh: {fileID: -8834378528603856437, guid: 7b47d053517c8b544a7d61575e4df06c, type: 3}
+--- !u!1 &1404931284
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1404931285}
+  - component: {fileID: 1404931286}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_0_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1404931285
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1404931284}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.08769878, y: 0.31787747, z: -0.02954358, w: 0.9436048}
+  m_LocalPosition: {x: 18.7261, y: 8.605, z: 26.955395}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1404931286
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1404931284}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 7.3500004, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1405063001
 GameObject:
   m_ObjectHideFlags: 0
@@ -315755,59 +315755,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1412176173}
   m_Mesh: {fileID: 2230451200271278869, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
---- !u!1 &1412399717
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1412399718}
-  - component: {fileID: 1412399719}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_12_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1412399718
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1412399717}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.021261645, y: 0.96907264, z: 0.09006578, w: -0.228767}
-  m_LocalPosition: {x: 4.5366564, y: -1.895, z: -44.92669}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1412399719
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1412399717}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.9500003, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1412506263
 GameObject:
   m_ObjectHideFlags: 0
@@ -317752,59 +317699,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!1 &1419247568
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1419247569}
-  - component: {fileID: 1419247570}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_11_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1419247569
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1419247568}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.026935397, y: 0.9714808, z: -0.1923202, w: -0.13606071}
-  m_LocalPosition: {x: -33, y: -2.42, z: -41.75}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1419247570
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1419247568}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.2, y: 0.4, z: 4.187004}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1419459096
 GameObject:
   m_ObjectHideFlags: 0
@@ -319634,59 +319528,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1431163124}
   m_Mesh: {fileID: -71850587174120192, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
---- !u!1 &1432437893
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1432437894}
-  - component: {fileID: 1432437895}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_3_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1432437894
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1432437893}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.06543665, y: 0.7040725, z: 0.06543665, w: 0.7040725}
-  m_LocalPosition: {x: 14.7, y: 0.30499998, z: -1.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1432437895
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1432437893}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.55, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1433052085
 GameObject:
   m_ObjectHideFlags: 0
@@ -322134,7 +321975,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -322857,59 +322698,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1450365929}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1450677151
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1450677152}
-  - component: {fileID: 1450677153}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_11_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1450677152
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1450677151}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.0128356125, y: 0.9860846, z: -0.09164683, w: -0.13810624}
-  m_LocalPosition: {x: -33.829666, y: -3.395, z: -44.65383}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1450677153
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1450677151}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.6, y: 0.4, z: 2.6418252}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1451149368
 GameObject:
   m_ObjectHideFlags: 0
@@ -326908,6 +326696,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1471189428}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1472171772
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1472171773}
+  - component: {fileID: 1472171774}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_11_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1472171773
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1472171772}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.026935397, y: 0.9714808, z: -0.1923202, w: -0.13606071}
+  m_LocalPosition: {x: -33, y: -2.42, z: -41.75}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1472171774
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1472171772}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.2, y: 0.4, z: 4.187004}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1472319885
 GameObject:
   m_ObjectHideFlags: 0
@@ -330282,7 +330123,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -330695,7 +330536,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -332689,7 +332530,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -334381,7 +334222,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -335435,7 +335276,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -336768,7 +336609,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -337531,6 +337372,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1523977125}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1525771203
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1525771204}
+  - component: {fileID: 1525771205}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_2_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1525771204
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1525771203}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.065436654, y: -0.7040725, z: 0.065436654, w: 0.7040725}
+  m_LocalPosition: {x: -25.2, y: 1.105, z: 3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1525771205
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1525771203}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.55, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1525942287
 GameObject:
   m_ObjectHideFlags: 0
@@ -340842,7 +340736,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -341520,7 +341414,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -343996,6 +343890,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1555547823}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1555820685
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1555820686}
+  - component: {fileID: 1555820687}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_0_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1555820686
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555820685}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.08769881, y: 0.31787747, z: 0.029543594, w: 0.9436048}
+  m_LocalPosition: {x: 7.7739, y: 0.30499998, z: 12.544605}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1555820687
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555820685}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 7.3500004, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1555860415
 GameObject:
   m_ObjectHideFlags: 0
@@ -344880,7 +344827,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -349727,7 +349674,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -351130,7 +351077,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -353562,7 +353509,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -354318,7 +354265,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -360604,7 +360551,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -362056,7 +362003,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -362386,7 +362333,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -366213,7 +366160,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -367069,7 +367016,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -369013,7 +368960,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -369252,7 +369199,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -370260,59 +370207,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1666280190}
   m_Mesh: {fileID: 4082046404321970722, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
---- !u!1 &1666459719
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1666459720}
-  - component: {fileID: 1666459721}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_0_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1666459720
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1666459719}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.22816494, y: 0.30985636, z: 0.07686321, w: 0.91979444}
-  m_LocalPosition: {x: 13.25, y: 4.68, z: 19.75}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1666459721
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1666459719}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 6.9500003, y: 0.4, z: 18.009224}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1666750755
 GameObject:
   m_ObjectHideFlags: 0
@@ -370875,7 +370769,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -371409,7 +371303,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -372837,7 +372731,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -375339,7 +375233,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -376222,6 +376116,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1692621535}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1692697001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1692697002}
+  - component: {fileID: 1692697003}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_7_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1692697002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1692697001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.0654366, y: 0.7040725, z: -0.0654366, w: 0.7040725}
+  m_LocalPosition: {x: 5.2, y: 8.605, z: 38}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1692697003
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1692697001}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1693877243
 GameObject:
   m_ObjectHideFlags: 0
@@ -376618,59 +376565,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1694418826}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1694518640
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1694518641}
-  - component: {fileID: 1694518642}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_9_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1694518641
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1694518640}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.0481514, y: 0.93540424, z: -0.14033902, w: -0.32094446}
-  m_LocalPosition: {x: 24.5, y: 0.08000004, z: -17.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1694518642
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1694518640}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.75, y: 0.4, z: 12.176861}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1695166796
 GameObject:
   m_ObjectHideFlags: 0
@@ -377807,6 +377701,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1701569852}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1702047087
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1702047088}
+  - component: {fileID: 1702047089}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_2_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1702047088
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1702047087}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.03395943, y: -0.7062909, z: -0.03395943, w: 0.7062909}
+  m_LocalPosition: {x: -19.85, y: 0.93, z: 3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1702047089
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1702047087}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 8.588466}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1702379319
 GameObject:
   m_ObjectHideFlags: 0
@@ -378874,59 +378821,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1708250470}
   m_Mesh: {fileID: -71850587174120192, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
---- !u!1 &1708582799
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1708582800}
-  - component: {fileID: 1708582801}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_10_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1708582800
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1708582799}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.016511686, y: 0.97973126, z: -0.09105639, w: 0.17765932}
-  m_LocalPosition: {x: -29.578651, y: -1.895, z: -17.123596}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1708582801
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1708582799}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.6418238}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1708644219
 GameObject:
   m_ObjectHideFlags: 0
@@ -379709,7 +379603,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -383908,9 +383802,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 6.5
-  m_Range: 10
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -384857,6 +384751,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1738395657}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1738671267
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1738671268}
+  - component: {fileID: 1738671269}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_7_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1738671268
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1738671267}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.12268514, y: 0.69638234, z: 0.12268514, w: 0.69638234}
+  m_LocalPosition: {x: -1.5, y: 6.83, z: 38}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1738671269
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1738671267}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.75, y: 0.4, z: 11.9546995}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1738947319
 GameObject:
   m_ObjectHideFlags: 0
@@ -384990,7 +384937,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -386616,59 +386563,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1745185836}
   m_CullTransparentMesh: 1
---- !u!1 &1745339178
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1745339179}
-  - component: {fileID: 1745339180}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_10_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1745339179
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1745339178}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.029981907, y: 0.9699625, z: -0.16534026, w: 0.17588775}
-  m_LocalPosition: {x: -31.5, y: -0.16999996, z: -12}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1745339180
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1745339178}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.75, y: 0.4, z: 9.305386}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1745355397
 GameObject:
   m_ObjectHideFlags: 0
@@ -387818,6 +387712,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1748259721}
   m_Mesh: {fileID: 4082046404321970722, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
+--- !u!1 &1748380175
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1748380176}
+  - component: {fileID: 1748380177}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_4_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1748380176
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1748380175}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.0326783, y: 0.96499056, z: -0.14670637, w: 0.21494807}
+  m_LocalPosition: {x: 5, y: -0.57, z: -18.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1748380177
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1748380175}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 6.55, y: 0.4, z: 7.652702}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1748446359
 GameObject:
   m_ObjectHideFlags: 0
@@ -389789,7 +389736,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -392290,7 +392237,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -395449,6 +395396,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1779750442}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1780485056
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1780485057}
+  - component: {fileID: 1780485058}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_2_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1780485057
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1780485056}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.06543662, y: -0.7040725, z: -0.06543662, w: 0.7040725}
+  m_LocalPosition: {x: -14.5, y: 0.30499998, z: 3}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1780485058
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1780485056}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.55, y: 0.4, z: 2.6418238}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1780885404
 GameObject:
   m_ObjectHideFlags: 0
@@ -398579,7 +398579,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -404716,7 +404716,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -405949,59 +405949,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1822448300}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1822460970
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1822460971}
-  - component: {fileID: 1822460972}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_2_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1822460971
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1822460970}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.065436654, y: -0.7040725, z: 0.065436654, w: 0.7040725}
-  m_LocalPosition: {x: -25.2, y: 1.105, z: 3}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1822460972
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1822460970}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.55, y: 0.4, z: 2.6418228}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1823664670
 GameObject:
   m_ObjectHideFlags: 0
@@ -407013,7 +406960,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -409555,7 +409502,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -412401,7 +412348,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -414462,7 +414409,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -414701,7 +414648,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -416935,7 +416882,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -417775,9 +417722,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 6.5
-  m_Range: 10
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -418351,7 +418298,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -418567,7 +418514,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -420752,59 +420699,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1887376714}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &1887684129
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1887684130}
-  - component: {fileID: 1887684131}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_4_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1887684130
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1887684129}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.020120153, y: 0.97189015, z: 0.09032765, w: 0.21648493}
-  m_LocalPosition: {x: 2.9906793, y: 0.30499998, z: -14.51345}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1887684131
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1887684129}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 6.9500003, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1887703319
 GameObject:
   m_ObjectHideFlags: 0
@@ -421697,9 +421591,9 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
-  m_Intensity: 7
-  m_Range: 10
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
+  m_Intensity: 5
+  m_Range: 8
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -423051,7 +422945,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -423978,7 +423872,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -425344,7 +425238,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -426482,7 +426376,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -427420,7 +427314,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -430894,6 +430788,59 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1933537773}
   m_CullTransparentMesh: 1
+--- !u!1 &1933586847
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1933586848}
+  - component: {fileID: 1933586849}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_8_StartWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1933586848
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1933586847}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.0925414, y: -0, z: -0, w: 0.9957089}
+  m_LocalPosition: {x: 36, y: 1.605, z: 11.8}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1933586849
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1933586847}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.3500004, y: 0.4, z: 2.6418228}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1933600548
 GameObject:
   m_ObjectHideFlags: 0
@@ -431847,7 +431794,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -431974,7 +431921,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -432101,7 +432048,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -432520,7 +432467,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -432604,6 +432551,59 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &1941578084
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1941578085}
+  - component: {fileID: 1941578086}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_4_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1941578085
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1941578084}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.02012015, y: 0.97189015, z: -0.090327635, w: 0.21648493}
+  m_LocalPosition: {x: 7.0093207, y: -1.895, z: -23.086552}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1941578086
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1941578084}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 6.9500003, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1942593971
 GameObject:
   m_ObjectHideFlags: 0
@@ -432808,6 +432808,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1942693961}
   m_Mesh: {fileID: 380195821085054666, guid: 7b47d053517c8b544a7d61575e4df06c, type: 3}
+--- !u!1 &1942818290
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1942818291}
+  - component: {fileID: 1942818292}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_8_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1942818291
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1942818290}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.2444677, y: -0, z: -0, w: 0.9696575}
+  m_LocalPosition: {x: 36, y: 5.33, z: 19.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1942818292
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1942818290}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.9500003, y: 0.4, z: 15.014823}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1943690804
 GameObject:
   m_ObjectHideFlags: 0
@@ -435559,7 +435612,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -435755,6 +435808,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1955136179}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1955986556
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1955986557}
+  - component: {fileID: 1955986558}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_0_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1955986557
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1955986556}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.22816494, y: 0.30985636, z: 0.07686321, w: 0.91979444}
+  m_LocalPosition: {x: 13.25, y: 4.68, z: 19.75}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &1955986558
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1955986556}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 6.9500003, y: 0.4, z: 18.009224}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &1956217350
 GameObject:
   m_ObjectHideFlags: 0
@@ -437297,7 +437403,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -437829,7 +437935,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -438695,7 +438801,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -440265,7 +440371,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -440850,7 +440956,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -441193,7 +441299,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -444936,59 +445042,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1999005292}
   m_Mesh: {fileID: -71850587174120192, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
---- !u!1 &1999910657
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1999910658}
-  - component: {fileID: 1999910659}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_2_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1999910658
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1999910657}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.03395943, y: -0.7062909, z: -0.03395943, w: 0.7062909}
-  m_LocalPosition: {x: -19.85, y: 0.93, z: 3}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1999910659
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1999910657}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 8.588466}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2001623581
 GameObject:
   m_ObjectHideFlags: 0
@@ -445606,7 +445659,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -452088,6 +452141,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2032729250}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &2032985926
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2032985927}
+  - component: {fileID: 2032985928}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_12_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2032985927
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2032985926}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.043690138, y: 0.95549, z: -0.18507439, w: -0.2255606}
+  m_LocalPosition: {x: 1.5, y: -3.92, z: -51}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &2032985928
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2032985926}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.55, y: 0.4, z: 12.3019705}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2033412778
 GameObject:
   m_ObjectHideFlags: 0
@@ -456218,7 +456324,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -457100,59 +457206,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.85, y: 1.4, z: 0.45}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!1 &2057111048
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2057111049}
-  - component: {fileID: 2057111050}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_6_EndWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2057111049
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2057111048}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.08857059, y: 0.28854045, z: -0.026816994, w: 0.95298505}
-  m_LocalPosition: {x: -24.33436, y: 4.605, z: 27.99846}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &2057111050
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2057111048}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 5.15, y: 0.4, z: 2.6418233}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2057205071
 GameObject:
   m_ObjectHideFlags: 0
@@ -458329,7 +458382,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -458413,59 +458466,6 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
---- !u!1 &2063201257
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2063201258}
-  - component: {fileID: 2063201259}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_6_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2063201258
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2063201257}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0.14914711, y: 0.286244, z: 0.04515811, w: 0.9453996}
-  m_LocalPosition: {x: -28, y: 3.08, z: 22.5}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &2063201259
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2063201257}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.75, y: 0.4, z: 11.618817}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2063582381
 GameObject:
   m_ObjectHideFlags: 0
@@ -460047,7 +460047,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -460490,7 +460490,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -460574,6 +460574,59 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &2071970523
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2071970524}
+  - component: {fileID: 2071970525}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_10_Main
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2071970524
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071970523}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.029981907, y: 0.9699625, z: -0.16534026, w: 0.17588775}
+  m_LocalPosition: {x: -31.5, y: -0.16999996, z: -12}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &2071970525
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2071970523}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 4.75, y: 0.4, z: 9.305386}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2072442829
 GameObject:
   m_ObjectHideFlags: 0
@@ -463061,59 +463114,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2080337984}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &2080597663
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2080597664}
-  - component: {fileID: 2080597665}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_11_StartWedge
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2080597664
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2080597663}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.012835576, y: 0.98608464, z: 0.091646835, w: -0.13810587}
-  m_LocalPosition: {x: -32.170334, y: -1.895, z: -38.84617}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &2080597665
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2080597663}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 4.6, y: 0.4, z: 2.6418247}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2081124496
 GameObject:
   m_ObjectHideFlags: 0
@@ -463465,6 +463465,59 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2082120920}
   m_Mesh: {fileID: -3515608341921188137, guid: 380cb18fec345d64c8c2aea3639751af, type: 3}
+--- !u!1 &2082154296
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2082154297}
+  - component: {fileID: 2082154298}
+  m_Layer: 0
+  m_Name: SmoothStairRamp_6_EndWedge
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2082154297
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2082154296}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.08857059, y: 0.28854045, z: -0.026816994, w: 0.95298505}
+  m_LocalPosition: {x: -24.33436, y: 4.605, z: 27.99846}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 54669811}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &2082154298
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2082154296}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.15, y: 0.4, z: 2.6418233}
+  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2083713971
 GameObject:
   m_ObjectHideFlags: 0
@@ -464911,7 +464964,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -466053,7 +466106,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -470886,7 +470939,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -471321,59 +471374,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2119268656}
   m_Mesh: {fileID: 4082046404321970722, guid: 000cfc0626c8e994583d6354fca1960c, type: 3}
---- !u!1 &2119513064
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2119513065}
-  - component: {fileID: 2119513066}
-  m_Layer: 0
-  m_Name: SmoothStairRamp_4_Main
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2119513065
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2119513064}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.0326783, y: 0.96499056, z: -0.14670637, w: 0.21494807}
-  m_LocalPosition: {x: 5, y: -0.57, z: -18.8}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 54669811}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &2119513066
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2119513064}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 6.55, y: 0.4, z: 7.652702}
-  m_Center: {x: 0, y: -0.2, z: 0}
 --- !u!1 &2120468093
 GameObject:
   m_ObjectHideFlags: 0
@@ -471672,7 +471672,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -472532,7 +472532,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30
@@ -474933,7 +474933,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 13
   m_Type: 2
-  m_Color: {r: 1, g: 0.56, b: 0.14, a: 1}
+  m_Color: {r: 1, g: 0.56, b: 0.16, a: 1}
   m_Intensity: 5
   m_Range: 8
   m_SpotAngle: 30

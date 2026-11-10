@@ -1787,6 +1787,23 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         EnterWaitingRoomWithId(rid, false);
     }
 
+    public void HideImmediatelyForMatchStart()
+    {
+        isInsideWaitingRoom = false;
+        if (lobbyRootObj != null && lobbyRootObj.activeSelf)
+        {
+            lobbyRootObj.SetActive(false);
+        }
+        if (inGameRoomBannerObj != null && inGameRoomBannerObj.activeSelf)
+        {
+            inGameRoomBannerObj.SetActive(false);
+        }
+        if (lobbyCanvas != null && lobbyCanvas.gameObject.activeSelf)
+        {
+            lobbyCanvas.gameObject.SetActive(false);
+        }
+    }
+
     public void OnLeaveWaitingRoomClicked()
     {
         Debug.Log("<color=yellow>[Lobby] Rời phòng chờ, quay lại sảnh chọn chế độ.</color>");
@@ -1868,22 +1885,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         // 2. Nếu trận đấu ĐÃ BẮT ĐẦU (sau khi đủ 4 người vào phòng hoặc bấm Test):
         if (isMatchRunning)
         {
-            if (lobbyRootObj != null && lobbyRootObj.activeSelf)
-            {
-                lobbyRootObj.SetActive(false);
-            }
-            if (inGameRoomBannerObj != null && !inGameRoomBannerObj.activeSelf)
-            {
-                inGameRoomBannerObj.SetActive(true);
-            }
-            if (inGameRoomBannerText != null)
-            {
-                string rid = !string.IsNullOrEmpty(currentRoomId)
-                    ? currentRoomId
-                    : (photonMgr != null ? photonMgr.roomName : "Mặc định");
-                int pCount = photonMgr != null ? Mathf.Max(1, photonMgr.CurrentRoomPlayersCount) : 1;
-                inGameRoomBannerText.text = $"🚪 ID Phòng: <b>{rid}</b> ({pCount}/4)  ●  [F4: Thoát]";
-            }
+            HideImmediatelyForMatchStart();
             return;
         }
 

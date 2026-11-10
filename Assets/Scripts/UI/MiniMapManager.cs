@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.SceneManagement;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -81,6 +82,10 @@ namespace GhostMaze.UI
         private const int MAX_RADAR_BLIPS = 16;
         private readonly List<RectTransform> ghostBlipPool = new List<RectTransform>(MAX_RADAR_BLIPS);
         private Transform blipContainer;
+        private Button settingsGearBtn;
+        public Button SettingsGearButton => settingsGearBtn;
+        private static Sprite gearIconSprite;
+        private static Sprite expandIconSprite;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoBootstrap()
@@ -89,6 +94,7 @@ namespace GhostMaze.UI
             {
                 GameObject go = new GameObject("MiniMap_System");
                 go.AddComponent<MiniMapManager>();
+                DontDestroyOnLoad(go);
             }
         }
 
@@ -119,19 +125,47 @@ namespace GhostMaze.UI
                 return;
             }
             Instance = this;
+            if (transform.parent == null) DontDestroyOnLoad(gameObject);
 
             currentZoom = defaultZoom;
             SetupRenderTextureAndCamera();
             BuildMiniMapUI();
+            SceneManager.sceneLoaded += OnSceneLoaded;
         }
 
         private void Start()
         {
             FindTargetPlayer();
+            UpdateSceneVisibilityAndLinks();
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            targetPlayer = null;
+            FindTargetPlayer();
+            UpdateSceneVisibilityAndLinks();
+        }
+
+        private void UpdateSceneVisibilityAndLinks()
+        {
+            bool isLobby = SceneManager.GetActiveScene().name == "LobbyScene";
+            if (miniMapRoot != null) miniMapRoot.SetActive(!isLobby && isMapVisible);
+            if (miniMapCamera != null) miniMapCamera.enabled = !isLobby && isMapVisible;
+
+            if (!isLobby)
+            {
+                var gsm = GameSettingsManager.Instance != null ? GameSettingsManager.Instance : FindAnyObjectByType<GameSettingsManager>();
+                if (gsm != null && gsm.gearCornerButton != null)
+                {
+                    // Ẩn nút bánh răng cũ ở góc (-25,-25) đang bị MiniMap đè lên để dùng nút Cài Đặt [⚙] gọn đẹp ngay dưới MiniMap
+                    gsm.gearCornerButton.gameObject.SetActive(false);
+                }
+            }
         }
 
         private void OnDestroy()
         {
+            SceneManager.sceneLoaded -= OnSceneLoaded;
             if (miniMapRT != null)
             {
                 if (miniMapCamera != null) miniMapCamera.targetTexture = null;
@@ -145,12 +179,12 @@ namespace GhostMaze.UI
 
         private void SetupRenderTextureAndCamera()
         {
-            // 1. Tạo RenderTexture độ phân giải cao 1024x1024 siêu sắc nét
-            miniMapRT = new RenderTexture(1024, 1024, 16, RenderTextureFormat.ARGB32)
+            // 1. Tạo RenderTexture 512x512 sắc nét nhưng tiết kiệm VRAM (tránh quá tải GPU trên Android & khi mở nhiều cửa sổ test)
+            miniMapRT = new RenderTexture(512, 512, 16, RenderTextureFormat.ARGB32)
             {
                 name = "MiniMap_RenderTexture",
                 filterMode = FilterMode.Bilinear,
-                antiAliasing = 4,
+                antiAliasing = 1,
                 wrapMode = TextureWrapMode.Clamp
             };
             miniMapRT.Create();
@@ -278,7 +312,28 @@ namespace GhostMaze.UI
         public void ToggleVisibility()
         {
             isMapVisible = !isMapVisible;
-            if (miniMapRoot != null) miniMapRoot.SetActive(isMapVisible);
+            UpdateSceneVisibilityAndLinks();
+        }
+
+        public void OnClickSettingsButton()
+        {
+            if (isFullscreen)
+            {
+                isFullscreen = false;
+                ApplyLayout();
+            }
+
+            var gsm = GameSettingsManager.Instance != null ? GameSettingsManager.Instance : FindAnyObjectByType<GameSettingsManager>();
+            if (gsm != null)
+            {
+                gsm.ToggleDashboard();
+                return;
+            }
+
+            if (PhotonMultiplayerChatVoice.Instance != null)
+            {
+                PhotonMultiplayerChatVoice.Instance.ToggleVoiceSettingsDialog();
+            }
         }
 
         public void ToggleFullscreen()
@@ -292,7 +347,7 @@ namespace GhostMaze.UI
             rotateMapWithPlayer = !rotateMapWithPlayer;
             if (modeBadgeText != null)
             {
-                modeBadgeText.text = rotateMapWithPlayer ? "XOAY: THEO HƯỚNG [N]" : "XOAY: HƯỚNG BẮC [N]";
+                modeBadgeText.text = rotateMapWithPlayer ? "XOAY: THEO HƯỚNG" : "XOAY: HƯỚNG BẮC";
             }
         }
 
@@ -312,7 +367,7 @@ namespace GhostMaze.UI
         {
             if (zoomLevelText != null)
             {
-                zoomLevelText.text = $"{Mathf.RoundToInt(currentZoom)}m";
+                zoomLevelText.text = $"-{Mathf.RoundToInt(currentZoom)}m";
             }
         }
 
@@ -424,61 +479,51 @@ namespace GhostMaze.UI
         // =========================================================================
         private void BuildMiniMapUI()
         {
-            // Tìm Canvas chính hoặc tạo Canvas Mini Map riêng
-            Canvas canvas = null;
-            GameObject hudContainer = GameObject.Find("HUD_Container");
-            if (hudContainer != null)
-            {
-                canvas = hudContainer.GetComponentInParent<Canvas>();
-            }
-            if (canvas == null)
-            {
-                canvas = FindAnyObjectByType<Canvas>();
-            }
+            if (gearIconSprite == null) gearIconSprite = CreateGearSprite(64);
+            if (expandIconSprite == null) expandIconSprite = CreateExpandSprite(64);
 
-            if (canvas == null)
-            {
-                GameObject cGo = new GameObject("Canvas_MiniMap");
-                cGo.transform.SetParent(transform, false);
-                canvas = cGo.AddComponent<Canvas>();
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                canvas.pixelPerfect = true;
-                canvas.sortingOrder = 42;
-                CanvasScaler scaler = cGo.AddComponent<CanvasScaler>();
-                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                scaler.referenceResolution = new Vector2(1920f, 1080f);
-                scaler.matchWidthOrHeight = 0.5f;
-                scaler.dynamicPixelsPerUnit = 2.5f;
-                scaler.referencePixelsPerUnit = 100f;
-                cGo.AddComponent<GraphicRaycaster>();
-            }
+            // Tạo Canvas Mini Map riêng gắn vào DontDestroyOnLoad để hoạt động ổn định từ LobbyScene sang SampleScene
+            GameObject cGo = new GameObject("Canvas_MiniMap");
+            cGo.transform.SetParent(transform, false);
+            Canvas canvas = cGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.pixelPerfect = true;
+            canvas.sortingOrder = 45;
 
-            Transform parentT = hudContainer != null ? hudContainer.transform : canvas.transform;
+            CanvasScaler scaler = cGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.matchWidthOrHeight = 0.5f;
+            scaler.dynamicPixelsPerUnit = 2.5f;
+            scaler.referencePixelsPerUnit = 100f;
+            cGo.AddComponent<GraphicRaycaster>();
+
             Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (defaultFont == null) defaultFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
 
-            // Khung chứa chính (MiniMapContainer)
+            // Khung chứa chính (MiniMap_Container)
             miniMapRoot = new GameObject("MiniMap_Container");
-            miniMapRoot.transform.SetParent(parentT, false);
+            miniMapRoot.transform.SetParent(canvas.transform, false);
             mapContainerRect = miniMapRoot.AddComponent<RectTransform>();
             ApplyLayout();
 
-            // 1. Nền tối phía sau la bàn
+            // 1. Nền tối phía sau bản đồ
             Image bgShadow = miniMapRoot.AddComponent<Image>();
             bgShadow.color = new Color(0.04f, 0.06f, 0.09f, 0.88f);
 
-            // 2. Vòng tròn hiển thị RenderTexture của Camera Mini Map
+            // 2. Màn hình hiển thị RenderTexture của Camera Mini Map
             GameObject mapDisplayObj = new GameObject("MapDisplay");
             mapDisplayObj.transform.SetParent(miniMapRoot.transform, false);
             RectTransform displayRect = mapDisplayObj.AddComponent<RectTransform>();
             displayRect.anchorMin = Vector2.zero;
             displayRect.anchorMax = Vector2.one;
-            displayRect.offsetMin = new Vector2(10f, 10f);
-            displayRect.offsetMax = new Vector2(-10f, -10f);
+            displayRect.offsetMin = new Vector2(8f, 8f);
+            displayRect.offsetMax = new Vector2(-8f, -8f);
 
             mapRawImage = mapDisplayObj.AddComponent<RawImage>();
             mapRawImage.texture = miniMapRT;
             mapRawImage.color = Color.white;
+            mapRawImage.raycastTarget = false;
 
             // 3. Vòng la bàn chỉ hướng Đông - Tây - Nam - Bắc (Compass Dial)
             GameObject compassObj = new GameObject("CompassRing");
@@ -489,26 +534,26 @@ namespace GhostMaze.UI
             compassRingRect.offsetMin = Vector2.zero;
             compassRingRect.offsetMax = Vector2.zero;
 
-            // Chữ Bắc (N) - Màu đỏ nổi bật
             CreateCompassLabel(compassObj, "Label_N", "N", new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Color(1f, 0.32f, 0.32f, 1f), defaultFont, 14);
-            // Chữ Nam (S)
             CreateCompassLabel(compassObj, "Label_S", "S", new Vector2(0.5f, 0f), new Vector2(0f, 14f), new Color(0.85f, 0.9f, 1f, 0.9f), defaultFont, 12);
-            // Chữ Đông (E)
             CreateCompassLabel(compassObj, "Label_E", "E", new Vector2(1f, 0.5f), new Vector2(-14f, 0f), new Color(0.85f, 0.9f, 1f, 0.9f), defaultFont, 12);
-            // Chữ Tây (W)
             CreateCompassLabel(compassObj, "Label_W", "W", new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Color(0.85f, 0.9f, 1f, 0.9f), defaultFont, 12);
 
-            // 4. Khung viền Gothic bao quanh
+            // 4. Khung viền Cyan bao quanh bản đồ
             GameObject borderObj = new GameObject("CompassBorder");
             borderObj.transform.SetParent(miniMapRoot.transform, false);
             RectTransform borderRect = borderObj.AddComponent<RectTransform>();
             borderRect.anchorMin = Vector2.zero;
             borderRect.anchorMax = Vector2.one;
-            borderRect.offsetMin = new Vector2(4f, 4f);
-            borderRect.offsetMax = new Vector2(-4f, -4f);
+            borderRect.offsetMin = new Vector2(3f, 3f);
+            borderRect.offsetMax = new Vector2(-3f, -3f);
+
+            Image borderImg = borderObj.AddComponent<Image>();
+            borderImg.color = new Color(0f, 0f, 0f, 0f);
+            borderImg.raycastTarget = false;
 
             Outline borderOutline = borderObj.AddComponent<Outline>();
-            borderOutline.effectColor = new Color(0.2f, 0.75f, 0.95f, 0.85f);
+            borderOutline.effectColor = new Color(0.22f, 0.72f, 0.98f, 0.85f);
             borderOutline.effectDistance = new Vector2(2f, 2f);
 
             // 5. Thùng chứa các Blip Radar Quái Ma
@@ -521,7 +566,6 @@ namespace GhostMaze.UI
             blipGroupRect.sizeDelta = Vector2.zero;
             blipContainer = blipGroup.transform;
 
-            // Khởi tạo sẵn Object Pool cho Quái Ma (Zero GC allocation)
             for (int i = 0; i < MAX_RADAR_BLIPS; i++)
             {
                 GameObject blip = new GameObject($"GhostBlip_{i}");
@@ -531,6 +575,7 @@ namespace GhostMaze.UI
 
                 Image bImg = blip.AddComponent<Image>();
                 bImg.color = new Color(1f, 0.28f, 0.18f, 0.95f);
+                bImg.raycastTarget = false;
 
                 Outline bOutline = blip.AddComponent<Outline>();
                 bOutline.effectColor = new Color(1f, 0.9f, 0.2f, 0.8f);
@@ -540,7 +585,7 @@ namespace GhostMaze.UI
                 ghostBlipPool.Add(bRect);
             }
 
-            // 6. Icon Người Chơi ở chính giữa (Mũi tên ngọc bích phát sáng)
+            // 6. Icon Người Chơi ở chính giữa
             GameObject playerMarker = new GameObject("PlayerMarker");
             playerMarker.transform.SetParent(miniMapRoot.transform, false);
             playerMarkerRect = playerMarker.AddComponent<RectTransform>();
@@ -551,59 +596,84 @@ namespace GhostMaze.UI
 
             Image markerImg = playerMarker.AddComponent<Image>();
             markerImg.color = new Color(0.2f, 0.98f, 0.85f, 1f);
+            markerImg.raycastTarget = false;
 
             Outline markerOutline = playerMarker.AddComponent<Outline>();
             markerOutline.effectColor = new Color(0.05f, 0.35f, 0.45f, 0.9f);
             markerOutline.effectDistance = new Vector2(1.5f, 1.5f);
 
-            // 7. Thanh công cụ nhỏ bên dưới Mini Map (Nút +, -, Zoom, Chế độ xoay)
+            // 7. Thanh nút bấm ngay bên dưới Mini Map: [ - ] | [ + ] | [ ⚙ Cài Đặt ] | [ ⛶ Phóng To ]
             GameObject toolRow = new GameObject("MiniMapToolBar");
             toolRow.transform.SetParent(miniMapRoot.transform, false);
             RectTransform toolRect = toolRow.AddComponent<RectTransform>();
             toolRect.anchorMin = new Vector2(0f, 0f);
             toolRect.anchorMax = new Vector2(1f, 0f);
             toolRect.pivot = new Vector2(0.5f, 1f);
-            toolRect.anchoredPosition = new Vector2(0f, -4f);
-            toolRect.sizeDelta = new Vector2(0f, 22f);
+            toolRect.anchoredPosition = new Vector2(0f, -6f);
+            toolRect.sizeDelta = new Vector2(0f, 34f);
 
-            // Nút Zoom In [+]
-            CreateMiniButton(toolRow, "Btn_ZoomIn", "+", new Vector2(0f, 0f), new Vector2(22f, 22f), defaultFont, ZoomIn);
-            // Nút Zoom Out [-]
-            CreateMiniButton(toolRow, "Btn_ZoomOut", "-", new Vector2(24f, 0f), new Vector2(22f, 22f), defaultFont, ZoomOut);
+            CreateAnchoredToolButton(toolRow, "Btn_ZoomOut", new Vector2(0f, 0f), new Vector2(0.23f, 1f), "−", 18, null, Color.white, defaultFont, ZoomOut);
+            CreateAnchoredToolButton(toolRow, "Btn_ZoomIn", new Vector2(0.255f, 0f), new Vector2(0.485f, 1f), "+", 18, null, Color.white, defaultFont, ZoomIn);
+            settingsGearBtn = CreateAnchoredToolButton(toolRow, "Btn_Settings", new Vector2(0.51f, 0f), new Vector2(0.74f, 1f), "", 16, gearIconSprite, new Color(1.0f, 0.84f, 0.30f, 1f), defaultFont, OnClickSettingsButton);
+            CreateAnchoredToolButton(toolRow, "Btn_Fullscreen", new Vector2(0.765f, 0f), new Vector2(1f, 1f), "", 16, expandIconSprite, new Color(0.75f, 0.94f, 1f, 1f), defaultFont, ToggleFullscreen);
 
-            // Text hiển thị khoảng cách Zoom
+            // 8. Hàng thông số & chế độ xoay ngay dưới thanh nút
+            GameObject infoRow = new GameObject("MiniMapInfoRow");
+            infoRow.transform.SetParent(miniMapRoot.transform, false);
+            RectTransform infoRect = infoRow.AddComponent<RectTransform>();
+            infoRect.anchorMin = new Vector2(0f, 0f);
+            infoRect.anchorMax = new Vector2(1f, 0f);
+            infoRect.pivot = new Vector2(0.5f, 1f);
+            infoRect.anchoredPosition = new Vector2(0f, -44f);
+            infoRect.sizeDelta = new Vector2(0f, 18f);
+
             GameObject zoomTextObj = new GameObject("ZoomText");
-            zoomTextObj.transform.SetParent(toolRow.transform, false);
+            zoomTextObj.transform.SetParent(infoRow.transform, false);
             RectTransform zRect = zoomTextObj.AddComponent<RectTransform>();
             zRect.anchorMin = new Vector2(0f, 0f);
-            zRect.anchorMax = new Vector2(0f, 1f);
-            zRect.anchoredPosition = new Vector2(62f, 0f);
-            zRect.sizeDelta = new Vector2(50f, 0f);
+            zRect.anchorMax = new Vector2(0.38f, 1f);
+            zRect.offsetMin = new Vector2(2f, 0f);
+            zRect.offsetMax = Vector2.zero;
 
             zoomLevelText = zoomTextObj.AddComponent<Text>();
             zoomLevelText.font = defaultFont;
             zoomLevelText.fontSize = 11;
             zoomLevelText.fontStyle = FontStyle.Bold;
             zoomLevelText.alignment = TextAnchor.MiddleLeft;
-            zoomLevelText.color = new Color(0.8f, 0.95f, 1f, 0.9f);
+            zoomLevelText.color = new Color(0.8f, 0.95f, 1f, 0.92f);
+            zoomLevelText.raycastTarget = false;
             UpdateZoomText();
 
-            // Text gợi ý phím [M] & [N]
-            GameObject hintObj = new GameObject("HintText");
-            hintObj.transform.SetParent(toolRow.transform, false);
+            GameObject hintObj = new GameObject("RotateModeButton");
+            hintObj.transform.SetParent(infoRow.transform, false);
             RectTransform hRect = hintObj.AddComponent<RectTransform>();
-            hRect.anchorMin = new Vector2(1f, 0f);
+            hRect.anchorMin = new Vector2(0.38f, 0f);
             hRect.anchorMax = new Vector2(1f, 1f);
-            hRect.pivot = new Vector2(1f, 0.5f);
-            hRect.anchoredPosition = Vector2.zero;
-            hRect.sizeDelta = new Vector2(110f, 0f);
+            hRect.offsetMin = Vector2.zero;
+            hRect.offsetMax = new Vector2(-2f, 0f);
 
-            modeBadgeText = hintObj.AddComponent<Text>();
+            Image hintBg = hintObj.AddComponent<Image>();
+            hintBg.color = new Color(0f, 0f, 0f, 0f);
+            Button rotateBtn = hintObj.AddComponent<Button>();
+            rotateBtn.onClick.AddListener(ToggleRotateMode);
+
+            // Tạo GameObject con riêng cho Text (vì 1 GameObject UI chỉ chứa được 1 thành phần Graphic: Image hoặc Text)
+            GameObject hintTxtObj = new GameObject("Text");
+            hintTxtObj.transform.SetParent(hintObj.transform, false);
+            RectTransform hTxtRect = hintTxtObj.AddComponent<RectTransform>();
+            hTxtRect.anchorMin = Vector2.zero;
+            hTxtRect.anchorMax = Vector2.one;
+            hTxtRect.offsetMin = Vector2.zero;
+            hTxtRect.offsetMax = Vector2.zero;
+
+            modeBadgeText = hintTxtObj.AddComponent<Text>();
             modeBadgeText.font = defaultFont;
             modeBadgeText.fontSize = 10;
+            modeBadgeText.fontStyle = FontStyle.Bold;
             modeBadgeText.alignment = TextAnchor.MiddleRight;
-            modeBadgeText.color = new Color(0.65f, 0.8f, 0.95f, 0.8f);
-            modeBadgeText.text = "PHÓNG TO: [M]";
+            modeBadgeText.color = new Color(0.65f, 0.85f, 0.98f, 0.9f);
+            modeBadgeText.raycastTarget = false;
+            modeBadgeText.text = rotateMapWithPlayer ? "XOAY: THEO HƯỚNG" : "XOAY: HƯỚNG BẮC";
         }
 
         private static void CreateCompassLabel(GameObject parent, string name, string text, Vector2 anchor, Vector2 pos, Color col, Font font, int size)
@@ -624,44 +694,150 @@ namespace GhostMaze.UI
             t.alignment = TextAnchor.MiddleCenter;
             t.color = col;
             t.text = text;
+            t.raycastTarget = false;
 
             Outline o = obj.AddComponent<Outline>();
             o.effectColor = new Color(0f, 0f, 0f, 0.85f);
             o.effectDistance = new Vector2(1f, 1f);
         }
 
-        private static void CreateMiniButton(GameObject parent, string name, string label, Vector2 pos, Vector2 size, Font font, UnityEngine.Events.UnityAction onClick)
+        private static Button CreateAnchoredToolButton(
+            GameObject parent,
+            string name,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            string label,
+            int fontSize,
+            Sprite iconSprite,
+            Color tint,
+            Font font,
+            UnityEngine.Events.UnityAction onClick)
         {
             GameObject btnObj = new GameObject(name);
             btnObj.transform.SetParent(parent.transform, false);
             RectTransform rt = btnObj.AddComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0f, 0f);
-            rt.anchorMax = new Vector2(0f, 0f);
-            rt.pivot = new Vector2(0f, 0f);
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
+            rt.anchorMin = anchorMin;
+            rt.anchorMax = anchorMax;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
 
-            Image img = btnObj.AddComponent<Image>();
-            img.color = new Color(0.15f, 0.22f, 0.32f, 0.9f);
+            Image bg = btnObj.AddComponent<Image>();
+            bg.color = new Color(0.08f, 0.14f, 0.25f, 0.94f);
+
+            Outline outline = btnObj.AddComponent<Outline>();
+            outline.effectColor = new Color(0.22f, 0.65f, 0.95f, 0.85f);
+            outline.effectDistance = new Vector2(1.2f, -1.2f);
 
             Button btn = btnObj.AddComponent<Button>();
             btn.onClick.AddListener(onClick);
 
-            GameObject txtObj = new GameObject("Text");
-            txtObj.transform.SetParent(btnObj.transform, false);
-            RectTransform trt = txtObj.AddComponent<RectTransform>();
-            trt.anchorMin = Vector2.zero;
-            trt.anchorMax = Vector2.one;
-            trt.offsetMin = Vector2.zero;
-            trt.offsetMax = Vector2.zero;
+            if (iconSprite != null)
+            {
+                GameObject iconObj = new GameObject("Icon");
+                iconObj.transform.SetParent(btnObj.transform, false);
+                RectTransform irt = iconObj.AddComponent<RectTransform>();
+                irt.anchorMin = new Vector2(0.5f, 0.5f);
+                irt.anchorMax = new Vector2(0.5f, 0.5f);
+                irt.pivot = new Vector2(0.5f, 0.5f);
+                irt.anchoredPosition = Vector2.zero;
+                irt.sizeDelta = new Vector2(22f, 22f);
 
-            Text t = txtObj.AddComponent<Text>();
-            t.font = font;
-            t.fontSize = 12;
-            t.fontStyle = FontStyle.Bold;
-            t.alignment = TextAnchor.MiddleCenter;
-            t.color = Color.white;
-            t.text = label;
+                Image iconImg = iconObj.AddComponent<Image>();
+                iconImg.sprite = iconSprite;
+                iconImg.color = tint;
+                iconImg.raycastTarget = false;
+            }
+
+            if (!string.IsNullOrEmpty(label))
+            {
+                GameObject txtObj = new GameObject("Text");
+                txtObj.transform.SetParent(btnObj.transform, false);
+                RectTransform trt = txtObj.AddComponent<RectTransform>();
+                trt.anchorMin = Vector2.zero;
+                trt.anchorMax = Vector2.one;
+                trt.offsetMin = Vector2.zero;
+                trt.offsetMax = Vector2.zero;
+
+                Text t = txtObj.AddComponent<Text>();
+                t.font = font;
+                t.fontSize = fontSize;
+                t.fontStyle = FontStyle.Bold;
+                t.alignment = TextAnchor.MiddleCenter;
+                t.color = tint;
+                t.text = label;
+                t.raycastTarget = false;
+            }
+
+            return btn;
+        }
+
+        private static Sprite CreateGearSprite(int size)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            float c = (size - 1) * 0.5f;
+            float outerBodyR = size * 0.27f;
+            float toothOuterR = size * 0.39f;
+            float innerHoleR = size * 0.13f;
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - c;
+                    float dy = y - c;
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    float ang = Mathf.Atan2(dy, dx);
+
+                    // 8 răng bánh răng sắc nét
+                    float toothWave = Mathf.Cos(ang * 8f);
+                    float maxR = toothWave > 0.25f ? toothOuterR : outerBodyR;
+                    if (toothWave > -0.15f && toothWave <= 0.25f)
+                    {
+                        float t = (toothWave + 0.15f) / 0.40f;
+                        maxR = Mathf.Lerp(outerBodyR, toothOuterR, t);
+                    }
+
+                    float outerAlpha = Mathf.Clamp01(maxR - r + 0.8f);
+                    float holeAlpha = Mathf.Clamp01(r - innerHoleR + 0.8f);
+                    float alpha = outerAlpha * holeAlpha;
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        }
+
+        private static Sprite CreateExpandSprite(int size)
+        {
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            float pad = size * 0.22f;
+            float end = size - 1 - pad;
+            float len = size * 0.22f;
+            float thick = Mathf.Max(2.2f, size * 0.065f);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dxMin = Mathf.Abs(x - pad);
+                    float dxMax = Mathf.Abs(x - end);
+                    float dyMin = Mathf.Abs(y - pad);
+                    float dyMax = Mathf.Abs(y - end);
+
+                    bool inXSpan = (x >= pad - thick * 0.5f && x <= pad + len) || (x <= end + thick * 0.5f && x >= end - len);
+                    bool inYSpan = (y >= pad - thick * 0.5f && y <= pad + len) || (y <= end + thick * 0.5f && y >= end - len);
+
+                    bool hBar = (dyMin <= thick * 0.5f || dyMax <= thick * 0.5f) && inXSpan;
+                    bool vBar = (dxMin <= thick * 0.5f || dxMax <= thick * 0.5f) && inYSpan;
+
+                    float a = (hBar || vBar) ? 1f : 0f;
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            }
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
         }
     }
 }

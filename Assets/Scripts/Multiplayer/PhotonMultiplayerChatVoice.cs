@@ -37,6 +37,13 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     [Header("2. Phím Tắt Chat & Voice")]
     public KeyCode toggleMicKey = KeyCode.V;
     public KeyCode openChatKey = KeyCode.Return;
+    public KeyCode toggleVoiceSettingsKey = KeyCode.K;
+
+    [Header("2.1. Cài Đặt Photon Voice Nâng Cao")]
+    [Range(0.5f, 3.0f)] public float micGain = 1.0f;
+    [Range(0.002f, 0.035f)] public float vadThreshold = 0.008f;
+    [Range(0.0f, 1.5f)] public float incomingVoiceVolume = 1.0f;
+    public float currentMicRMS { get; private set; } = 0f;
 
     [Header("3. Chế Độ Phòng Chờ Đủ Người Mới Vào (Matchmaking Lobby)")]
     [Tooltip("Bật chế độ chờ đủ 4 người chơi mới mở phong ấn bắt đầu game")]
@@ -74,6 +81,23 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     public static bool IsLocalPlayerReady = false;
     public static readonly System.Collections.Generic.List<int> GhostActorNumbers = new System.Collections.Generic.List<int>();
     public static bool soloTestAsGhost = false;
+
+    private const string ROOM_PROP_MATCH_STATE = "gm_ms";
+    private const string ROOM_PROP_GHOST_ACTORS = "gm_ga";
+    private bool isTransitioningToMatchScene = false;
+    private bool needReliableInitialPlayerSync = false;
+
+    private void ResetMatchLobbyState(bool clearRoles = true)
+    {
+        IsLocalPlayerReady = false;
+        ReadyPlayerDict.Clear();
+        if (clearRoles) GhostActorNumbers.Clear();
+        IsGameStarted = !requireFullRoomToStart;
+        currentMatchState = requireFullRoomToStart ? MatchState.WaitingForPlayers : MatchState.GameStarted;
+        countdownTimer = 0f;
+        isTransitioningToMatchScene = false;
+        needReliableInitialPlayerSync = false;
+    }
 
     private RealtimeClient client;
     private bool isConnectingOrConnected;
@@ -123,7 +147,20 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     // Giao diện UI Thu Gọn Chat & Phòng Chờ
     private RectTransform chatPanelRect;
+    public RectTransform ChatPanelRect => chatPanelRect;
     private Text minimizeButtonText;
+
+    // Giao diện UI Bảng Cài Đặt Photon Voice
+    private GameObject voiceSettingsDialogObj;
+    private Text voiceSettingsMicDeviceText;
+    private RectTransform voiceSettingsVuFillRect;
+    private Slider voiceSettingsGainSlider;
+    private Text voiceSettingsGainValueText;
+    private Slider voiceSettingsVadSlider;
+    private Text voiceSettingsVadValueText;
+    private Slider voiceSettingsIncomingSlider;
+    private Text voiceSettingsIncomingValueText;
+
     private GameObject lobbyPanelObj;
     private GameObject lobbyMainMenuSubView;
     private GameObject lobbyRoomWaitingSubView;
@@ -141,6 +178,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private float gameStartBannerTimer = 0f;
     private bool isLobbyCursorUnlocked = false;
     private readonly System.Text.StringBuilder lobbySb = new System.Text.StringBuilder();
+    private readonly List<int> voiceTargetActorBuffer = new List<int>(8);
 
     public struct RoomPlayerEntry
     {
@@ -232,6 +270,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 {
                     HostAssignRandomRoles();
                     BroadcastMatchState(2, 0f);
+                    PublishMatchStartRoomProperties();
+                    client.SendOutgoingCommands();
                     StartGameLocally();
                 }
             }
@@ -268,9 +308,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         hasUserRequestedRoom = true;
         isAutoMatchingRandomRoom = true;
-        IsGameStarted = false;
-        currentMatchState = MatchState.WaitingForPlayers;
-        countdownTimer = 0f;
+        ResetMatchLobbyState();
 
         if (client == null)
         {
@@ -306,9 +344,16 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         hasUserRequestedRoom = true;
         isAutoMatchingRandomRoom = false;
-        IsGameStarted = false;
-        currentMatchState = MatchState.WaitingForPlayers;
-        countdownTimer = 0f;
+
+        if (client != null && client.InRoom && client.CurrentRoom != null
+            && string.Equals(client.CurrentRoom.Name, roomName, StringComparison.OrdinalIgnoreCase))
+        {
+            CheckRoomPropertiesForMatchStart();
+            CheckLobbyPlayerCount();
+            return;
+        }
+
+        ResetMatchLobbyState();
 
         if (client == null)
         {
@@ -318,11 +363,6 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         if (client.InRoom)
         {
-            if (client.CurrentRoom != null && string.Equals(client.CurrentRoom.Name, roomName, StringComparison.OrdinalIgnoreCase))
-            {
-                CheckLobbyPlayerCount();
-                return;
-            }
             client.OpLeaveRoom(false);
             return;
         }
@@ -340,13 +380,12 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     public void LeaveRoomAndReturnToMenu()
     {
         hasUserRequestedRoom = false;
-        IsGameStarted = false;
-        currentMatchState = MatchState.WaitingForPlayers;
-        countdownTimer = 0f;
+        ResetMatchLobbyState();
         ClearRemotePlayers();
         if (client != null && client.InRoom)
         {
             client.OpLeaveRoom(false);
+            client.SendOutgoingCommands();
         }
         if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "LobbyScene")
         {
@@ -446,6 +485,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
 
         // Giữ kết nối Photon khi cửa sổ Game mất focus (tránh cảnh báo "SendOutgoingCommands() was not called for > 5 seconds")
         Application.runInBackground = true;
@@ -455,8 +495,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             playerName = "NgườiChơi_" + UnityEngine.Random.Range(100, 999);
         }
 
-        IsGameStarted = !requireFullRoomToStart;
-        currentMatchState = requireFullRoomToStart ? MatchState.WaitingForPlayers : MatchState.GameStarted;
+        ResetMatchLobbyState();
         isChatMinimized = startChatMinimized;
 
         SetupVoicePlayback();
@@ -466,6 +505,12 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     private void Start()
     {
+#if UNITY_ANDROID
+        if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone))
+        {
+            UnityEngine.Android.Permission.RequestUserPermission(UnityEngine.Android.Permission.Microphone);
+        }
+#endif
         StartMicrophoneCapture();
     }
 
@@ -498,6 +543,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         {
             client.Service();
 
+            if (!IsGameStarted && !isTransitioningToMatchScene && client.InRoom)
+            {
+                CheckRoomPropertiesForMatchStart();
+            }
+
             if (client.State == ClientState.Disconnected && !roomJoinBlocked && Time.unscaledTime >= reconnectTimer)
             {
                 reconnectTimer = Time.unscaledTime + 5f;
@@ -509,8 +559,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         {
             if (isLobbyScene)
             {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
+                if (!Application.isMobilePlatform)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
                 ThirdPersonCamera.isUIPanelOpen = true;
             }
             else if (client != null && client.InRoom)
@@ -534,26 +587,42 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 bool isDashboard = GameSettingsManager.Instance != null
                     && GameSettingsManager.Instance.dashboardPanel != null
                     && GameSettingsManager.Instance.dashboardPanel.activeSelf;
+                bool isVoiceDialog = voiceSettingsDialogObj != null && voiceSettingsDialogObj.activeSelf;
+                bool isEditingHUD = VirtualJoystickTouchUI.Instance != null && VirtualJoystickTouchUI.Instance.IsEditingHUDLayout;
 
-                ThirdPersonCamera.isUIPanelOpen = isTyping || isDashboard;
+                ThirdPersonCamera.isUIPanelOpen = isTyping || isDashboard || isVoiceDialog || isEditingHUD;
 
-                bool shouldShowCursor = isLobbyCursorUnlocked || isTyping || isDashboard;
-                if (shouldShowCursor)
+                if (!Application.isMobilePlatform)
                 {
-                    Cursor.lockState = CursorLockMode.None;
-                    Cursor.visible = true;
-                }
-                else
-                {
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
+                    bool shouldShowCursor = isLobbyCursorUnlocked || isTyping || isDashboard || isVoiceDialog || isEditingHUD;
+                    if (shouldShowCursor)
+                    {
+                        Cursor.lockState = CursorLockMode.None;
+                        Cursor.visible = true;
+                    }
+                    else
+                    {
+                        Cursor.lockState = CursorLockMode.Locked;
+                        Cursor.visible = false;
+                    }
                 }
             }
             else
             {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-                ThirdPersonCamera.isUIPanelOpen = true;
+                bool isTyping = IsTypingChat();
+                bool isDashboard = GameSettingsManager.Instance != null
+                    && GameSettingsManager.Instance.dashboardPanel != null
+                    && GameSettingsManager.Instance.dashboardPanel.activeSelf;
+                bool isVoiceDialog = voiceSettingsDialogObj != null && voiceSettingsDialogObj.activeSelf;
+                bool isLobbyBox = lobbyPanelObj != null && lobbyPanelObj.activeSelf;
+                bool isEditingHUD = VirtualJoystickTouchUI.Instance != null && VirtualJoystickTouchUI.Instance.IsEditingHUDLayout;
+
+                if (!Application.isMobilePlatform)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
+                ThirdPersonCamera.isUIPanelOpen = isTyping || isDashboard || isVoiceDialog || isLobbyBox || isEditingHUD;
             }
         }
 
@@ -567,6 +636,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 {
                     if (GhostActorNumbers.Count == 0) HostAssignRandomRoles();
                     BroadcastMatchState(2, 0f);
+                    PublishMatchStartRoomProperties();
+                    client.SendOutgoingCommands();
                 }
                 StartGameLocally();
             }
@@ -589,6 +660,12 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
 
         HandleShortcuts();
+#if UNITY_ANDROID
+        if (string.IsNullOrEmpty(activeMicDevice) && UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone))
+        {
+            StartMicrophoneCapture();
+        }
+#endif
         ProcessMicrophoneAndSendVoice();
         UpdateRemotePlayersInterpolation();
         UpdateStatusUI();
@@ -596,6 +673,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     private void OnDestroy()
     {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
         IsGameStarted = false;
         if (client != null)
         {
@@ -734,7 +812,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         int count = client.CurrentRoom != null ? client.CurrentRoom.PlayerCount : 1;
         AddSystemMessage($"Đã vào phòng [{roomName}] ({count}/{requiredPlayersToStart} người). Nhấn [Enter] để Chat, [V] để Mic, [H] để ẩn Chat!");
         BroadcastLocalReadyState();
-        CheckLobbyPlayerCount();
+        CheckRoomPropertiesForMatchStart();
+        if (!IsGameStarted)
+        {
+            CheckLobbyPlayerCount();
+        }
 
         bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
         if (!inLobbyScene)
@@ -793,8 +875,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         ClearRemotePlayers();
         if (lobbyPanelObj != null) lobbyPanelObj.SetActive(false);
-        IsGameStarted = !requireFullRoomToStart;
-        currentMatchState = requireFullRoomToStart ? MatchState.WaitingForPlayers : MatchState.GameStarted;
+        ResetMatchLobbyState();
     }
 
     public void OnDisconnected(DisconnectCause cause)
@@ -803,8 +884,10 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         reconnectTimer = Time.unscaledTime + 5f;
         ClearRemotePlayers();
         if (lobbyPanelObj != null) lobbyPanelObj.SetActive(false);
-        IsGameStarted = !requireFullRoomToStart;
-        currentMatchState = requireFullRoomToStart ? MatchState.WaitingForPlayers : MatchState.GameStarted;
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
+        {
+            ResetMatchLobbyState();
+        }
     }
 
     public void OnRegionListReceived(RegionHandler regionHandler) { }
@@ -856,9 +939,19 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
     }
 
-    public void OnRoomPropertiesUpdate(PhotonHashtable propertiesThatChanged) { }
+    public void OnRoomPropertiesUpdate(PhotonHashtable propertiesThatChanged)
+    {
+        CheckRoomPropertiesForMatchStart();
+    }
     public void OnPlayerPropertiesUpdate(Player targetPlayer, PhotonHashtable changedProps) { }
-    public void OnMasterClientSwitched(Player newMasterClient) { }
+    public void OnMasterClientSwitched(Player newMasterClient)
+    {
+        if (!IsGameStarted && !isTransitioningToMatchScene)
+        {
+            CheckAllPlayersConfirmedAndStart();
+            CheckLobbyPlayerCount();
+        }
+    }
 
     // =========================================================================
     // 2. NHẮN TIN TRỰC TUYẾN (TEXT CHAT) & ĐÀM THOẠI GIỌNG NÓI (VOICE CHAT)
@@ -894,29 +987,48 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         bool enterPressed = false;
         bool escPressed = false;
         bool micTogglePressed = false;
+        bool f1Pressed = false;
 
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         bool toggleChatPressed = false;
+        bool toggleVoiceSettingsPressed = false;
         if (kb != null)
         {
             enterPressed = kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame;
             escPressed = kb.escapeKey.wasPressedThisFrame;
             micTogglePressed = kb.vKey != null && kb.vKey.wasPressedThisFrame;
             toggleChatPressed = kb.hKey != null && kb.hKey.wasPressedThisFrame;
+            toggleVoiceSettingsPressed = kb.kKey != null && kb.kKey.wasPressedThisFrame;
+            if (kb.f1Key != null && kb.f1Key.wasPressedThisFrame) f1Pressed = true;
         }
 #if ENABLE_LEGACY_INPUT_MANAGER
         if (!micTogglePressed) micTogglePressed = Input.GetKeyDown(toggleMicKey);
         if (!toggleChatPressed) toggleChatPressed = Input.GetKeyDown(toggleChatKey);
+        if (!toggleVoiceSettingsPressed) toggleVoiceSettingsPressed = Input.GetKeyDown(toggleVoiceSettingsKey);
         if (!enterPressed) enterPressed = Input.GetKeyDown(openChatKey) || Input.GetKeyDown(KeyCode.KeypadEnter);
         if (!escPressed) escPressed = Input.GetKeyDown(KeyCode.Escape);
+        if (!f1Pressed && Input.GetKeyDown(KeyCode.F1)) f1Pressed = true;
 #endif
 #else
         enterPressed = Input.GetKeyDown(openChatKey) || Input.GetKeyDown(KeyCode.KeypadEnter);
         escPressed = Input.GetKeyDown(KeyCode.Escape);
         micTogglePressed = Input.GetKeyDown(toggleMicKey);
         bool toggleChatPressed = Input.GetKeyDown(toggleChatKey);
+        bool toggleVoiceSettingsPressed = Input.GetKeyDown(toggleVoiceSettingsKey);
+        if (Input.GetKeyDown(KeyCode.F1)) f1Pressed = true;
 #endif
+
+        if (f1Pressed)
+        {
+            if (isChatMinimized) SetChatMinimized(false);
+            SetChatFocus(!isChatInputFocused);
+        }
+
+        if (toggleVoiceSettingsPressed && !isCurrentlyTyping)
+        {
+            ToggleVoiceSettingsDialog();
+        }
 
         if (enterPressed)
         {
@@ -958,7 +1070,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         isChatMinimized = min;
         if (isChatMinimized)
         {
-            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(340f, 38f);
+            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(390f, 40f);
             if (chatHistoryText != null) chatHistoryText.gameObject.SetActive(false);
             if (chatInputRow != null) chatInputRow.SetActive(false);
             if (speakingIndicatorText != null) speakingIndicatorText.gameObject.SetActive(false);
@@ -966,7 +1078,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         else
         {
-            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(410f, 225f);
+            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(390f, 80f);
             if (chatHistoryText != null) chatHistoryText.gameObject.SetActive(true);
             if (chatInputRow != null) chatInputRow.SetActive(true);
             if (speakingIndicatorText != null) speakingIndicatorText.gameObject.SetActive(true);
@@ -1062,7 +1174,15 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         try
         {
-            // 1. Kiểm tra sự tồn tại của thiết bị Microphone trên máy tính
+#if UNITY_ANDROID
+            if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(UnityEngine.Android.Permission.Microphone))
+            {
+                UnityEngine.Android.Permission.RequestUserPermission(UnityEngine.Android.Permission.Microphone);
+                AddSystemMessage("Đang yêu cầu cấp quyền Micro trên thiết bị Android...");
+                return;
+            }
+#endif
+            // 1. Kiểm tra sự tồn tại của thiết bị Microphone trên máy tính / điện thoại
             if (Microphone.devices == null || Microphone.devices.Length == 0)
             {
                 Debug.LogWarning("[PhotonVoice] Không tìm thấy thiết bị Microphone khả dụng trên hệ thống.");
@@ -1243,8 +1363,9 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                     sumSq += micSampleBuffer[i] * micSampleBuffer[i];
                 }
                 float rms = Mathf.Sqrt(sumSq / micSampleBuffer.Length);
+                currentMicRMS = rms;
 
-                bool isVoiceDetected = rms > 0.008f;
+                bool isVoiceDetected = rms > vadThreshold;
                 if (isVoiceDetected)
                 {
                     // Giữ trạng thái nói ổn định 0.45s chống nhấp nháy đèn mic và UI
@@ -1257,15 +1378,120 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 {
                     if (client != null && client.InRoom)
                     {
+                        // Khuếch đại âm lượng mic theo micGain
+                        if (Mathf.Abs(micGain - 1.0f) > 0.01f)
+                        {
+                            for (int i = 0; i < micSampleBuffer.Length; i++)
+                            {
+                                micSampleBuffer[i] = Mathf.Clamp(micSampleBuffer[i] * micGain, -1.0f, 1.0f);
+                            }
+                        }
+
                         byte[] encoded = EncodeMuLaw(micSampleBuffer);
-                        object[] voicePayload = new object[] { playerName, encoded };
-                        RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
-                        client.OpRaiseEvent(EVENT_VOICE_PACKET, voicePayload, args, SendOptions.SendUnreliable);
+                        bool localIsGhost = IsLocalPlayerGhostRole();
+                        bool teamIsolated = IsVoiceTeamIsolatedNow();
+                        object[] voicePayload = new object[] { playerName, encoded, localIsGhost, teamIsolated };
+
+                        if (teamIsolated && client.CurrentRoom != null && client.CurrentRoom.Players != null && GhostActorNumbers.Count > 0)
+                        {
+                            int myActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
+                            voiceTargetActorBuffer.Clear();
+                            foreach (var kvp in client.CurrentRoom.Players)
+                            {
+                                int actorNr = kvp.Key;
+                                if (actorNr == myActor) continue;
+                                bool peerIsGhost = GhostActorNumbers.Contains(actorNr);
+                                if (peerIsGhost == localIsGhost)
+                                {
+                                    voiceTargetActorBuffer.Add(actorNr);
+                                }
+                            }
+
+                            // Sau 20s trốn: Chỉ gửi gói tin Voice cho đồng đội cùng phe (Ma -> Ma, Người -> Người)
+                            if (voiceTargetActorBuffer.Count > 0)
+                            {
+                                RaiseEventArgs teamArgs = new RaiseEventArgs { TargetActors = voiceTargetActorBuffer.ToArray() };
+                                client.OpRaiseEvent(EVENT_VOICE_PACKET, voicePayload, teamArgs, SendOptions.SendUnreliable);
+                            }
+                        }
+                        else
+                        {
+                            RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
+                            client.OpRaiseEvent(EVENT_VOICE_PACKET, voicePayload, args, SendOptions.SendUnreliable);
+                        }
                     }
                 }
             }
         }
         catch { }
+    }
+
+    public bool IsVoiceTeamIsolatedNow()
+    {
+        return SurvivalTimerUI.Instance != null
+            && SurvivalTimerUI.Instance.currentPhase == SurvivalTimerUI.MatchPhase.Hunting_3Min;
+    }
+
+    public bool IsLocalPlayerGhostRole()
+    {
+        if (client != null && client.InRoom && client.LocalPlayer != null && GhostActorNumbers.Count > 0)
+        {
+            return GhostActorNumbers.Contains(client.LocalPlayer.ActorNumber);
+        }
+        if (SurvivalTimerUI.Instance != null)
+        {
+            return SurvivalTimerUI.Instance.localRole == SurvivalTimerUI.PlayerRole.Ghost;
+        }
+        return false;
+    }
+
+    private bool IsActorGhostRole(int actorNr, object[] payloadArr)
+    {
+        if (GhostActorNumbers.Count > 0)
+        {
+            return GhostActorNumbers.Contains(actorNr);
+        }
+        if (payloadArr != null && payloadArr.Length >= 3 && payloadArr[2] is bool senderGhost)
+        {
+            return senderGhost;
+        }
+        if (remotePlayers.TryGetValue(actorNr, out var av) && av != null)
+        {
+            return av.isGhostForm;
+        }
+        return false;
+    }
+
+    public void OnEnterHuntingVoiceIsolation()
+    {
+        remoteSpeakerName = "";
+        remoteSpeakingTimer = 0f;
+
+        if (playbackRingClip != null)
+        {
+            float[] silence = new float[PLAYBACK_RING_SAMPLES];
+            playbackRingClip.SetData(silence, 0);
+        }
+
+        bool amIGhost = IsLocalPlayerGhostRole();
+        if (amIGhost)
+        {
+            AddSystemMessage("🔒 [VOICE PHE MA] Đã hết 20s trốn! Từ lúc này chỉ Phe MA mới nghe được mic của nhau.");
+        }
+        else
+        {
+            AddSystemMessage("🔒 [VOICE PHE NGƯỜI] Đã hết 20s trốn! Từ lúc này chỉ Phe NGƯỜI mới nghe được mic của nhau.");
+        }
+    }
+
+    public void OnExitHuntingVoiceIsolation(bool notifyEnd)
+    {
+        remoteSpeakerName = "";
+        remoteSpeakingTimer = 0f;
+        if (notifyEnd)
+        {
+            AddSystemMessage("🔊 [VOICE KÊNH CHUNG] Trận đấu kết thúc — Tất cả người chơi có thể nghe lại mic của nhau!");
+        }
     }
 
     private void PlayReceivedVoicePacket(string speaker, byte[] encodedBytes)
@@ -1276,9 +1502,13 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         {
             SetupVoicePlayback();
         }
-        if (voicePlaybackSource != null && !voicePlaybackSource.isPlaying)
+        if (voicePlaybackSource != null)
         {
-            voicePlaybackSource.Play();
+            voicePlaybackSource.volume = incomingVoiceVolume;
+            if (!voicePlaybackSource.isPlaying)
+            {
+                voicePlaybackSource.Play();
+            }
         }
         if (playbackRingClip == null || voicePlaybackSource == null) return;
 
@@ -1483,6 +1713,19 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         {
             if (photonEvent.CustomData is object[] arr && arr.Length >= 2)
             {
+                int senderActor = photonEvent.Sender;
+                bool isolateVoice = IsVoiceTeamIsolatedNow() || (arr.Length >= 4 && arr[3] is bool bIso && bIso);
+                if (isolateVoice)
+                {
+                    bool amIGhost = IsLocalPlayerGhostRole();
+                    bool senderIsGhost = IsActorGhostRole(senderActor, arr);
+                    // Sau 20s trốn: Ma chỉ nghe được mic Ma, Người chỉ nghe được mic Người
+                    if (amIGhost != senderIsGhost)
+                    {
+                        return;
+                    }
+                }
+
                 string speaker = arr[0]?.ToString() ?? "NgườiChơi";
                 byte[] audioBytes = arr[1] as byte[];
                 PlayReceivedVoicePacket(speaker, audioBytes);
@@ -1548,6 +1791,12 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     private void UpdateRemotePlayersInterpolation()
     {
+        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        if (!IsGameStarted || inLobbyScene || isTransitioningToMatchScene)
+        {
+            return;
+        }
+
         if (client != null && client.InRoom && Time.unscaledTime >= nextSyncTime)
         {
             nextSyncTime = Time.unscaledTime + 0.08f; // Đồng bộ 12.5 lần/giây mượt mà
@@ -1558,7 +1807,13 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 float ry = pt.eulerAngles.y;
                 object[] syncData = new object[] { playerName, p.x, p.y, p.z, ry, isGhostForm };
                 RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
-                client.OpRaiseEvent(EVENT_PLAYER_SYNC, syncData, args, SendOptions.SendUnreliable);
+                SendOptions opts = needReliableInitialPlayerSync ? SendOptions.SendReliable : SendOptions.SendUnreliable;
+                client.OpRaiseEvent(EVENT_PLAYER_SYNC, syncData, args, opts);
+                if (needReliableInitialPlayerSync)
+                {
+                    needReliableInitialPlayerSync = false;
+                    client.SendOutgoingCommands();
+                }
             }
         }
 
@@ -1720,13 +1975,33 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     public void StartGameLocally()
     {
+        string activeSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (isTransitioningToMatchScene && activeSceneName == "LobbyScene")
+        {
+            return;
+        }
+        if (currentMatchState == MatchState.GameStarted && IsGameStarted && activeSceneName != "LobbyScene")
+        {
+            return;
+        }
+
         currentMatchState = MatchState.GameStarted;
         IsGameStarted = true;
         isLobbyCursorUnlocked = false;
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        needReliableInitialPlayerSync = true;
+        nextSyncTime = 0f;
+
+        if (!Application.isMobilePlatform)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
         ThirdPersonCamera.isUIPanelOpen = false;
         if (lobbyPanelObj != null) lobbyPanelObj.SetActive(false);
+        if (FusionVietnameseLobbyUI.Instance != null)
+        {
+            FusionVietnameseLobbyUI.Instance.HideImmediatelyForMatchStart();
+        }
         if (gameStartBannerObj != null)
         {
             gameStartBannerObj.SetActive(true);
@@ -1744,10 +2019,64 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             gameStartBannerText.text = $"🎮 Người chơi [{curPName}] đã vào trận! 🔥";
         }
 
-        // [GhostMaze] Khi bắt đầu trận đấu ở LobbyScene -> Tất cả máy cùng tự động chuyển sang SampleScene (Map thi đấu gameplay)
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
+        // [GhostMaze] Khi bắt đầu trận đấu ở LobbyScene -> Bơm gói mạng Photon ra ngoài trước rồi tải SampleScene bất đồng bộ để không treo kết nối
+        if (activeSceneName == "LobbyScene")
         {
-            UnityEngine.SceneManagement.SceneManager.LoadScene("SampleScene");
+            ClearRemotePlayers();
+            if (client != null && client.IsConnected)
+            {
+                client.SendOutgoingCommands();
+            }
+            isTransitioningToMatchScene = true;
+            StartCoroutine(LoadSampleSceneWithNetworkFlushCoroutine());
+        }
+    }
+
+    private System.Collections.IEnumerator LoadSampleSceneWithNetworkFlushCoroutine()
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            if (client != null && client.IsConnected)
+            {
+                client.Service();
+                client.SendOutgoingCommands();
+            }
+            yield return null;
+        }
+
+        AsyncOperation loadOp = UnityEngine.SceneManagement.SceneManager.LoadSceneAsync("SampleScene", UnityEngine.SceneManagement.LoadSceneMode.Single);
+        while (loadOp != null && !loadOp.isDone)
+        {
+            if (client != null && client.IsConnected)
+            {
+                client.Service();
+            }
+            yield return null;
+        }
+        isTransitioningToMatchScene = false;
+    }
+
+    private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (scene.name == "SampleScene")
+        {
+            isTransitioningToMatchScene = false;
+            isLobbyCursorUnlocked = false;
+            ThirdPersonCamera.isUIPanelOpen = false;
+            needReliableInitialPlayerSync = true;
+            nextSyncTime = 0f;
+
+            if (!Application.isMobilePlatform)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+            SyncRoleWithSurvivalTimer();
+        }
+        else if (scene.name == "LobbyScene")
+        {
+            isTransitioningToMatchScene = false;
+            ClearRemotePlayers();
         }
     }
 
@@ -1813,6 +2142,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         if (client != null && client.InRoom)
         {
             BroadcastMatchState(2, 0f);
+            PublishMatchStartRoomProperties();
+            client.SendOutgoingCommands();
             StartGameLocally();
         }
         else
@@ -1821,19 +2152,56 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
     }
 
+    private void PublishMatchStartRoomProperties()
+    {
+        if (client == null || !client.InRoom || client.CurrentRoom == null) return;
+        if (client.LocalPlayer == null || !client.LocalPlayer.IsMasterClient) return;
+
+        PhotonHashtable props = new PhotonHashtable
+        {
+            { ROOM_PROP_MATCH_STATE, (byte)2 },
+            { ROOM_PROP_GHOST_ACTORS, GhostActorNumbers.ToArray() }
+        };
+        client.CurrentRoom.SetCustomProperties(props);
+    }
+
+    private void CheckRoomPropertiesForMatchStart()
+    {
+        if (IsGameStarted || isTransitioningToMatchScene) return;
+        if (client == null || !client.InRoom || client.CurrentRoom == null || client.CurrentRoom.CustomProperties == null) return;
+
+        var props = client.CurrentRoom.CustomProperties;
+        if (!props.TryGetValue(ROOM_PROP_MATCH_STATE, out object msObj) || msObj == null) return;
+
+        byte stateCode = Convert.ToByte(msObj);
+        if (stateCode != 2) return;
+
+        if (props.TryGetValue(ROOM_PROP_GHOST_ACTORS, out object gaObj) && gaObj is int[] ghostInts)
+        {
+            GhostActorNumbers.Clear();
+            GhostActorNumbers.AddRange(ghostInts);
+            SyncRoleWithSurvivalTimer();
+        }
+
+        StartGameLocally();
+    }
+
     private void BroadcastMatchState(byte stateCode, float duration)
     {
         if (client == null || !client.InRoom) return;
         object[] content = new object[] { stateCode, duration, GhostActorNumbers.ToArray() };
         RaiseEventArgs raiseEventOptions = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
         client.OpRaiseEvent(EVENT_MATCH_STATE, content, raiseEventOptions, SendOptions.SendReliable);
+        client.SendOutgoingCommands();
     }
 
     private void CheckLobbyPlayerCount()
     {
+        if (IsGameStarted || isTransitioningToMatchScene) return;
+
         if (!requireFullRoomToStart)
         {
-            if (!IsGameStarted) StartGameLocally();
+            StartGameLocally();
             return;
         }
 
@@ -1846,6 +2214,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             {
                 if (client.LocalPlayer != null && client.LocalPlayer.IsMasterClient)
                 {
+                    if (GhostActorNumbers.Count == 0) HostAssignRandomRoles();
                     BroadcastMatchState(1, countdownDuration);
                 }
                 StartCountdownLocally(countdownDuration);
@@ -1971,58 +2340,179 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         if (defaultFont == null) defaultFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
 
-        // Khung chứa chính ở góc dưới bên trái
+        // Khung chứa chính ở góc dưới bên trái (đặt ở Y: 335 để không bị Virtual Joystick che khuất)
+        // Khung chứa chính ở góc dưới bên trái (đặt ở Y: 335 để không bị Virtual Joystick che khuất)
         GameObject panel = new GameObject("PhotonChatVoicePanel");
         panel.transform.SetParent(canvas.transform, false);
         RectTransform panelRect = panel.AddComponent<RectTransform>();
         panelRect.anchorMin = new Vector2(0f, 0f);
         panelRect.anchorMax = new Vector2(0f, 0f);
         panelRect.pivot = new Vector2(0f, 0f);
-        panelRect.anchoredPosition = new Vector2(18f, 18f);
-        panelRect.sizeDelta = new Vector2(410f, 225f);
+        panelRect.anchoredPosition = new Vector2(18f, 335f);
+        panelRect.sizeDelta = new Vector2(390f, 80f);
         chatPanelRect = panelRect;
+        VirtualJoystickTouchUI.ApplySavedRectTransform("ChatVoice", panelRect, new Vector2(18f, 335f));
 
         Image panelBg = panel.AddComponent<Image>();
-        panelBg.color = new Color(0.05f, 0.08f, 0.12f, 0.72f);
+        panelBg.color = new Color(0.05f, 0.08f, 0.12f, 0.78f);
 
-        // Thanh trạng thái kết nối + Nút bật/tắt Mic + Nút Thu gọn ở phía trên khung Chat
-        GameObject topBar = new GameObject("TopVoiceBar");
-        topBar.transform.SetParent(panel.transform, false);
-        RectTransform topRect = topBar.AddComponent<RectTransform>();
-        topRect.anchorMin = new Vector2(0f, 1f);
-        topRect.anchorMax = new Vector2(1f, 1f);
-        topRect.pivot = new Vector2(0.5f, 1f);
-        topRect.anchoredPosition = new Vector2(0f, -6f);
-        topRect.sizeDelta = new Vector2(-16f, 28f);
+        // ==========================================
+        // HÀNG TRÊN: Ô Nhập Tin Nhắn + Nút Máy Bay Gửi
+        // ==========================================
+        chatInputRow = new GameObject("ChatInputRow");
+        chatInputRow.transform.SetParent(panel.transform, false);
+        RectTransform inputRowRect = chatInputRow.AddComponent<RectTransform>();
+        inputRowRect.anchorMin = new Vector2(0f, 1f);
+        inputRowRect.anchorMax = new Vector2(1f, 1f);
+        inputRowRect.pivot = new Vector2(0.5f, 1f);
+        inputRowRect.anchoredPosition = new Vector2(0f, -6f);
+        inputRowRect.sizeDelta = new Vector2(-12f, 32f);
 
-        // Trạng thái phòng (Bên trái)
-        GameObject statusObj = new GameObject("StatusText");
-        statusObj.transform.SetParent(topBar.transform, false);
-        RectTransform statusRect = statusObj.AddComponent<RectTransform>();
+        GameObject inputBoxObj = new GameObject("ChatInputField");
+        inputBoxObj.transform.SetParent(chatInputRow.transform, false);
+        RectTransform inputBoxRect = inputBoxObj.AddComponent<RectTransform>();
+        inputBoxRect.anchorMin = new Vector2(0f, 0f);
+        inputBoxRect.anchorMax = new Vector2(0.88f, 1f);
+        inputBoxRect.offsetMin = Vector2.zero;
+        inputBoxRect.offsetMax = new Vector2(-4f, 0f);
+
+        Image inputBg = inputBoxObj.AddComponent<Image>();
+        inputBg.color = new Color(0.10f, 0.14f, 0.20f, 0.90f);
+
+        chatInputField = inputBoxObj.AddComponent<InputField>();
+        chatInputField.characterLimit = 40; // Giới hạn tối đa 40 ký tự mỗi lần chat
+        chatInputField.lineType = InputField.LineType.SingleLine;
+        chatInputField.shouldHideMobileInput = false; // Hiện bàn phím ảo và thanh nhập liệu chuẩn trên Android
+        chatInputField.onEndEdit.AddListener(OnChatInputEndEdit);
+
+        GameObject placeholderObj = new GameObject("Placeholder");
+        placeholderObj.transform.SetParent(inputBoxObj.transform, false);
+        RectTransform phRect = placeholderObj.AddComponent<RectTransform>();
+        phRect.anchorMin = Vector2.zero;
+        phRect.anchorMax = Vector2.one;
+        phRect.offsetMin = new Vector2(8f, 2f);
+        phRect.offsetMax = new Vector2(-8f, -2f);
+
+        Text phText = placeholderObj.AddComponent<Text>();
+        phText.font = defaultFont;
+        phText.fontSize = 12;
+        phText.fontStyle = FontStyle.Normal;
+        phText.alignment = TextAnchor.MiddleLeft;
+        phText.color = new Color(0.68f, 0.75f, 0.85f, 0.80f);
+        phText.text = "💬 Chat [F1] - Nhập để trò chuyện...";
+
+        GameObject inputTextObj = new GameObject("Text");
+        inputTextObj.transform.SetParent(inputBoxObj.transform, false);
+        RectTransform itRect = inputTextObj.AddComponent<RectTransform>();
+        itRect.anchorMin = Vector2.zero;
+        itRect.anchorMax = Vector2.one;
+        itRect.offsetMin = new Vector2(8f, 2f);
+        itRect.offsetMax = new Vector2(-8f, -2f);
+
+        Text inputText = inputTextObj.AddComponent<Text>();
+        inputText.font = defaultFont;
+        inputText.fontSize = 13;
+        inputText.alignment = TextAnchor.MiddleLeft;
+        inputText.color = Color.white;
+        inputText.supportRichText = false;
+
+        chatInputField.textComponent = inputText;
+        chatInputField.placeholder = phText;
+
+        // Nút GỬI (Biểu tượng phi cơ giấy ✈)
+        GameObject sendBtnObj = new GameObject("SendButton");
+        sendBtnObj.transform.SetParent(chatInputRow.transform, false);
+        RectTransform sendRect = sendBtnObj.AddComponent<RectTransform>();
+        sendRect.anchorMin = new Vector2(0.88f, 0f);
+        sendRect.anchorMax = new Vector2(1f, 1f);
+        sendRect.offsetMin = Vector2.zero;
+        sendRect.offsetMax = Vector2.zero;
+
+        Image sendBg = sendBtnObj.AddComponent<Image>();
+        sendBg.color = new Color(0.18f, 0.45f, 0.85f, 0.95f);
+
+        Button sendBtn = sendBtnObj.AddComponent<Button>();
+        sendBtn.onClick.AddListener(() =>
+        {
+            SendChatMessageFromUI();
+            SetChatFocus(false);
+        });
+
+        GameObject sendTxtObj = new GameObject("Text");
+        sendTxtObj.transform.SetParent(sendBtnObj.transform, false);
+        RectTransform stRect = sendTxtObj.AddComponent<RectTransform>();
+        stRect.anchorMin = Vector2.zero;
+        stRect.anchorMax = Vector2.one;
+        stRect.offsetMin = Vector2.zero;
+        stRect.offsetMax = Vector2.zero;
+
+        Text sendTxt = sendTxtObj.AddComponent<Text>();
+        sendTxt.font = defaultFont;
+        sendTxt.fontSize = 14;
+        sendTxt.fontStyle = FontStyle.Bold;
+        sendTxt.alignment = TextAnchor.MiddleCenter;
+        sendTxt.color = Color.white;
+        sendTxt.text = "✈";
+
+        // ==========================================
+        // HÀNG DƯỚI: 4 Nút Điều Khiển
+        // 1. [Chat [F1] ●] | 2. [🎙 MIC: TẮT [V]] | 3. [🔊 VOICE] | 4. [▲]
+        // ==========================================
+        GameObject bottomBar = new GameObject("BottomControlBar");
+        bottomBar.transform.SetParent(panel.transform, false);
+        RectTransform bottomRect = bottomBar.AddComponent<RectTransform>();
+        bottomRect.anchorMin = new Vector2(0f, 0f);
+        bottomRect.anchorMax = new Vector2(1f, 0f);
+        bottomRect.pivot = new Vector2(0.5f, 0f);
+        bottomRect.anchoredPosition = new Vector2(0f, 6f);
+        bottomRect.sizeDelta = new Vector2(-12f, 30f);
+
+        // 1. Nút Chat [F1] ●
+        GameObject statusBtnObj = new GameObject("ChatBadgeButton");
+        statusBtnObj.transform.SetParent(bottomBar.transform, false);
+        RectTransform statusRect = statusBtnObj.AddComponent<RectTransform>();
         statusRect.anchorMin = new Vector2(0f, 0f);
-        statusRect.anchorMax = new Vector2(0.50f, 1f);
+        statusRect.anchorMax = new Vector2(0.28f, 1f);
         statusRect.offsetMin = Vector2.zero;
-        statusRect.offsetMax = Vector2.zero;
+        statusRect.offsetMax = new Vector2(-2f, 0f);
 
-        statusBadgeText = statusObj.AddComponent<Text>();
+        Image statusBg = statusBtnObj.AddComponent<Image>();
+        statusBg.color = new Color(0.12f, 0.18f, 0.25f, 0.92f);
+
+        Button statusBtn = statusBtnObj.AddComponent<Button>();
+        statusBtn.onClick.AddListener(() =>
+        {
+            if (isChatMinimized) SetChatMinimized(false);
+            SetChatFocus(!isChatInputFocused);
+        });
+
+        GameObject statusTxtObj = new GameObject("Text");
+        statusTxtObj.transform.SetParent(statusBtnObj.transform, false);
+        RectTransform strt = statusTxtObj.AddComponent<RectTransform>();
+        strt.anchorMin = Vector2.zero;
+        strt.anchorMax = Vector2.one;
+        strt.offsetMin = Vector2.zero;
+        strt.offsetMax = Vector2.zero;
+
+        statusBadgeText = statusTxtObj.AddComponent<Text>();
         statusBadgeText.font = defaultFont;
-        statusBadgeText.fontSize = 12;
+        statusBadgeText.fontSize = 11;
         statusBadgeText.fontStyle = FontStyle.Bold;
-        statusBadgeText.alignment = TextAnchor.MiddleLeft;
-        statusBadgeText.color = new Color(0.4f, 0.9f, 1f, 1f);
-        statusBadgeText.text = "● Đang kết nối Photon...";
+        statusBadgeText.alignment = TextAnchor.MiddleCenter;
+        statusBadgeText.color = new Color(0.35f, 0.95f, 0.60f, 1f);
+        statusBadgeText.text = "Chat [F1] ●";
 
-        // Nút Mic [V] (Ở giữa)
+        // 2. Nút MIC: BẬT / TẮT [V]
         GameObject micBtnObj = new GameObject("MicToggleButton");
-        micBtnObj.transform.SetParent(topBar.transform, false);
+        micBtnObj.transform.SetParent(bottomBar.transform, false);
         RectTransform micRect = micBtnObj.AddComponent<RectTransform>();
-        micRect.anchorMin = new Vector2(0.52f, 0f);
-        micRect.anchorMax = new Vector2(0.83f, 1f);
-        micRect.offsetMin = Vector2.zero;
-        micRect.offsetMax = Vector2.zero;
+        micRect.anchorMin = new Vector2(0.28f, 0f);
+        micRect.anchorMax = new Vector2(0.68f, 1f);
+        micRect.offsetMin = new Vector2(2f, 0f);
+        micRect.offsetMax = new Vector2(-2f, 0f);
 
         micButtonBg = micBtnObj.AddComponent<Image>();
-        micButtonBg.color = new Color(0.15f, 0.65f, 0.38f, 0.92f);
+        micButtonBg.color = new Color(0.65f, 0.22f, 0.22f, 0.92f);
 
         Button micBtn = micBtnObj.AddComponent<Button>();
         micBtn.onClick.AddListener(ToggleMicrophone);
@@ -2037,23 +2527,54 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         micButtonText = micTxtObj.AddComponent<Text>();
         micButtonText.font = defaultFont;
-        micButtonText.fontSize = 12;
+        micButtonText.fontSize = 11;
         micButtonText.fontStyle = FontStyle.Bold;
         micButtonText.alignment = TextAnchor.MiddleCenter;
         micButtonText.color = Color.white;
-        micButtonText.text = "🎙 MIC: BẬT [V]";
+        micButtonText.text = "🎙 MIC: TẮT [V]";
 
-        // Nút Thu Gọn / Ẩn Chat (Bên phải)
+        // 3. Nút Cài Đặt VOICE
+        GameObject voiceSetBtnObj = new GameObject("VoiceSettingsButton");
+        voiceSetBtnObj.transform.SetParent(bottomBar.transform, false);
+        RectTransform voiceSetRect = voiceSetBtnObj.AddComponent<RectTransform>();
+        voiceSetRect.anchorMin = new Vector2(0.68f, 0f);
+        voiceSetRect.anchorMax = new Vector2(0.88f, 1f);
+        voiceSetRect.offsetMin = new Vector2(2f, 0f);
+        voiceSetRect.offsetMax = new Vector2(-2f, 0f);
+
+        Image voiceSetBg = voiceSetBtnObj.AddComponent<Image>();
+        voiceSetBg.color = new Color(0.18f, 0.48f, 0.88f, 0.92f);
+
+        Button voiceSetBtn = voiceSetBtnObj.AddComponent<Button>();
+        voiceSetBtn.onClick.AddListener(ToggleVoiceSettingsDialog);
+
+        GameObject voiceSetTxtObj = new GameObject("Text");
+        voiceSetTxtObj.transform.SetParent(voiceSetBtnObj.transform, false);
+        RectTransform vstrt = voiceSetTxtObj.AddComponent<RectTransform>();
+        vstrt.anchorMin = Vector2.zero;
+        vstrt.anchorMax = Vector2.one;
+        vstrt.offsetMin = Vector2.zero;
+        vstrt.offsetMax = Vector2.zero;
+
+        Text voiceSetTxt = voiceSetTxtObj.AddComponent<Text>();
+        voiceSetTxt.font = defaultFont;
+        voiceSetTxt.fontSize = 11;
+        voiceSetTxt.fontStyle = FontStyle.Bold;
+        voiceSetTxt.alignment = TextAnchor.MiddleCenter;
+        voiceSetTxt.color = Color.white;
+        voiceSetTxt.text = "🔊 VOICE";
+
+        // 4. Nút Thu Gọn ▲ / ▼
         GameObject minBtnObj = new GameObject("MinimizeChatButton");
-        minBtnObj.transform.SetParent(topBar.transform, false);
+        minBtnObj.transform.SetParent(bottomBar.transform, false);
         RectTransform minRect = minBtnObj.AddComponent<RectTransform>();
-        minRect.anchorMin = new Vector2(0.85f, 0f);
+        minRect.anchorMin = new Vector2(0.88f, 0f);
         minRect.anchorMax = new Vector2(1f, 1f);
-        minRect.offsetMin = Vector2.zero;
+        minRect.offsetMin = new Vector2(2f, 0f);
         minRect.offsetMax = Vector2.zero;
 
         Image minBg = minBtnObj.AddComponent<Image>();
-        minBg.color = new Color(0.18f, 0.25f, 0.35f, 0.92f);
+        minBg.color = new Color(0.16f, 0.22f, 0.30f, 0.92f);
 
         Button minBtn = minBtnObj.AddComponent<Button>();
         minBtn.onClick.AddListener(ToggleChatMinimized);
@@ -2074,15 +2595,15 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         minimizeButtonText.color = Color.white;
         minimizeButtonText.text = isChatMinimized ? "▲" : "▼";
 
-        // Dòng báo hiệu ai đang nói Voice Chat
+        // Dòng báo hiệu ai đang nói Voice Chat (nằm ngay trên khung)
         GameObject speakObj = new GameObject("SpeakingIndicator");
         speakObj.transform.SetParent(panel.transform, false);
         RectTransform speakRect = speakObj.AddComponent<RectTransform>();
         speakRect.anchorMin = new Vector2(0f, 1f);
         speakRect.anchorMax = new Vector2(1f, 1f);
-        speakRect.pivot = new Vector2(0.5f, 1f);
-        speakRect.anchoredPosition = new Vector2(0f, -35f);
-        speakRect.sizeDelta = new Vector2(-16f, 18f);
+        speakRect.pivot = new Vector2(0.5f, 0f);
+        speakRect.anchoredPosition = new Vector2(0f, 2f);
+        speakRect.sizeDelta = new Vector2(0f, 18f);
 
         speakingIndicatorText = speakObj.AddComponent<Text>();
         speakingIndicatorText.font = defaultFont;
@@ -2091,15 +2612,17 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         speakingIndicatorText.alignment = TextAnchor.MiddleLeft;
         speakingIndicatorText.color = new Color(0.3f, 1f, 0.55f, 1f);
         speakingIndicatorText.text = "";
+        speakingIndicatorText.raycastTarget = false;
 
-        // Vùng hiển thị lịch sử tin nhắn
+        // Vùng hiển thị lịch sử tin nhắn (nổi phía trên khung nhập khi có tin nhắn)
         GameObject historyObj = new GameObject("ChatHistoryText");
         historyObj.transform.SetParent(panel.transform, false);
         RectTransform histRect = historyObj.AddComponent<RectTransform>();
-        histRect.anchorMin = new Vector2(0f, 0f);
+        histRect.anchorMin = new Vector2(0f, 1f);
         histRect.anchorMax = new Vector2(1f, 1f);
-        histRect.offsetMin = new Vector2(10f, 40f);
-        histRect.offsetMax = new Vector2(-10f, -54f);
+        histRect.pivot = new Vector2(0.5f, 0f);
+        histRect.anchoredPosition = new Vector2(0f, 22f);
+        histRect.sizeDelta = new Vector2(0f, 140f);
 
         chatHistoryText = historyObj.AddComponent<Text>();
         chatHistoryText.font = defaultFont;
@@ -2109,108 +2632,510 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         chatHistoryText.verticalOverflow = VerticalWrapMode.Truncate;
         chatHistoryText.supportRichText = true;
         chatHistoryText.color = new Color(0.92f, 0.95f, 1f, 0.95f);
-
-        // Dòng nhập tin nhắn ở dưới cùng
-        chatInputRow = new GameObject("ChatInputRow");
-        chatInputRow.transform.SetParent(panel.transform, false);
-        RectTransform inputRowRect = chatInputRow.AddComponent<RectTransform>();
-        inputRowRect.anchorMin = new Vector2(0f, 0f);
-        inputRowRect.anchorMax = new Vector2(1f, 0f);
-        inputRowRect.pivot = new Vector2(0.5f, 0f);
-        inputRowRect.anchoredPosition = new Vector2(0f, 6f);
-        inputRowRect.sizeDelta = new Vector2(-16f, 28f);
-
-        GameObject inputBoxObj = new GameObject("ChatInputField");
-        inputBoxObj.transform.SetParent(chatInputRow.transform, false);
-        RectTransform inputBoxRect = inputBoxObj.AddComponent<RectTransform>();
-        inputBoxRect.anchorMin = new Vector2(0f, 0f);
-        inputBoxRect.anchorMax = new Vector2(0.80f, 1f);
-        inputBoxRect.offsetMin = Vector2.zero;
-        inputBoxRect.offsetMax = new Vector2(-4f, 0f);
-
-        Image inputBg = inputBoxObj.AddComponent<Image>();
-        inputBg.color = new Color(0.12f, 0.16f, 0.22f, 0.92f);
-
-        chatInputField = inputBoxObj.AddComponent<InputField>();
-        chatInputField.characterLimit = 40; // Giới hạn tối đa 40 ký tự mỗi lần chat
-        chatInputField.lineType = InputField.LineType.SingleLine;
-        chatInputField.onEndEdit.AddListener(OnChatInputEndEdit);
-
-        GameObject placeholderObj = new GameObject("Placeholder");
-        placeholderObj.transform.SetParent(inputBoxObj.transform, false);
-        RectTransform phRect = placeholderObj.AddComponent<RectTransform>();
-        phRect.anchorMin = Vector2.zero;
-        phRect.anchorMax = Vector2.one;
-        phRect.offsetMin = new Vector2(8f, 2f);
-        phRect.offsetMax = new Vector2(-8f, -2f);
-
-        Text phText = placeholderObj.AddComponent<Text>();
-        phText.font = defaultFont;
-        phText.fontSize = 12;
-        phText.fontStyle = FontStyle.Italic;
-        phText.alignment = TextAnchor.MiddleLeft;
-        phText.color = new Color(0.6f, 0.68f, 0.78f, 0.75f);
-        phText.text = "Nhập tin nhắn (tối đa 40 ký tự)...";
-
-        GameObject inputTextObj = new GameObject("Text");
-        inputTextObj.transform.SetParent(inputBoxObj.transform, false);
-        RectTransform itRect = inputTextObj.AddComponent<RectTransform>();
-        itRect.anchorMin = Vector2.zero;
-        itRect.anchorMax = Vector2.one;
-        itRect.offsetMin = new Vector2(8f, 2f);
-        itRect.offsetMax = new Vector2(-8f, -2f);
-
-        Text inputText = inputTextObj.AddComponent<Text>();
-        inputText.font = defaultFont;
-        inputText.fontSize = 13;
-        inputText.alignment = TextAnchor.MiddleLeft;
-        inputText.color = Color.white;
-        inputText.supportRichText = false;
-
-        chatInputField.textComponent = inputText;
-        chatInputField.placeholder = phText;
-
-        // Nút GỬI
-        GameObject sendBtnObj = new GameObject("SendButton");
-        sendBtnObj.transform.SetParent(chatInputRow.transform, false);
-        RectTransform sendRect = sendBtnObj.AddComponent<RectTransform>();
-        sendRect.anchorMin = new Vector2(0.80f, 0f);
-        sendRect.anchorMax = new Vector2(1f, 1f);
-        sendRect.offsetMin = Vector2.zero;
-        sendRect.offsetMax = Vector2.zero;
-
-        Image sendBg = sendBtnObj.AddComponent<Image>();
-        sendBg.color = new Color(0.2f, 0.55f, 0.95f, 0.95f);
-
-        Button sendBtn = sendBtnObj.AddComponent<Button>();
-        sendBtn.onClick.AddListener(() =>
-        {
-            SendChatMessageFromUI();
-            SetChatFocus(false);
-        });
-
-        GameObject sendTxtObj = new GameObject("Text");
-        sendTxtObj.transform.SetParent(sendBtnObj.transform, false);
-        RectTransform stRect = sendTxtObj.AddComponent<RectTransform>();
-        stRect.anchorMin = Vector2.zero;
-        stRect.anchorMax = Vector2.one;
-        stRect.offsetMin = Vector2.zero;
-        stRect.offsetMax = Vector2.zero;
-
-        Text sendTxt = sendTxtObj.AddComponent<Text>();
-        sendTxt.font = defaultFont;
-        sendTxt.fontSize = 12;
-        sendTxt.fontStyle = FontStyle.Bold;
-        sendTxt.alignment = TextAnchor.MiddleCenter;
-        sendTxt.color = Color.white;
-        sendTxt.text = "GỬI";
+        chatHistoryText.raycastTarget = false;
 
         // Dựng giao diện Phòng Chờ 4 người (Lobby HUD)
         BuildLobbyWaitingUI(canvas, defaultFont);
 
+        // Dựng bảng Cài Đặt Photon Voice Nâng Cao
+        BuildVoiceSettingsDialog(canvas, defaultFont);
+
         if (startChatMinimized)
         {
             SetChatMinimized(true);
+        }
+    }
+
+    private void BuildVoiceSettingsDialog(Canvas canvas, Font defaultFont)
+    {
+        voiceSettingsDialogObj = new GameObject("PhotonVoiceSettingsDialog");
+        voiceSettingsDialogObj.transform.SetParent(canvas.transform, false);
+
+        RectTransform dialogRect = voiceSettingsDialogObj.AddComponent<RectTransform>();
+        dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+        dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+        dialogRect.pivot = new Vector2(0.5f, 0.5f);
+        dialogRect.anchoredPosition = Vector2.zero;
+        dialogRect.sizeDelta = new Vector2(490f, 390f);
+
+        Image dialogBg = voiceSettingsDialogObj.AddComponent<Image>();
+        dialogBg.color = new Color(0.06f, 0.10f, 0.16f, 0.96f);
+
+        // Viền sáng xung quanh
+        GameObject borderObj = new GameObject("Border");
+        borderObj.transform.SetParent(voiceSettingsDialogObj.transform, false);
+        RectTransform borderRect = borderObj.AddComponent<RectTransform>();
+        borderRect.anchorMin = Vector2.zero;
+        borderRect.anchorMax = Vector2.one;
+        borderRect.sizeDelta = Vector2.zero;
+        Outline outline = borderObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0.2f, 0.75f, 1f, 0.85f);
+        outline.effectDistance = new Vector2(2f, 2f);
+
+        // Header Title
+        GameObject titleObj = new GameObject("Title");
+        titleObj.transform.SetParent(voiceSettingsDialogObj.transform, false);
+        RectTransform titleRect = titleObj.AddComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0f, 1f);
+        titleRect.anchorMax = new Vector2(1f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 1f);
+        titleRect.anchoredPosition = new Vector2(0f, -10f);
+        titleRect.sizeDelta = new Vector2(-20f, 32f);
+
+        Text titleText = titleObj.AddComponent<Text>();
+        titleText.font = defaultFont;
+        titleText.fontSize = 17;
+        titleText.fontStyle = FontStyle.Bold;
+        titleText.alignment = TextAnchor.MiddleCenter;
+        titleText.color = new Color(0.35f, 0.9f, 1f, 1f);
+        titleText.text = "🎙️ CÀI ĐẶT PHOTON VOICE CHAT";
+
+        // Nút Đóng [X] góc trên phải
+        GameObject closeBtnObj = new GameObject("CloseButton");
+        closeBtnObj.transform.SetParent(voiceSettingsDialogObj.transform, false);
+        RectTransform closeRect = closeBtnObj.AddComponent<RectTransform>();
+        closeRect.anchorMin = new Vector2(1f, 1f);
+        closeRect.anchorMax = new Vector2(1f, 1f);
+        closeRect.pivot = new Vector2(1f, 1f);
+        closeRect.anchoredPosition = new Vector2(-8f, -8f);
+        closeRect.sizeDelta = new Vector2(32f, 32f);
+
+        Image closeBg = closeBtnObj.AddComponent<Image>();
+        closeBg.color = new Color(0.85f, 0.25f, 0.25f, 0.9f);
+        Button closeBtn = closeBtnObj.AddComponent<Button>();
+        closeBtn.onClick.AddListener(ToggleVoiceSettingsDialog);
+
+        GameObject closeTxtObj = new GameObject("Text");
+        closeTxtObj.transform.SetParent(closeBtnObj.transform, false);
+        RectTransform ctrt = closeTxtObj.AddComponent<RectTransform>();
+        ctrt.anchorMin = Vector2.zero;
+        ctrt.anchorMax = Vector2.one;
+        ctrt.sizeDelta = Vector2.zero;
+        Text closeTxt = closeTxtObj.AddComponent<Text>();
+        closeTxt.font = defaultFont;
+        closeTxt.fontSize = 15;
+        closeTxt.fontStyle = FontStyle.Bold;
+        closeTxt.alignment = TextAnchor.MiddleCenter;
+        closeTxt.color = Color.white;
+        closeTxt.text = "✕";
+
+        // Dòng 1: Tên Micro hiện tại + Nút Đổi Micro
+        GameObject micRow = new GameObject("MicDeviceRow");
+        micRow.transform.SetParent(voiceSettingsDialogObj.transform, false);
+        RectTransform micRowRect = micRow.AddComponent<RectTransform>();
+        micRowRect.anchorMin = new Vector2(0.5f, 1f);
+        micRowRect.anchorMax = new Vector2(0.5f, 1f);
+        micRowRect.pivot = new Vector2(0.5f, 1f);
+        micRowRect.anchoredPosition = new Vector2(0f, -50f);
+        micRowRect.sizeDelta = new Vector2(450f, 36f);
+
+        Image micRowBg = micRow.AddComponent<Image>();
+        micRowBg.color = new Color(0.12f, 0.16f, 0.24f, 0.85f);
+
+        GameObject devTxtObj = new GameObject("DeviceText");
+        devTxtObj.transform.SetParent(micRow.transform, false);
+        RectTransform devRt = devTxtObj.AddComponent<RectTransform>();
+        devRt.anchorMin = new Vector2(0f, 0f);
+        devRt.anchorMax = new Vector2(0.72f, 1f);
+        devRt.offsetMin = new Vector2(10f, 0f);
+        devRt.offsetMax = Vector2.zero;
+
+        voiceSettingsMicDeviceText = devTxtObj.AddComponent<Text>();
+        voiceSettingsMicDeviceText.font = defaultFont;
+        voiceSettingsMicDeviceText.fontSize = 12;
+        voiceSettingsMicDeviceText.alignment = TextAnchor.MiddleLeft;
+        voiceSettingsMicDeviceText.color = new Color(0.9f, 0.95f, 1f);
+        voiceSettingsMicDeviceText.text = "Micro: " + (string.IsNullOrEmpty(activeMicDevice) ? "Mặc định" : activeMicDevice);
+
+        GameObject switchMicBtnObj = new GameObject("SwitchMicBtn");
+        switchMicBtnObj.transform.SetParent(micRow.transform, false);
+        RectTransform swRt = switchMicBtnObj.AddComponent<RectTransform>();
+        swRt.anchorMin = new Vector2(0.74f, 0.1f);
+        swRt.anchorMax = new Vector2(0.98f, 0.9f);
+        swRt.offsetMin = Vector2.zero;
+        swRt.offsetMax = Vector2.zero;
+
+        Image swBg = switchMicBtnObj.AddComponent<Image>();
+        swBg.color = new Color(0.20f, 0.55f, 0.85f, 0.9f);
+        Button swBtn = switchMicBtnObj.AddComponent<Button>();
+        swBtn.onClick.AddListener(SwitchToNextMicrophone);
+
+        GameObject swTxtObj = new GameObject("Text");
+        swTxtObj.transform.SetParent(switchMicBtnObj.transform, false);
+        RectTransform swtrt = swTxtObj.AddComponent<RectTransform>();
+        swtrt.anchorMin = Vector2.zero;
+        swtrt.anchorMax = Vector2.one;
+        swtrt.sizeDelta = Vector2.zero;
+        Text swTxt = swTxtObj.AddComponent<Text>();
+        swTxt.font = defaultFont;
+        swTxt.fontSize = 11;
+        swTxt.fontStyle = FontStyle.Bold;
+        swTxt.alignment = TextAnchor.MiddleCenter;
+        swTxt.color = Color.white;
+        swTxt.text = "🔄 Đổi Mic";
+
+        // Dòng 2: Thanh đo âm lượng Mic thời gian thực (VU Meter)
+        GameObject vuRow = new GameObject("VuMeterRow");
+        vuRow.transform.SetParent(voiceSettingsDialogObj.transform, false);
+        RectTransform vuRowRect = vuRow.AddComponent<RectTransform>();
+        vuRowRect.anchorMin = new Vector2(0.5f, 1f);
+        vuRowRect.anchorMax = new Vector2(0.5f, 1f);
+        vuRowRect.pivot = new Vector2(0.5f, 1f);
+        vuRowRect.anchoredPosition = new Vector2(0f, -94f);
+        vuRowRect.sizeDelta = new Vector2(450f, 30f);
+
+        GameObject vuLabelObj = new GameObject("Label");
+        vuLabelObj.transform.SetParent(vuRow.transform, false);
+        RectTransform vult = vuLabelObj.AddComponent<RectTransform>();
+        vult.anchorMin = new Vector2(0f, 0f);
+        vult.anchorMax = new Vector2(0.36f, 1f);
+        vult.offsetMin = new Vector2(6f, 0f);
+        vult.offsetMax = Vector2.zero;
+        Text vuLabel = vuLabelObj.AddComponent<Text>();
+        vuLabel.font = defaultFont;
+        vuLabel.fontSize = 11;
+        vuLabel.alignment = TextAnchor.MiddleLeft;
+        vuLabel.color = new Color(0.7f, 0.85f, 1f);
+        vuLabel.text = "Âm Thanh Mic (Live):";
+
+        GameObject vuBgObj = new GameObject("VuBg");
+        vuBgObj.transform.SetParent(vuRow.transform, false);
+        RectTransform vuBgRt = vuBgObj.AddComponent<RectTransform>();
+        vuBgRt.anchorMin = new Vector2(0.38f, 0.18f);
+        vuBgRt.anchorMax = new Vector2(0.98f, 0.82f);
+        vuBgRt.offsetMin = Vector2.zero;
+        vuBgRt.offsetMax = Vector2.zero;
+        Image vuBgImg = vuBgObj.AddComponent<Image>();
+        vuBgImg.color = new Color(0.1f, 0.14f, 0.2f, 0.95f);
+
+        GameObject vuFillObj = new GameObject("VuFill");
+        vuFillObj.transform.SetParent(vuBgObj.transform, false);
+        voiceSettingsVuFillRect = vuFillObj.AddComponent<RectTransform>();
+        voiceSettingsVuFillRect.anchorMin = Vector2.zero;
+        voiceSettingsVuFillRect.anchorMax = new Vector2(0f, 1f);
+        voiceSettingsVuFillRect.offsetMin = Vector2.zero;
+        voiceSettingsVuFillRect.offsetMax = Vector2.zero;
+        Image vuFillImg = vuFillObj.AddComponent<Image>();
+        vuFillImg.color = new Color(0.2f, 0.88f, 0.45f, 0.95f);
+
+        // Dòng 3: Slider Âm Lượng Mic (Mic Gain)
+        CreateVoiceSliderRow(
+            voiceSettingsDialogObj.transform,
+            defaultFont,
+            name: "Row_MicGain",
+            yPos: -136f,
+            title: "Âm Lượng Mic (Gain):",
+            min: 0.5f,
+            max: 3.0f,
+            initVal: micGain,
+            onChanged: (val) =>
+            {
+                micGain = val;
+                if (voiceSettingsGainValueText != null) voiceSettingsGainValueText.text = $"{Mathf.RoundToInt(val * 100)}%";
+            },
+            out voiceSettingsGainSlider,
+            out voiceSettingsGainValueText
+        );
+        if (voiceSettingsGainValueText != null) voiceSettingsGainValueText.text = $"{Mathf.RoundToInt(micGain * 100)}%";
+
+        // Dòng 4: Slider Độ Nhạy / Lọc Ồn (VAD Threshold)
+        CreateVoiceSliderRow(
+            voiceSettingsDialogObj.transform,
+            defaultFont,
+            name: "Row_VadSensitivity",
+            yPos: -192f,
+            title: "Ngưỡng Nhận Diện (VAD):",
+            min: 0.002f,
+            max: 0.030f,
+            initVal: vadThreshold,
+            onChanged: (val) =>
+            {
+                vadThreshold = val;
+                if (voiceSettingsVadValueText != null)
+                {
+                    string desc = val < 0.006f ? "Rất nhạy" : (val > 0.015f ? "Lọc ồn cao" : "Tiêu chuẩn");
+                    voiceSettingsVadValueText.text = $"{val:F3} ({desc})";
+                }
+            },
+            out voiceSettingsVadSlider,
+            out voiceSettingsVadValueText
+        );
+        if (voiceSettingsVadValueText != null) voiceSettingsVadValueText.text = $"{vadThreshold:F3} (Tiêu chuẩn)";
+
+        // Dòng 5: Slider Âm Lượng Nghe Người Khác (Incoming Volume)
+        CreateVoiceSliderRow(
+            voiceSettingsDialogObj.transform,
+            defaultFont,
+            name: "Row_IncomingVoice",
+            yPos: -248f,
+            title: "Âm Lượng Voice Đến:",
+            min: 0.0f,
+            max: 1.5f,
+            initVal: incomingVoiceVolume,
+            onChanged: (val) =>
+            {
+                incomingVoiceVolume = val;
+                if (voicePlaybackSource != null) voicePlaybackSource.volume = incomingVoiceVolume;
+                if (voiceSettingsIncomingValueText != null) voiceSettingsIncomingValueText.text = $"{Mathf.RoundToInt(val * 100)}%";
+            },
+            out voiceSettingsIncomingSlider,
+            out voiceSettingsIncomingValueText
+        );
+        if (voiceSettingsIncomingValueText != null) voiceSettingsIncomingValueText.text = $"{Mathf.RoundToInt(incomingVoiceVolume * 100)}%";
+
+        // Dòng 6: Hàng nút phía dưới: Bật/Tắt Mic + Nút Lưu & Đóng
+        GameObject botRow = new GameObject("BottomRow");
+        botRow.transform.SetParent(voiceSettingsDialogObj.transform, false);
+        RectTransform botRt = botRow.AddComponent<RectTransform>();
+        botRt.anchorMin = new Vector2(0.5f, 0f);
+        botRt.anchorMax = new Vector2(0.5f, 0f);
+        botRt.pivot = new Vector2(0.5f, 0f);
+        botRt.anchoredPosition = new Vector2(0f, 16f);
+        botRt.sizeDelta = new Vector2(450f, 38f);
+
+        // Nút toggle Mic trong Dialog
+        GameObject toggleMicBtnObj = new GameObject("ToggleMicInDialogBtn");
+        toggleMicBtnObj.transform.SetParent(botRow.transform, false);
+        RectTransform tmbRt = toggleMicBtnObj.AddComponent<RectTransform>();
+        tmbRt.anchorMin = new Vector2(0f, 0f);
+        tmbRt.anchorMax = new Vector2(0.48f, 1f);
+        tmbRt.offsetMin = Vector2.zero;
+        tmbRt.offsetMax = Vector2.zero;
+        Image tmbBg = toggleMicBtnObj.AddComponent<Image>();
+        tmbBg.color = new Color(0.15f, 0.65f, 0.38f, 0.92f);
+        Button tmbBtn = toggleMicBtnObj.AddComponent<Button>();
+        tmbBtn.onClick.AddListener(() =>
+        {
+            ToggleMicrophone();
+            UpdateVoiceSettingsLabels();
+        });
+
+        GameObject tmbTxtObj = new GameObject("Text");
+        tmbTxtObj.transform.SetParent(toggleMicBtnObj.transform, false);
+        RectTransform tmbtRt = tmbTxtObj.AddComponent<RectTransform>();
+        tmbtRt.anchorMin = Vector2.zero;
+        tmbtRt.anchorMax = Vector2.one;
+        tmbtRt.sizeDelta = Vector2.zero;
+        Text tmbTxt = tmbTxtObj.AddComponent<Text>();
+        tmbTxt.font = defaultFont;
+        tmbTxt.fontSize = 12;
+        tmbTxt.fontStyle = FontStyle.Bold;
+        tmbTxt.alignment = TextAnchor.MiddleCenter;
+        tmbTxt.color = Color.white;
+        tmbTxt.text = "🎙 Bật / Tắt Mic [V]";
+
+        // Nút Đóng
+        GameObject saveCloseBtnObj = new GameObject("SaveCloseBtn");
+        saveCloseBtnObj.transform.SetParent(botRow.transform, false);
+        RectTransform scRt = saveCloseBtnObj.AddComponent<RectTransform>();
+        scRt.anchorMin = new Vector2(0.52f, 0f);
+        scRt.anchorMax = new Vector2(1f, 1f);
+        scRt.offsetMin = Vector2.zero;
+        scRt.offsetMax = Vector2.zero;
+        Image scBg = saveCloseBtnObj.AddComponent<Image>();
+        scBg.color = new Color(0.2f, 0.5f, 0.85f, 0.92f);
+        Button scBtn = saveCloseBtnObj.AddComponent<Button>();
+        scBtn.onClick.AddListener(ToggleVoiceSettingsDialog);
+
+        GameObject scTxtObj = new GameObject("Text");
+        scTxtObj.transform.SetParent(saveCloseBtnObj.transform, false);
+        RectTransform sctRt = scTxtObj.AddComponent<RectTransform>();
+        sctRt.anchorMin = Vector2.zero;
+        sctRt.anchorMax = Vector2.one;
+        sctRt.sizeDelta = Vector2.zero;
+        Text scTxt = scTxtObj.AddComponent<Text>();
+        scTxt.font = defaultFont;
+        scTxt.fontSize = 12;
+        scTxt.fontStyle = FontStyle.Bold;
+        scTxt.alignment = TextAnchor.MiddleCenter;
+        scTxt.color = Color.white;
+        scTxt.text = "✓ LƯU & ĐÓNG";
+
+        // Mặc định ẩn bảng cài đặt
+        voiceSettingsDialogObj.SetActive(false);
+    }
+
+    private void CreateVoiceSliderRow(
+        Transform parent,
+        Font font,
+        string name,
+        float yPos,
+        string title,
+        float min,
+        float max,
+        float initVal,
+        UnityEngine.Events.UnityAction<float> onChanged,
+        out Slider outSlider,
+        out Text outValueText)
+    {
+        GameObject row = new GameObject(name);
+        row.transform.SetParent(parent, false);
+        RectTransform rowRt = row.AddComponent<RectTransform>();
+        rowRt.anchorMin = new Vector2(0.5f, 1f);
+        rowRt.anchorMax = new Vector2(0.5f, 1f);
+        rowRt.pivot = new Vector2(0.5f, 1f);
+        rowRt.anchoredPosition = new Vector2(0f, yPos);
+        rowRt.sizeDelta = new Vector2(450f, 48f);
+
+        GameObject titleObj = new GameObject("Title");
+        titleObj.transform.SetParent(row.transform, false);
+        RectTransform trt = titleObj.AddComponent<RectTransform>();
+        trt.anchorMin = new Vector2(0f, 0.5f);
+        trt.anchorMax = new Vector2(0.65f, 1f);
+        trt.offsetMin = new Vector2(6f, 0f);
+        trt.offsetMax = Vector2.zero;
+        Text t = titleObj.AddComponent<Text>();
+        t.font = font;
+        t.fontSize = 12;
+        t.fontStyle = FontStyle.Bold;
+        t.alignment = TextAnchor.MiddleLeft;
+        t.color = new Color(0.85f, 0.92f, 1f);
+        t.text = title;
+
+        GameObject valObj = new GameObject("ValueText");
+        valObj.transform.SetParent(row.transform, false);
+        RectTransform vrt = valObj.AddComponent<RectTransform>();
+        vrt.anchorMin = new Vector2(0.65f, 0.5f);
+        vrt.anchorMax = new Vector2(1f, 1f);
+        vrt.offsetMin = Vector2.zero;
+        vrt.offsetMax = new Vector2(-6f, 0f);
+        outValueText = valObj.AddComponent<Text>();
+        outValueText.font = font;
+        outValueText.fontSize = 12;
+        outValueText.fontStyle = FontStyle.Bold;
+        outValueText.alignment = TextAnchor.MiddleRight;
+        outValueText.color = new Color(0.35f, 0.9f, 1f);
+        outValueText.text = $"{initVal}";
+
+        GameObject sliderObj = new GameObject("Slider");
+        sliderObj.transform.SetParent(row.transform, false);
+        RectTransform srt = sliderObj.AddComponent<RectTransform>();
+        srt.anchorMin = new Vector2(0f, 0f);
+        srt.anchorMax = new Vector2(1f, 0.45f);
+        srt.offsetMin = new Vector2(6f, 0f);
+        srt.offsetMax = new Vector2(-6f, 0f);
+
+        GameObject bgObj = new GameObject("Background");
+        bgObj.transform.SetParent(sliderObj.transform, false);
+        RectTransform bgrt = bgObj.AddComponent<RectTransform>();
+        bgrt.anchorMin = Vector2.zero;
+        bgrt.anchorMax = Vector2.one;
+        bgrt.sizeDelta = Vector2.zero;
+        Image bgImg = bgObj.AddComponent<Image>();
+        bgImg.color = new Color(0.12f, 0.16f, 0.22f, 0.9f);
+
+        GameObject fillArea = new GameObject("Fill Area");
+        fillArea.transform.SetParent(sliderObj.transform, false);
+        RectTransform fart = fillArea.AddComponent<RectTransform>();
+        fart.anchorMin = Vector2.zero;
+        fart.anchorMax = Vector2.one;
+        fart.offsetMin = new Vector2(4f, 0f);
+        fart.offsetMax = new Vector2(-4f, 0f);
+
+        GameObject fill = new GameObject("Fill");
+        fill.transform.SetParent(fillArea.transform, false);
+        RectTransform frt = fill.AddComponent<RectTransform>();
+        frt.anchorMin = Vector2.zero;
+        frt.anchorMax = Vector2.zero;
+        frt.sizeDelta = Vector2.zero;
+        Image fillImg = fill.AddComponent<Image>();
+        fillImg.color = new Color(0.20f, 0.75f, 1.0f, 0.95f);
+
+        GameObject handleArea = new GameObject("Handle Slide Area");
+        handleArea.transform.SetParent(sliderObj.transform, false);
+        RectTransform hart = handleArea.AddComponent<RectTransform>();
+        hart.anchorMin = Vector2.zero;
+        hart.anchorMax = Vector2.one;
+        hart.offsetMin = new Vector2(6f, 0f);
+        hart.offsetMax = new Vector2(-6f, 0f);
+
+        GameObject handle = new GameObject("Handle");
+        handle.transform.SetParent(handleArea.transform, false);
+        RectTransform hrt = handle.AddComponent<RectTransform>();
+        hrt.sizeDelta = new Vector2(16f, 24f);
+        Image handleImg = handle.AddComponent<Image>();
+        handleImg.color = Color.white;
+
+        outSlider = sliderObj.AddComponent<Slider>();
+        outSlider.fillRect = frt;
+        outSlider.handleRect = hrt;
+        outSlider.targetGraphic = handleImg;
+        outSlider.direction = Slider.Direction.LeftToRight;
+        outSlider.minValue = min;
+        outSlider.maxValue = max;
+        outSlider.value = initVal;
+        outSlider.onValueChanged.AddListener(onChanged);
+    }
+
+    public void SwitchToNextMicrophone()
+    {
+        if (Microphone.devices == null || Microphone.devices.Length == 0) return;
+        int currentIndex = -1;
+        for (int i = 0; i < Microphone.devices.Length; i++)
+        {
+            if (Microphone.devices[i] == activeMicDevice)
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+        int nextIndex = (currentIndex + 1) % Microphone.devices.Length;
+        activeMicDevice = Microphone.devices[nextIndex];
+        if (Microphone.IsRecording(activeMicDevice))
+        {
+            Microphone.End(activeMicDevice);
+        }
+        micClip = Microphone.Start(activeMicDevice, true, 2, VOICE_SAMPLE_RATE);
+        lastMicSamplePos = 0;
+        Debug.Log($"<color=#2ECC71>[PhotonVoice] Đã đổi Microphone sang: '{activeMicDevice}'</color>");
+        UpdateVoiceSettingsLabels();
+    }
+
+    public void UpdateVoiceSettingsLabels()
+    {
+        if (voiceSettingsMicDeviceText != null)
+        {
+            string devName = string.IsNullOrEmpty(activeMicDevice) ? "Không có Micro" : activeMicDevice;
+            voiceSettingsMicDeviceText.text = $"Micro: {devName}";
+        }
+        if (voiceSettingsGainValueText != null)
+        {
+            voiceSettingsGainValueText.text = $"{Mathf.RoundToInt(micGain * 100)}%";
+        }
+        if (voiceSettingsVadValueText != null)
+        {
+            string desc = vadThreshold < 0.006f ? "Rất nhạy" : (vadThreshold > 0.015f ? "Lọc ồn cao" : "Chuẩn");
+            voiceSettingsVadValueText.text = $"{vadThreshold:F3} ({desc})";
+        }
+        if (voiceSettingsIncomingValueText != null)
+        {
+            voiceSettingsIncomingValueText.text = $"{Mathf.RoundToInt(incomingVoiceVolume * 100)}%";
+        }
+    }
+
+    public void ToggleVoiceSettingsDialog()
+    {
+        if (voiceSettingsDialogObj != null)
+        {
+            bool nextState = !voiceSettingsDialogObj.activeSelf;
+            voiceSettingsDialogObj.SetActive(nextState);
+            if (nextState)
+            {
+                UpdateVoiceSettingsLabels();
+                if (!Application.isMobilePlatform)
+                {
+                    Cursor.lockState = CursorLockMode.None;
+                    Cursor.visible = true;
+                }
+                ThirdPersonCamera.isUIPanelOpen = true;
+            }
+            else
+            {
+                bool isDashboard = GameSettingsManager.Instance != null
+                    && GameSettingsManager.Instance.dashboardPanel != null
+                    && GameSettingsManager.Instance.dashboardPanel.activeSelf;
+                ThirdPersonCamera.isUIPanelOpen = IsTypingChat() || isDashboard;
+            }
         }
     }
 
@@ -2430,43 +3355,17 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     private void UpdateStatusUI()
     {
-        if (statusBadgeText != null && client != null)
+        if (statusBadgeText != null)
         {
-            if (isChatMinimized)
+            if (hasUnreadChat)
             {
-                if (hasUnreadChat)
-                {
-                    statusBadgeText.color = new Color(1f, 0.75f, 0.15f, 1f);
-                    statusBadgeText.text = $"💬 <color=#FFDD44>Tin mới!</color> [{toggleChatKey}]";
-                }
-                else if (client.InRoom && client.CurrentRoom != null)
-                {
-                    statusBadgeText.color = new Color(0.4f, 0.95f, 0.65f, 1f);
-                    statusBadgeText.text = $"💬 Chat [{toggleChatKey}] ● {client.CurrentRoom.PlayerCount}/{requiredPlayersToStart}";
-                }
-                else
-                {
-                    statusBadgeText.color = new Color(0.7f, 0.85f, 1f, 0.9f);
-                    statusBadgeText.text = $"💬 Chat [{toggleChatKey}]";
-                }
+                statusBadgeText.color = new Color(1f, 0.75f, 0.15f, 1f);
+                statusBadgeText.text = "Chat [F1] ● !";
             }
             else
             {
-                if (client.InRoom && client.CurrentRoom != null)
-                {
-                    statusBadgeText.color = new Color(0.3f, 1f, 0.55f, 1f);
-                    statusBadgeText.text = $"● Online: {client.CurrentRoom.Name} ({client.CurrentRoom.PlayerCount}/{requiredPlayersToStart})";
-                }
-                else if (client.IsConnected)
-                {
-                    statusBadgeText.color = new Color(1f, 0.85f, 0.3f, 1f);
-                    statusBadgeText.text = $"● Photon: {client.State}...";
-                }
-                else
-                {
-                    statusBadgeText.color = new Color(1f, 0.45f, 0.45f, 1f);
-                    statusBadgeText.text = "● Đang kết nối Photon Cloud...";
-                }
+                statusBadgeText.color = new Color(0.35f, 0.95f, 0.60f, 1f);
+                statusBadgeText.text = "Chat [F1] ●";
             }
         }
 
@@ -2474,17 +3373,17 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         {
             if (Microphone.devices == null || Microphone.devices.Length == 0)
             {
-                micButtonText.text = "🚫 MIC: KHÔNG TÌM THẤY";
+                micButtonText.text = "🚫 MIC: TRỐNG";
                 micButtonBg.color = new Color(0.40f, 0.40f, 0.45f, 0.88f);
             }
             else if (isMicMuted)
             {
-                micButtonText.text = $"🔇 MIC: TẮT [{toggleMicKey}]";
+                micButtonText.text = "🎙 MIC: TẮT [V]";
                 micButtonBg.color = new Color(0.65f, 0.22f, 0.22f, 0.92f);
             }
             else
             {
-                micButtonText.text = $"🎙 MIC: BẬT [{toggleMicKey}]";
+                micButtonText.text = "🎙 MIC: BẬT [V]";
                 micButtonBg.color = IsLocalSpeaking
                     ? new Color(0.18f, 0.88f, 0.45f, 1f)
                     : new Color(0.15f, 0.58f, 0.35f, 0.92f);
@@ -2493,17 +3392,37 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         if (speakingIndicatorText != null)
         {
+            bool teamIsolated = IsVoiceTeamIsolatedNow();
+            bool amIGhost = IsLocalPlayerGhostRole();
+            string teamTag = teamIsolated ? (amIGhost ? " [Phe MA]" : " [Phe NGƯỜI]") : "";
+
             if (Time.unscaledTime < remoteSpeakingTimer && !string.IsNullOrEmpty(remoteSpeakerName))
             {
-                speakingIndicatorText.text = $"🔊 {remoteSpeakerName} đang nói...";
+                speakingIndicatorText.color = teamIsolated && amIGhost ? new Color(1f, 0.55f, 0.25f, 1f) : new Color(0.3f, 1f, 0.55f, 1f);
+                speakingIndicatorText.text = $"🔊 {remoteSpeakerName}{teamTag} đang nói...";
             }
             else if (IsLocalSpeaking)
             {
-                speakingIndicatorText.text = "🎙 Bạn đang nói qua Mic...";
+                speakingIndicatorText.color = teamIsolated && amIGhost ? new Color(1f, 0.65f, 0.28f, 1f) : new Color(0.3f, 1f, 0.55f, 1f);
+                speakingIndicatorText.text = $"🎙 Bạn đang nói{teamTag}...";
+            }
+            else if (teamIsolated)
+            {
+                speakingIndicatorText.color = amIGhost ? new Color(1f, 0.58f, 0.25f, 0.9f) : new Color(0.45f, 0.92f, 1f, 0.9f);
+                speakingIndicatorText.text = amIGhost ? "🔒 Kênh Mic: Chỉ Phe MA" : "🔒 Kênh Mic: Chỉ Phe NGƯỜI";
             }
             else
             {
                 speakingIndicatorText.text = "";
+            }
+        }
+
+        if (voiceSettingsDialogObj != null && voiceSettingsDialogObj.activeSelf)
+        {
+            float vu = Mathf.Clamp01(currentMicRMS * 35f);
+            if (voiceSettingsVuFillRect != null)
+            {
+                voiceSettingsVuFillRect.anchorMax = new Vector2(vu, 1f);
             }
         }
     }

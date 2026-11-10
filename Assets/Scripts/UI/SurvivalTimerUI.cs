@@ -343,6 +343,11 @@ public class SurvivalTimerUI : MonoBehaviour
                     KeepLocalPlayerAsHuman();
                 }
 
+                if (PhotonMultiplayerChatVoice.Instance != null)
+                {
+                    PhotonMultiplayerChatVoice.Instance.OnEnterHuntingVoiceIsolation();
+                }
+
                 Debug.Log("<color=#FF4757>====================================================\n🔥 [GIAI ĐOẠN 3] HẾT 30 GIÂY: 2 NGƯỜI CHƠI MA BÍ NGÔ ĐÃ HÓA THÂN! BẮT ĐẦU SĂN 2 NGƯỜI SỐNG SÓT TRONG 3 PHÚT!\n====================================================</color>");
             }
             return;
@@ -398,6 +403,10 @@ public class SurvivalTimerUI : MonoBehaviour
         {
             isRunning = false;
             currentPhase = MatchPhase.Lobby;
+            if (PhotonMultiplayerChatVoice.Instance != null)
+            {
+                PhotonMultiplayerChatVoice.Instance.OnExitHuntingVoiceIsolation(false);
+            }
         }
     }
 
@@ -449,6 +458,7 @@ public class SurvivalTimerUI : MonoBehaviour
         // Đồng bộ vai trò (2 Ma Bí Ngô / 2 Người Sống Sót) đã được Host random
         if (PhotonMultiplayerChatVoice.Instance != null)
         {
+            PhotonMultiplayerChatVoice.Instance.OnExitHuntingVoiceIsolation(false);
             PhotonMultiplayerChatVoice.Instance.SyncRoleWithSurvivalTimer();
         }
 
@@ -781,6 +791,11 @@ public class SurvivalTimerUI : MonoBehaviour
         isRunning = false;
         currentPhase = MatchPhase.Finished;
 
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.OnExitHuntingVoiceIsolation(true);
+        }
+
         if (timerDigitsText != null)
         {
             timerDigitsText.text = "00:00";
@@ -851,6 +866,11 @@ public class SurvivalTimerUI : MonoBehaviour
         isFinished = true;
         isRunning = false;
         currentPhase = MatchPhase.Finished;
+
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.OnExitHuntingVoiceIsolation(true);
+        }
 
         if (timerDigitsText != null)
         {

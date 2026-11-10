@@ -8,10 +8,49 @@ using UnityEngine.InputSystem;
 public class PumpkinGhostAI : MonoBehaviour
 {
     public static readonly System.Collections.Generic.List<PumpkinGhostAI> ActiveGhosts = new System.Collections.Generic.List<PumpkinGhostAI>();
+    public static PumpkinGhostAI PlayerControlledGhost { get; private set; }
 
     [Header("0. Điều Khiển Bởi Người Chơi (Player Controlled)")]
     [Tooltip("Khi bật, con ma bí ngô sẽ do người chơi trực tiếp điều khiển qua WASD, Chuột trái (Cào), Space (Vồ), Chuột phải/E (Ẩn thân)")]
     public bool isPlayerControlled = false;
+
+    [Header("Virtual / Mobile Touch Input Cho Ma Bí Ngô")]
+    public Vector2 virtualMoveInput = Vector2.zero;
+    public bool virtualAttackTriggered = false;
+    public bool virtualAttackHeld = false;
+    public bool virtualLeapTriggered = false;
+    public bool virtualLeapHeld = false;
+    public bool virtualVanishTriggered = false;
+
+    public void SetVirtualMove(Vector2 dir)
+    {
+        virtualMoveInput = Vector2.ClampMagnitude(dir, 1f);
+    }
+
+    public void TriggerVirtualAttack()
+    {
+        virtualAttackTriggered = true;
+    }
+
+    public void SetVirtualAttackHeld(bool held)
+    {
+        virtualAttackHeld = held;
+    }
+
+    public void TriggerVirtualLeap()
+    {
+        virtualLeapTriggered = true;
+    }
+
+    public void SetVirtualLeapHeld(bool held)
+    {
+        virtualLeapHeld = held;
+    }
+
+    public void TriggerVirtualVanish()
+    {
+        virtualVanishTriggered = true;
+    }
 
     public enum GhostState
     {
@@ -215,6 +254,7 @@ public class PumpkinGhostAI : MonoBehaviour
     private void OnDisable()
     {
         ActiveGhosts.Remove(this);
+        if (PlayerControlledGhost == this) PlayerControlledGhost = null;
     }
 
     private void OnDestroy()
@@ -1623,6 +1663,7 @@ public class PumpkinGhostAI : MonoBehaviour
     public void TakeOverAsPlayer()
     {
         isPlayerControlled = true;
+        PlayerControlledGhost = this;
 
         if (freezeRoutine != null)
         {
@@ -1925,16 +1966,19 @@ public class PumpkinGhostAI : MonoBehaviour
             if (kb.sKey.isPressed || kb.downArrowKey.isPressed) input.y -= 1f;
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) input.x -= 1f;
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) input.x += 1f;
-            return input.normalized;
         }
 #endif
 #if ENABLE_LEGACY_INPUT_MANAGER
-        input.x = Input.GetAxisRaw("Horizontal");
-        input.y = Input.GetAxisRaw("Vertical");
-        return input.normalized;
-#else
-        return input;
+        input.x += Input.GetAxisRaw("Horizontal");
+        input.y += Input.GetAxisRaw("Vertical");
 #endif
+
+        if (virtualMoveInput.sqrMagnitude > 0.001f)
+        {
+            input += virtualMoveInput;
+        }
+
+        return Vector2.ClampMagnitude(input, 1f);
     }
 
     private bool ReadPlayerSprintInput()
@@ -1949,38 +1993,62 @@ public class PumpkinGhostAI : MonoBehaviour
         return false;
     }
 
+    private bool AllowDesktopMouseAction()
+    {
+        if (Application.isMobilePlatform) return false;
+        if (Cursor.lockState != CursorLockMode.Locked) return false;
+        if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject()) return false;
+        return true;
+    }
+
     private bool ReadPlayerAttackInputDown()
     {
+        if (virtualAttackTriggered)
+        {
+            virtualAttackTriggered = false;
+            return true;
+        }
+
         if (ThirdPersonCamera.isUIPanelOpen) return false;
+        bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (mouse != null && mouse.leftButton.wasPressedThisFrame) return true;
+        if (allowMouse && mouse != null && mouse.leftButton.wasPressedThisFrame) return true;
         var kb = Keyboard.current;
         if (kb != null && kb.qKey.wasPressedThisFrame) return true;
 #endif
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Q)) return true;
+        if ((allowMouse && Input.GetMouseButtonDown(0)) || Input.GetKeyDown(KeyCode.Q)) return true;
 #endif
         return false;
     }
 
     private bool ReadPlayerAttackInputHold()
     {
+        if (virtualAttackHeld) return true;
+
         if (ThirdPersonCamera.isUIPanelOpen) return false;
+        bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (mouse != null && mouse.leftButton.isPressed) return true;
+        if (allowMouse && mouse != null && mouse.leftButton.isPressed) return true;
         var kb = Keyboard.current;
         if (kb != null && kb.qKey.isPressed) return true;
 #endif
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetMouseButton(0) || Input.GetKey(KeyCode.Q)) return true;
+        if ((allowMouse && Input.GetMouseButton(0)) || Input.GetKey(KeyCode.Q)) return true;
 #endif
         return false;
     }
 
     private bool ReadPlayerLeapInputDown()
     {
+        if (virtualLeapTriggered)
+        {
+            virtualLeapTriggered = false;
+            return true;
+        }
+
         if (ThirdPersonCamera.isUIPanelOpen) return false;
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
@@ -1994,6 +2062,8 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private bool ReadPlayerLeapInputHold()
     {
+        if (virtualLeapHeld) return true;
+
         if (ThirdPersonCamera.isUIPanelOpen) return false;
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
@@ -2008,14 +2078,15 @@ public class PumpkinGhostAI : MonoBehaviour
     private bool ReadPlayerVanishInputDown()
     {
         if (ThirdPersonCamera.isUIPanelOpen) return false;
+        bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
+        if (allowMouse && mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
         var kb = Keyboard.current;
         if (kb != null && (kb.eKey.wasPressedThisFrame || kb.fKey.wasPressedThisFrame)) return true;
 #endif
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.F)) return true;
+        if ((allowMouse && Input.GetMouseButtonDown(1)) || Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.F)) return true;
 #endif
         return false;
     }
