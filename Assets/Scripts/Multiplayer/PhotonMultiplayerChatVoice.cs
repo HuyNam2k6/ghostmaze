@@ -1044,6 +1044,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         public float lastUpdateTime;
         public bool isGhostForm;
         public Animator animator;
+        public float stunEndTime;
+        public bool IsStunned => Time.unscaledTime < stunEndTime;
     }
 
     /// <summary>
@@ -2831,17 +2833,21 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             {
                 int targetActor = Convert.ToInt32(orbArr[0]);
                 int myActor = (client != null && client.LocalPlayer != null) ? client.LocalPlayer.ActorNumber : -1;
+                Vector3 pushDir = new Vector3(Convert.ToSingle(orbArr[1]), 0f, Convert.ToSingle(orbArr[2]));
+                float pushDist = Convert.ToSingle(orbArr[3]);
+                float stunDur = Convert.ToSingle(orbArr[4]);
+
                 if (targetActor == myActor
                     && SurvivalTimerUI.Instance != null
                     && SurvivalTimerUI.Instance.CachedGhostVessel != null
                     && SurvivalTimerUI.Instance.CachedGhostVessel.isPlayerControlled
                     && SurvivalTimerUI.Instance.CachedGhostVessel.gameObject.activeInHierarchy)
                 {
-                    Vector3 pushDir = new Vector3(Convert.ToSingle(orbArr[1]), 0f, Convert.ToSingle(orbArr[2]));
-                    float pushDist = Convert.ToSingle(orbArr[3]);
-                    float stunDur = Convert.ToSingle(orbArr[4]);
                     SurvivalTimerUI.Instance.CachedGhostVessel.ApplyKnockbackAndFreeze(pushDir, pushDist, stunDur);
                 }
+
+                // Đồng bộ hiệu ứng xích trói và đứng yên cho con ma trên màn hình của tất cả người chơi khác
+                ApplyStunEffectToRemoteGhostAvatar(targetActor, pushDir, pushDist, stunDur);
             }
         }
         else if (code == EVENT_REPLAY_VOTE)
@@ -2918,6 +2924,15 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         return alive;
     }
 
+    public void ApplyStunEffectToRemoteGhostAvatar(int targetActor, Vector3 pushDir, float pushDist, float stunDur)
+    {
+        if (remotePlayers.TryGetValue(targetActor, out var av) && av != null && av.rootObj != null)
+        {
+            av.stunEndTime = Time.unscaledTime + stunDur;
+            GhostChainStunVFX.ApplyChainStun(av.rootObj, stunDur, pushDir, pushDist, av.animator);
+        }
+    }
+
     public bool TryCheckAndStunRemoteGhost(Vector3 orbPos, float hitRadiusLimit, Vector3 pushDir, float knockbackDistance, float stunDuration)
     {
         if (client == null || !client.InRoom) return false;
@@ -2931,6 +2946,9 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             Vector3 ghostCenter = av.rootObj.transform.position + Vector3.up * 0.9f;
             if (Vector3.Distance(orbPos, ghostCenter) <= hitRadiusLimit + 0.75f)
             {
+                // Kích hoạt ngay lập tức trên máy người ném (0ms độ trễ)
+                ApplyStunEffectToRemoteGhostAvatar(actorNr, pushDir, knockbackDistance, stunDuration);
+
                 object[] payload = new object[] { actorNr, pushDir.x, pushDir.z, knockbackDistance, stunDuration, 1 };
                 RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
                 client.OpRaiseEvent(EVENT_ORB_STUN, payload, args, SendOptions.SendReliable);
@@ -3026,12 +3044,20 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
             if (av.animator != null)
             {
-                float moveSpeed = Vector3.Distance(prevPos, av.targetPos) * 5.0f;
-                try
+                if (av.IsStunned)
                 {
-                    av.animator.SetFloat("Speed", moveSpeed);
+                    av.animator.speed = 0f;
                 }
-                catch { }
+                else
+                {
+                    if (av.animator.speed < 0.01f) av.animator.speed = 1f;
+                    float moveSpeed = Vector3.Distance(prevPos, av.targetPos) * 5.0f;
+                    try
+                    {
+                        av.animator.SetFloat("Speed", moveSpeed);
+                    }
+                    catch { }
+                }
             }
         }
     }

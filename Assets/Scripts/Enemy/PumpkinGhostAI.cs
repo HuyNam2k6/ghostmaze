@@ -1532,6 +1532,8 @@ public class PumpkinGhostAI : MonoBehaviour
         isLeaping = false;
         SetGhostBodyVisible(true);
 
+        GhostChainStunVFX.ApplyChainStun(gameObject, freezeDuration, pushDirection, pushDistance, animator);
+
         if (freezeRoutine != null)
         {
             StopCoroutine(freezeRoutine);
