@@ -48,6 +48,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Image waitingReadyBtnBg;
     private Outline waitingReadyBtnOutline;
 
+    // UI Ghép Trận Xoay Trực Tiếp (Direct Spinning Matchmaking Overlay)
+    private GameObject matchmakingSpinnerOverlayObj;
+    private Image matchmakingSpinnerArcImage;
+    private Text matchmakingSpinnerTitleText;
+    private Text matchmakingSpinnerTimerText;
+    private Text matchmakingSpinnerCountText;
+    private Button matchmakingSpinnerCancelBtn;
+    private Sprite sprSpinnerArc;
+    private bool isDirectMatchmakingActive = false;
+
     private struct PlayerSlotUI
     {
         public GameObject rootObj;
@@ -164,6 +174,10 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     private void HandleRoomJoinFailedFromPhoton(short returnCode, string message)
     {
+        if (isDirectMatchmakingActive)
+        {
+            CancelDirectMatchmaking();
+        }
         if (isInsideWaitingRoom)
         {
             SwitchToMainCardsView();
@@ -207,6 +221,44 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             sprCardIcons[i] = CreateModeIconSprite(i, 128);
         }
+        sprSpinnerArc = CreateSpinnerArcSprite(128);
+    }
+
+    private Sprite CreateSpinnerArcSprite(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
+        float outerR = size * 0.46f;
+        float innerR = size * 0.30f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x, y);
+                float dist = Vector2.Distance(p, center);
+                if (dist >= innerR && dist <= outerR)
+                {
+                    float angle = (Mathf.Atan2(y - center.y, x - center.x) * Mathf.Rad2Deg + 360f) % 360f;
+                    if (angle < 280f)
+                    {
+                        float alpha = Mathf.Clamp01(angle / 280f);
+                        tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                    }
+                    else
+                    {
+                        tex.SetPixel(x, y, Color.clear);
+                    }
+                }
+                else
+                {
+                    tex.SetPixel(x, y, Color.clear);
+                }
+            }
+        }
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
     }
 
     private Sprite CreateGothicNightSkySprite(int w, int h)
@@ -702,6 +754,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         // 4. MÀN HÌNH 2: BÊN TRONG PHÒNG CHỜ (Waiting Room View - Hiển thị ID Phòng + 4 Người Chơi & Tôi Ở Đây)
         BuildWaitingRoomView(lobbyRootObj.transform, font);
+
+        // 4.1. Overlay Vòng Xoay Tìm Trận Trực Tiếp (Không cần vào phòng chờ)
+        BuildMatchmakingSpinnerOverlay(lobbyRootObj.transform, font);
 
         // 5. Thanh HUD ID Phòng Nhỏ Gọn Góc Trên Phải Khi Đã Bắt Đầu Trận Đấu
         BuildInGameRoomHUD(lobbyCanvas.transform, font);
@@ -1558,6 +1613,10 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             OnHostForceStartClicked
         );
         waitingForceStartBtnObj = forceBtn.gameObject;
+        if (!Application.isEditor && waitingForceStartBtnObj != null)
+        {
+            waitingForceStartBtnObj.SetActive(false);
+        }
     }
 
     private PlayerSlotUI CreateWaitingPlayerSlotCard(Transform parent, int slotIndex, float posX, Font font)
@@ -1707,6 +1766,159 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     }
 
     // =========================================================================
+    // 7.1. BẢNG OVERLAY VÒNG XOAY TÌM TRẬN TRỰC TIẾP (KHÔNG CẦN VÀO PHÒNG CHỜ)
+    // =========================================================================
+    private void BuildMatchmakingSpinnerOverlay(Transform parent, Font font)
+    {
+        matchmakingSpinnerOverlayObj = new GameObject("MatchmakingSpinnerOverlay");
+        matchmakingSpinnerOverlayObj.transform.SetParent(parent, false);
+
+        RectTransform rt = matchmakingSpinnerOverlayObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0f, -30f);
+        rt.sizeDelta = new Vector2(580f, 260f);
+
+        Image bg = matchmakingSpinnerOverlayObj.AddComponent<Image>();
+        bg.color = new Color(0.04f, 0.07f, 0.16f, 0.97f);
+
+        Outline outline = matchmakingSpinnerOverlayObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0.88f, 1f, 0.95f);
+        outline.effectDistance = new Vector2(2f, 2f);
+
+        // Biểu tượng vòng xoay (Spinner Arc)
+        GameObject spinnerGo = new GameObject("SpinnerArc");
+        spinnerGo.transform.SetParent(matchmakingSpinnerOverlayObj.transform, false);
+        RectTransform srt = spinnerGo.AddComponent<RectTransform>();
+        srt.anchorMin = new Vector2(0.5f, 1f);
+        srt.anchorMax = new Vector2(0.5f, 1f);
+        srt.pivot = new Vector2(0.5f, 0.5f);
+        srt.anchoredPosition = new Vector2(0f, -44f);
+        srt.sizeDelta = new Vector2(58f, 58f);
+
+        matchmakingSpinnerArcImage = spinnerGo.AddComponent<Image>();
+        matchmakingSpinnerArcImage.sprite = sprSpinnerArc;
+        matchmakingSpinnerArcImage.color = new Color(0f, 0.95f, 1f, 1f);
+
+        // Tiêu đề
+        GameObject titleGo = new GameObject("TitleText");
+        titleGo.transform.SetParent(matchmakingSpinnerOverlayObj.transform, false);
+        RectTransform trt = titleGo.AddComponent<RectTransform>();
+        trt.anchorMin = new Vector2(0f, 1f);
+        trt.anchorMax = new Vector2(1f, 1f);
+        trt.pivot = new Vector2(0.5f, 1f);
+        trt.anchoredPosition = new Vector2(0f, -82f);
+        trt.sizeDelta = new Vector2(-20f, 32f);
+
+        matchmakingSpinnerTitleText = titleGo.AddComponent<Text>();
+        matchmakingSpinnerTitleText.font = font;
+        matchmakingSpinnerTitleText.fontSize = 20;
+        matchmakingSpinnerTitleText.fontStyle = FontStyle.Bold;
+        matchmakingSpinnerTitleText.alignment = TextAnchor.MiddleCenter;
+        matchmakingSpinnerTitleText.color = new Color(0.35f, 1f, 0.85f, 1f);
+        matchmakingSpinnerTitleText.text = "🔍 ĐANG TÌM TRẬN ĐẤU...";
+
+        // Đồng hồ đếm giây
+        GameObject timerGo = new GameObject("TimerText");
+        timerGo.transform.SetParent(matchmakingSpinnerOverlayObj.transform, false);
+        RectTransform tmrt = timerGo.AddComponent<RectTransform>();
+        tmrt.anchorMin = new Vector2(0f, 1f);
+        tmrt.anchorMax = new Vector2(1f, 1f);
+        tmrt.pivot = new Vector2(0.5f, 1f);
+        tmrt.anchoredPosition = new Vector2(0f, -116f);
+        tmrt.sizeDelta = new Vector2(-20f, 34f);
+
+        matchmakingSpinnerTimerText = timerGo.AddComponent<Text>();
+        matchmakingSpinnerTimerText.font = font;
+        matchmakingSpinnerTimerText.fontSize = 25;
+        matchmakingSpinnerTimerText.fontStyle = FontStyle.Bold;
+        matchmakingSpinnerTimerText.alignment = TextAnchor.MiddleCenter;
+        matchmakingSpinnerTimerText.color = new Color(1f, 0.90f, 0.25f, 1f);
+        matchmakingSpinnerTimerText.text = "00:00";
+
+        // Số người chơi đã tìm thấy
+        GameObject countGo = new GameObject("CountText");
+        countGo.transform.SetParent(matchmakingSpinnerOverlayObj.transform, false);
+        RectTransform crt = countGo.AddComponent<RectTransform>();
+        crt.anchorMin = new Vector2(0f, 1f);
+        crt.anchorMax = new Vector2(1f, 1f);
+        crt.pivot = new Vector2(0.5f, 1f);
+        crt.anchoredPosition = new Vector2(0f, -152f);
+        crt.sizeDelta = new Vector2(-20f, 26f);
+
+        matchmakingSpinnerCountText = countGo.AddComponent<Text>();
+        matchmakingSpinnerCountText.font = font;
+        matchmakingSpinnerCountText.fontSize = 16;
+        matchmakingSpinnerCountText.fontStyle = FontStyle.Bold;
+        matchmakingSpinnerCountText.alignment = TextAnchor.MiddleCenter;
+        matchmakingSpinnerCountText.color = Color.white;
+        matchmakingSpinnerCountText.supportRichText = true;
+        matchmakingSpinnerCountText.text = "👥 Đã tìm thấy: <color=#2EE87A>1 / 4</color> người chơi (Đủ 4 tự vào)";
+
+        // Nút HỦY TÌM TRẬN
+        Button cancelBtn = CreateStyledActionButton(
+            matchmakingSpinnerOverlayObj.transform,
+            "CancelMatchmakingBtn",
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(0f, 18f),
+            new Vector2(230f, 44f),
+            new Color(0.75f, 0.20f, 0.20f, 0.95f),
+            new Color(1f, 0.45f, 0.45f, 1f),
+            "🛑 HỦY TÌM TRẬN",
+            font,
+            16,
+            CancelDirectMatchmaking
+        );
+        matchmakingSpinnerCancelBtn = cancelBtn;
+
+        matchmakingSpinnerOverlayObj.SetActive(false);
+    }
+
+    public void StartDirectMatchmaking()
+    {
+        isDirectMatchmakingActive = true;
+        isInsideWaitingRoom = false;
+        if (waitingRoomViewObj != null) waitingRoomViewObj.SetActive(false);
+        if (mainCardsViewObj != null) mainCardsViewObj.SetActive(true);
+
+        if (matchmakingSpinnerOverlayObj != null)
+        {
+            matchmakingSpinnerOverlayObj.SetActive(true);
+            if (matchmakingSpinnerTimerText != null) matchmakingSpinnerTimerText.text = "00:00";
+            if (matchmakingSpinnerCountText != null) matchmakingSpinnerCountText.text = "👥 Đang tìm: <color=#2EE87A>1 / 4</color> người chơi...";
+            if (matchmakingSpinnerTitleText != null)
+            {
+                matchmakingSpinnerTitleText.text = "🔍 ĐANG TÌM TRẬN ĐẤU...";
+                matchmakingSpinnerTitleText.color = new Color(0.35f, 1f, 0.85f, 1f);
+            }
+            if (matchmakingSpinnerCancelBtn != null) matchmakingSpinnerCancelBtn.gameObject.SetActive(true);
+        }
+
+        var photonMgr = PhotonMultiplayerChatVoice.Instance;
+        if (photonMgr != null)
+        {
+            photonMgr.StartSoloPartyMatchmaking();
+        }
+    }
+
+    public void CancelDirectMatchmaking()
+    {
+        isDirectMatchmakingActive = false;
+        if (matchmakingSpinnerOverlayObj != null)
+        {
+            matchmakingSpinnerOverlayObj.SetActive(false);
+        }
+
+        var photonMgr = PhotonMultiplayerChatVoice.Instance;
+        if (photonMgr != null)
+        {
+            photonMgr.CancelSoloPartyMatchmaking();
+        }
+    }
+
+    // =========================================================================
     // 8. ĐIỀU HƯỚNG GIỮA SẢNH CHÍNH <-> PHÒNG CHỜ 4 NGƯỜI <-> VÀO GAME
     // =========================================================================
     private void SwitchToMainCardsView()
@@ -1714,10 +1926,19 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         isInsideWaitingRoom = false;
         if (mainCardsViewObj != null) mainCardsViewObj.SetActive(true);
         if (waitingRoomViewObj != null) waitingRoomViewObj.SetActive(false);
+        if (!isDirectMatchmakingActive && matchmakingSpinnerOverlayObj != null)
+        {
+            matchmakingSpinnerOverlayObj.SetActive(false);
+        }
     }
 
     private void EnterWaitingRoomWithId(string roomId, bool isCreatingNewRoom)
     {
+        if (isDirectMatchmakingActive)
+        {
+            CancelDirectMatchmaking();
+        }
+
         bool autoMatchAnyOpenRoom = !isCreatingNewRoom && string.IsNullOrWhiteSpace(roomId);
         if (string.IsNullOrWhiteSpace(roomId))
         {
@@ -1808,9 +2029,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     public void OnCard1_StartSinglePlayer()
     {
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
-        string rid = GetOrGenerateRoomId(true);
-        Debug.Log($"<color=#3498DB>[Lobby] Chế độ Đấu Đơn / Ghép Trận - Phòng chuẩn bị ID: {rid}</color>");
-        EnterWaitingRoomWithId(rid, true);
+        Debug.Log("<color=#3498DB>[Lobby] Chế độ Đấu Đơn / Ghép Trận: Bắt đầu tìm trận xoay xoay trực tiếp (không cần vào phòng chờ!)</color>");
+        StartDirectMatchmaking();
     }
 
     public void OnCard2_StartSharedClient()
@@ -1843,14 +2063,18 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     public void OnCard6_StartAutoClient()
     {
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
-        string rid = GetOrGenerateRoomId(false);
-        Debug.Log($"<color=#E056FD>[Lobby] Tự động làm chủ hoặc làm khách - Phòng Chờ ID: {(string.IsNullOrEmpty(rid) ? "Tự động ghép phòng" : rid)}</color>");
-        EnterWaitingRoomWithId(rid, false);
+        Debug.Log("<color=#E056FD>[Lobby] Tự động tìm trận trực tiếp</color>");
+        StartDirectMatchmaking();
     }
 
     public void HideImmediatelyForMatchStart()
     {
         isInsideWaitingRoom = false;
+        isDirectMatchmakingActive = false;
+        if (matchmakingSpinnerOverlayObj != null && matchmakingSpinnerOverlayObj.activeSelf)
+        {
+            matchmakingSpinnerOverlayObj.SetActive(false);
+        }
         ThirdPersonCamera.isUIPanelOpen = false;
         if (lobbyRootObj != null && lobbyRootObj.activeSelf)
         {
@@ -2000,6 +2224,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         // 2. Nếu trận đấu ĐÃ BẮT ĐẦU (sau khi đủ 4 người vào phòng hoặc bấm Test):
         if (isMatchRunning)
         {
+            if (isDirectMatchmakingActive)
+            {
+                isDirectMatchmakingActive = false;
+                if (matchmakingSpinnerOverlayObj != null) matchmakingSpinnerOverlayObj.SetActive(false);
+            }
             HideImmediatelyForMatchStart();
             return;
         }
@@ -2019,9 +2248,70 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Cursor.visible = true;
         ThirdPersonCamera.isUIPanelOpen = true;
 
+        if (isDirectMatchmakingActive)
+        {
+            UpdateDirectMatchmakingOverlay();
+        }
+
         if (isInsideWaitingRoom)
         {
             UpdateWaitingRoomUI();
+        }
+    }
+
+    private void UpdateDirectMatchmakingOverlay()
+    {
+        if (matchmakingSpinnerOverlayObj == null || !matchmakingSpinnerOverlayObj.activeSelf) return;
+
+        // Xoay vòng tròn spinner liên tục
+        if (matchmakingSpinnerArcImage != null)
+        {
+            matchmakingSpinnerArcImage.transform.Rotate(0f, 0f, -320f * Time.unscaledDeltaTime);
+        }
+
+        var photonMgr = PhotonMultiplayerChatVoice.Instance;
+        int sec = Mathf.FloorToInt(PhotonMultiplayerChatVoice.MatchmakingSearchDuration);
+        string timeStr = $"{sec / 60:D2}:{sec % 60:D2}";
+        if (matchmakingSpinnerTimerText != null)
+        {
+            matchmakingSpinnerTimerText.text = timeStr;
+        }
+
+        int count = photonMgr != null ? photonMgr.CurrentRoomPlayersCount : 1;
+        float countdown = photonMgr != null ? photonMgr.RemainingCountdown : -1f;
+
+        if (countdown >= 0f)
+        {
+            int remSec = Mathf.CeilToInt(countdown);
+            if (matchmakingSpinnerTitleText != null)
+            {
+                matchmakingSpinnerTitleText.text = "⚡ ĐÃ TÌM THẤY TRẬN ĐẤU!";
+                matchmakingSpinnerTitleText.color = new Color(0.25f, 1.0f, 0.58f, 1f);
+            }
+            if (matchmakingSpinnerCountText != null)
+            {
+                matchmakingSpinnerCountText.text = $"🎉 ĐỦ 4/4 NGƯỜI CHƠI! VÀO TRẬN TRONG: {remSec} GIÂY...";
+            }
+            if (matchmakingSpinnerCancelBtn != null && matchmakingSpinnerCancelBtn.gameObject.activeSelf)
+            {
+                matchmakingSpinnerCancelBtn.gameObject.SetActive(false);
+            }
+        }
+        else
+        {
+            if (matchmakingSpinnerTitleText != null)
+            {
+                matchmakingSpinnerTitleText.text = "🔍 ĐANG TÌM TRẬN ĐẤU...";
+                matchmakingSpinnerTitleText.color = new Color(0.35f, 1f, 0.85f, 1f);
+            }
+            if (matchmakingSpinnerCountText != null)
+            {
+                matchmakingSpinnerCountText.text = $"👥 Đã tìm thấy: <color=#2EE87A>{count} / 4</color> người chơi (Đủ 4 tự vào)";
+            }
+            if (matchmakingSpinnerCancelBtn != null && !matchmakingSpinnerCancelBtn.gameObject.activeSelf)
+            {
+                matchmakingSpinnerCancelBtn.gameObject.SetActive(true);
+            }
         }
     }
 
@@ -2339,7 +2629,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             OnLeaveWaitingRoomClicked();
         }
-        else if (f1Pressed)
+        else if (f1Pressed && Application.isEditor)
         {
             var net = PhotonMultiplayerChatVoice.Instance;
             bool inPhotonWaitingRoom = isInsideWaitingRoom && net != null && net.IsInPhotonRoom && !PhotonMultiplayerChatVoice.IsGameStarted;

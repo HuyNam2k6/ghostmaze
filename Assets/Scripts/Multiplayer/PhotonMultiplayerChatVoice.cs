@@ -309,6 +309,10 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         if (client == null || !client.IsConnected)
         {
+            hasUserRequestedRoom = true;
+            isAutoMatchingRandomRoom = true;
+            IsMatchmakingSearching = true;
+            MatchmakingSearchDuration = 0f;
             ConnectToPhoton();
             return;
         }
@@ -1841,6 +1845,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     private bool ReadF1KeyDown()
     {
+        if (!Application.isEditor) return false;
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb != null && kb.f1Key.wasPressedThisFrame) return true;
@@ -4639,7 +4644,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         lfTxt.fontStyle = FontStyle.Bold;
         lfTxt.alignment = TextAnchor.MiddleCenter;
         lfTxt.color = Color.white;
-        lfTxt.text = "Bắt Đầu ▶ [F1]";
+        lfTxt.text = Application.isEditor ? "Bắt Đầu ▶ [F1]" : "Bắt Đầu ▶";
 
         GameObject hintObj = new GameObject("LobbyKeyHintText");
         hintObj.transform.SetParent(lobbyPanelObj.transform, false);
@@ -4655,7 +4660,9 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         hintTxt.fontSize = 11;
         hintTxt.alignment = TextAnchor.MiddleCenter;
         hintTxt.color = new Color(0.65f, 0.85f, 0.95f, 0.9f);
-        hintTxt.text = "🎮 [WASD]: Chạy nhảy tự do khắp đảo  |  [F1]: Bắt đầu ngay (Host)  |  [Alt]: Mở chuột  |  [Enter]: Chat  |  [V]: Mic";
+        hintTxt.text = Application.isEditor
+            ? "🎮 [WASD]: Chạy nhảy tự do khắp đảo  |  [F1]: Bắt đầu ngay (Host)  |  [Alt]: Mở chuột  |  [Enter]: Chat  |  [V]: Mic"
+            : "🎮 [WASD]: Chạy nhảy tự do khắp đảo  |  [Alt]: Mở chuột  |  [Enter]: Chat  |  [V]: Mic";
 
         lobbyPanelObj.SetActive(false); // Sẽ bật khi đã vào phòng
 

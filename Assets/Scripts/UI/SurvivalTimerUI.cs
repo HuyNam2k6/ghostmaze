@@ -1499,6 +1499,7 @@ public class SurvivalTimerUI : MonoBehaviour
     /// </summary>
     public void EnsureQuickTestF1Button()
     {
+        if (!Application.isEditor) return;
         if (quickTestBtnObj != null) return;
 
         Canvas canvas = GetComponentInParent<Canvas>();
