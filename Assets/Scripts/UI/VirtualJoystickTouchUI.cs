@@ -53,6 +53,15 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     private Text fppToggleText;
     private Image fppToggleBg;
 
+    // Nút Tự Chạy (Auto-Run) gắn cạnh Joystick
+    private RectTransform autoRunBtnRect;
+    private Button autoRunBtn;
+    private Image autoRunBtnBg;
+    private Image autoRunIconImg;
+    private Text autoRunBtnText;
+    private bool isAutoRunEnabled = false;
+    public bool IsAutoRunEnabled => isAutoRunEnabled;
+
     // Nút Nhảy
     private RectTransform jumpBtnRect;
     private Image jumpBtnImg;
@@ -97,13 +106,27 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     private static Sprite joystickHandleSprite;
     private static Sprite fppCapsuleSprite;
     private static Sprite cameraIconSprite;
+    private static Sprite autoRunIconSprite;
     private static Sprite jumpButtonSprite;
     private static Sprite punchButtonSprite;
     private static Sprite crosshairSprite;
     private static Font cachedFont;
 
+    private struct ActiveTouchEntry
+    {
+        public int id;
+        public Vector2 pos;
+        public bool isBegan;
+    }
+
     private int lookTouchFingerId = -1;
     private Vector2 lastLookTouchPos = Vector2.zero;
+    private int joystickRawTouchId = -1;
+    private bool isPinching = false;
+    private float lastPinchDistance = 0f;
+    private bool gameplayControlsHiddenForSpectate = false;
+    private readonly HashSet<int> ignoredUiTouchIds = new HashSet<int>();
+    private readonly List<ActiveTouchEntry> rawFreeTouches = new List<ActiveTouchEntry>(8);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoInitialize()
@@ -142,6 +165,12 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        isAutoRunEnabled = false;
+        isPinching = false;
+        joystickRawTouchId = -1;
+        ignoredUiTouchIds.Clear();
+        SetGameplayHUDControlsVisible(true);
+        UpdateAutoRunBtnLabel();
         EnsureEventSystem();
     }
 
@@ -149,6 +178,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     {
         EnsureEventSystem();
         UpdateFPPToggleBtnLabel();
+        UpdateAutoRunBtnLabel();
     }
 
     private void Update()
@@ -162,11 +192,16 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         {
             if (isEditingHUDLayout) ExitHUDCustomizationModeInternal();
             isDragging = false;
+            isAutoRunEnabled = false;
             joystickPointerId = -1;
+            joystickRawTouchId = -1;
             isPunchHeld = false;
             lookTouchFingerId = -1;
+            isPinching = false;
+            ignoredUiTouchIds.Clear();
             currentDragVector = Vector2.zero;
             if (joystickHandleRect != null) joystickHandleRect.anchoredPosition = Vector2.zero;
+            UpdateAutoRunBtnLabel();
             return;
         }
 
@@ -182,18 +217,27 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         // Trong chế độ Tùy chỉnh vị trí nút (Custom HUD Editor): tạm dừng gameplay input & khóa xoay camera
         if (isEditingHUDLayout)
         {
+            SetGameplayHUDControlsVisible(true);
             ThirdPersonCamera.isUIPanelOpen = true;
             isDragging = false;
+            isAutoRunEnabled = false;
             joystickPointerId = -1;
+            joystickRawTouchId = -1;
             isPunchHeld = false;
             lookTouchFingerId = -1;
+            isPinching = false;
+            ignoredUiTouchIds.Clear();
             currentDragVector = Vector2.zero;
             if (joystickHandleRect != null) joystickHandleRect.anchoredPosition = Vector2.zero;
+            if (ThirdPersonPlayerController.Instance != null) ThirdPersonPlayerController.Instance.SetVirtualSprint(false);
+            PumpkinGhostAI activeGhostEdit = GetActivePlayerGhost();
+            if (activeGhostEdit != null) activeGhostEdit.SetVirtualSprint(false);
+            UpdateAutoRunBtnLabel();
             return;
         }
 
-        // 1. Phím [T] để mở/khóa chuột test trên PC (chỉ chạy khi không phải mobile)
-        if (!Application.isMobilePlatform)
+        // 1. Phím [T] để mở/khóa chuột test trên PC (bỏ qua khi đang gõ Chat hoặc mở UI)
+        if (!Application.isMobilePlatform && !ThirdPersonCamera.isUIPanelOpen)
         {
             bool toggleKeyPressed = false;
 #if ENABLE_INPUT_SYSTEM
@@ -212,24 +256,82 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         // 2. Xoay Camera cảm ứng trực tiếp trên Android (PUBG Touch Look System)
         HandleMobileCameraTouchLook();
 
-        // 3. Cập nhật nhãn nút FPP / TPP
+        // 3. Cập nhật nhãn nút FPP / TPP & ẩn nút điều khiển hành động khi đã tử trận / hết trận (giữ Camera xoay & zoom)
         UpdateFPPToggleBtnLabel();
 
-        // 4. Đẩy dữ liệu điều khiển di chuyển
+        bool isMatchFinished = SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished;
+        bool isLocalHumanDead = !IsPlayerControllingGhost() && PlayerHealth.Instance != null && PlayerHealth.Instance.isDead;
+        if (isMatchFinished || isLocalHumanDead)
+        {
+            isDragging = false;
+            joystickPointerId = -1;
+            joystickRawTouchId = -1;
+            isPunchHeld = false;
+            isAutoRunEnabled = false;
+            currentDragVector = Vector2.zero;
+            UpdateAutoRunBtnLabel();
+            SetGameplayHUDControlsVisible(false);
+
+            if (ThirdPersonPlayerController.Instance != null)
+            {
+                ThirdPersonPlayerController.Instance.SetVirtualJoystick(Vector2.zero);
+                ThirdPersonPlayerController.Instance.SetVirtualSprint(false);
+            }
+            if (isMatchFinished)
+            {
+                PumpkinGhostAI gEnd = GetActivePlayerGhost();
+                if (gEnd != null)
+                {
+                    gEnd.SetVirtualMove(Vector2.zero);
+                    gEnd.SetVirtualSprint(false);
+                }
+            }
+            return;
+        }
+        else
+        {
+            SetGameplayHUDControlsVisible(true);
+        }
+
+        Vector2 moveToSend = currentDragVector;
+        bool sprintToSend = false;
+        if (isAutoRunEnabled)
+        {
+            if (!isDragging)
+            {
+                moveToSend = Vector2.up;
+            }
+            sprintToSend = true;
+        }
+
+        if (!isDragging && joystickHandleRect != null)
+        {
+            joystickHandleRect.anchoredPosition = isAutoRunEnabled
+                ? new Vector2(0f, joystickBaseRadius * 0.78f)
+                : Vector2.zero;
+        }
+
+        // 4. Đẩy dữ liệu điều khiển di chuyển & chạy nhanh (Tự Chạy)
         bool isGhost = IsPlayerControllingGhost();
         if (isGhost)
         {
             PumpkinGhostAI ghost = GetActivePlayerGhost();
             if (ghost != null)
             {
-                ghost.SetVirtualMove(currentDragVector);
+                ghost.SetVirtualMove(moveToSend);
+                ghost.SetVirtualSprint(sprintToSend);
+            }
+            if (ThirdPersonPlayerController.Instance != null)
+            {
+                ThirdPersonPlayerController.Instance.SetVirtualSprint(false);
             }
         }
         else
         {
             if (ThirdPersonPlayerController.Instance != null)
             {
-                ThirdPersonPlayerController.Instance.SetVirtualJoystick(currentDragVector);
+                ThirdPersonPlayerController.Instance.SetVirtualJoystick(moveToSend);
+                ThirdPersonPlayerController.Instance.SetVirtualSprint(sprintToSend);
             }
         }
 
@@ -246,25 +348,25 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Xử lý xoay góc nhìn cảm ứng siêu nhạy và mượt mà trên Android (PUBG Touch Look Engine).
-    /// Tương thích hoàn toàn New Input System (activeInputHandler=1) và đa điểm trên Android:
-    /// tay trái điều khiển joystick, tay phải vuốt màn hình xoay camera, tự lọc nút bấm UI.
+    /// Xử lý xoay góc nhìn cảm ứng 1 ngón và chụm/tách 2 ngón thu phóng góc rộng camera (tối đa 1.5x).
+    /// Tương thích hoàn toàn New Input System &amp; Legacy Input trên thiết bị di động.
     /// </summary>
     private void HandleMobileCameraTouchLook()
     {
         if (ThirdPersonCamera.Instance == null || ThirdPersonCamera.isUIPanelOpen)
         {
             lookTouchFingerId = -1;
+            isPinching = false;
             return;
         }
+
+        rawFreeTouches.Clear();
 
 #if ENABLE_INPUT_SYSTEM
         var ts = Touchscreen.current;
         if (ts != null)
         {
             var touches = ts.touches;
-            bool lookFingerStillActive = false;
-
             for (int i = 0; i < touches.Count; i++)
             {
                 var tc = touches[i];
@@ -273,43 +375,12 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
                 int fid = tc.touchId.ReadValue();
                 Vector2 pos = tc.position.ReadValue();
-
-                if (phase == UnityEngine.InputSystem.TouchPhase.Began)
-                {
-                    if (lookTouchFingerId == -1 && pos.x > Screen.width * 0.25f)
-                    {
-                        if (!IsPointerOverInteractiveUI(pos))
-                        {
-                            lookTouchFingerId = fid;
-                            lastLookTouchPos = pos;
-                            lookFingerStillActive = true;
-                        }
-                    }
-                }
-                else if (fid == lookTouchFingerId)
-                {
-                    if (phase == UnityEngine.InputSystem.TouchPhase.Ended || phase == UnityEngine.InputSystem.TouchPhase.Canceled)
-                    {
-                        lookTouchFingerId = -1;
-                        lookFingerStillActive = false;
-                    }
-                    else
-                    {
-                        lookFingerStillActive = true;
-                        Vector2 delta = pos - lastLookTouchPos;
-                        lastLookTouchPos = pos;
-                        if (delta.sqrMagnitude > 0.0001f)
-                        {
-                            ThirdPersonCamera.Instance.AddTouchLookDelta(delta);
-                        }
-                    }
-                }
+                CollectTouchSample(fid, pos,
+                    phase == UnityEngine.InputSystem.TouchPhase.Began,
+                    phase == UnityEngine.InputSystem.TouchPhase.Ended || phase == UnityEngine.InputSystem.TouchPhase.Canceled);
             }
 
-            if (lookTouchFingerId != -1 && !lookFingerStillActive)
-            {
-                lookTouchFingerId = -1;
-            }
+            ProcessFreeTouchesForPinchAndLook();
             return;
         }
 #endif
@@ -317,53 +388,168 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 #if ENABLE_LEGACY_INPUT_MANAGER
         if (Input.touchCount > 0)
         {
-            bool lookFingerStillActive = false;
             for (int i = 0; i < Input.touchCount; i++)
             {
                 UnityEngine.Touch t = Input.GetTouch(i);
-
-                if (t.phase == UnityEngine.TouchPhase.Began)
-                {
-                    if (lookTouchFingerId == -1 && t.position.x > Screen.width * 0.25f)
-                    {
-                        if (!IsPointerOverInteractiveUI(t.position))
-                        {
-                            lookTouchFingerId = t.fingerId;
-                            lastLookTouchPos = t.position;
-                            lookFingerStillActive = true;
-                        }
-                    }
-                }
-                else if (t.fingerId == lookTouchFingerId)
-                {
-                    if (t.phase == UnityEngine.TouchPhase.Ended || t.phase == UnityEngine.TouchPhase.Canceled)
-                    {
-                        lookTouchFingerId = -1;
-                        lookFingerStillActive = false;
-                    }
-                    else
-                    {
-                        lookFingerStillActive = true;
-                        Vector2 delta = t.position - lastLookTouchPos;
-                        lastLookTouchPos = t.position;
-                        if (delta.sqrMagnitude > 0.0001f)
-                        {
-                            ThirdPersonCamera.Instance.AddTouchLookDelta(delta);
-                        }
-                    }
-                }
+                CollectTouchSample(t.fingerId, t.position,
+                    t.phase == UnityEngine.TouchPhase.Began,
+                    t.phase == UnityEngine.TouchPhase.Ended || t.phase == UnityEngine.TouchPhase.Canceled);
             }
 
-            if (lookTouchFingerId != -1 && !lookFingerStillActive)
-            {
-                lookTouchFingerId = -1;
-            }
+            ProcessFreeTouchesForPinchAndLook();
         }
         else
         {
             lookTouchFingerId = -1;
+            isPinching = false;
+            ignoredUiTouchIds.Clear();
         }
 #endif
+    }
+
+    private void CollectTouchSample(int touchId, Vector2 pos, bool isBegan, bool isEnded)
+    {
+        if (isEnded)
+        {
+            ignoredUiTouchIds.Remove(touchId);
+            if (touchId == joystickRawTouchId) joystickRawTouchId = -1;
+            if (touchId == lookTouchFingerId) lookTouchFingerId = -1;
+            return;
+        }
+
+        if (isBegan)
+        {
+            bool overJoystick = joystickBaseRect != null
+                && joystickBaseRect.gameObject.activeInHierarchy
+                && RectTransformUtility.RectangleContainsScreenPoint(joystickBaseRect, pos);
+            if (overJoystick && joystickRawTouchId == -1)
+            {
+                joystickRawTouchId = touchId;
+            }
+            else if (IsPointerOverInteractiveUI(pos))
+            {
+                ignoredUiTouchIds.Add(touchId);
+                return;
+            }
+        }
+
+        if (touchId == joystickRawTouchId || ignoredUiTouchIds.Contains(touchId))
+        {
+            return;
+        }
+
+        rawFreeTouches.Add(new ActiveTouchEntry
+        {
+            id = touchId,
+            pos = pos,
+            isBegan = isBegan
+        });
+    }
+
+    private void ProcessFreeTouchesForPinchAndLook()
+    {
+        if (rawFreeTouches.Count >= 2)
+        {
+            // Hai ngón tay tự do -> kích hoạt thu phóng (chụm lại = thu màn hình nhỏ lại -> góc camera rộng tới 1.5x)
+            lookTouchFingerId = -1;
+            float dist = Vector2.Distance(rawFreeTouches[0].pos, rawFreeTouches[1].pos);
+            if (isPinching)
+            {
+                float deltaDist = dist - lastPinchDistance;
+                if (Mathf.Abs(deltaDist) > 0.25f)
+                {
+                    ThirdPersonCamera.Instance.AddPinchZoomDelta(deltaDist);
+                }
+            }
+            isPinching = true;
+            lastPinchDistance = dist;
+            return;
+        }
+
+        isPinching = false;
+        bool lookFingerStillActive = false;
+
+        for (int i = 0; i < rawFreeTouches.Count; i++)
+        {
+            ActiveTouchEntry t = rawFreeTouches[i];
+            if (t.isBegan && lookTouchFingerId == -1 && t.pos.x > Screen.width * 0.25f)
+            {
+                lookTouchFingerId = t.id;
+                lastLookTouchPos = t.pos;
+                lookFingerStillActive = true;
+            }
+            else if (t.id == lookTouchFingerId)
+            {
+                lookFingerStillActive = true;
+                Vector2 delta = t.pos - lastLookTouchPos;
+                lastLookTouchPos = t.pos;
+                if (delta.sqrMagnitude > 0.0001f)
+                {
+                    ThirdPersonCamera.Instance.AddTouchLookDelta(delta);
+                }
+            }
+        }
+
+        if (lookTouchFingerId != -1 && !lookFingerStillActive)
+        {
+            lookTouchFingerId = -1;
+        }
+    }
+
+    private void RecordJoystickRawTouchFromPointerPos(Vector2 screenPos)
+    {
+        float bestDistSq = 180f * 180f;
+        int bestId = -1;
+
+#if ENABLE_INPUT_SYSTEM
+        var ts = Touchscreen.current;
+        if (ts != null)
+        {
+            var touches = ts.touches;
+            for (int i = 0; i < touches.Count; i++)
+            {
+                var tc = touches[i];
+                var phase = tc.phase.ReadValue();
+                if (phase == UnityEngine.InputSystem.TouchPhase.None ||
+                    phase == UnityEngine.InputSystem.TouchPhase.Ended ||
+                    phase == UnityEngine.InputSystem.TouchPhase.Canceled) continue;
+                float dSq = (tc.position.ReadValue() - screenPos).sqrMagnitude;
+                if (dSq < bestDistSq)
+                {
+                    bestDistSq = dSq;
+                    bestId = tc.touchId.ReadValue();
+                }
+            }
+        }
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            UnityEngine.Touch t = Input.GetTouch(i);
+            float dSq = (t.position - screenPos).sqrMagnitude;
+            if (dSq < bestDistSq)
+            {
+                bestDistSq = dSq;
+                bestId = t.fingerId;
+            }
+        }
+#endif
+        if (bestId != -1)
+        {
+            joystickRawTouchId = bestId;
+        }
+    }
+
+    private void SetGameplayHUDControlsVisible(bool visible)
+    {
+        if (gameplayControlsHiddenForSpectate == !visible) return;
+        gameplayControlsHiddenForSpectate = !visible;
+
+        if (joystickBaseRect != null) joystickBaseRect.gameObject.SetActive(visible);
+        if (autoRunBtnRect != null) autoRunBtnRect.gameObject.SetActive(visible);
+        if (jumpBtnRect != null) jumpBtnRect.gameObject.SetActive(visible);
+        if (punchBtnRect != null) punchBtnRect.gameObject.SetActive(visible);
+        if (fppBtnRect != null) fppBtnRect.gameObject.SetActive(visible);
+        if (crosshairObj != null) crosshairObj.SetActive(visible);
     }
 
     /// <summary>
@@ -387,8 +573,11 @@ public class VirtualJoystickTouchUI : MonoBehaviour
             if (n == "TouchLookSwipeArea" || n == "CenterCrosshair" || n == "Canvas_VirtualTouchControls") continue;
 
             if (n == "Joystick_Base" || n == "Joystick_Handle" ||
+                n == "PhotonChatVoicePanel" || n == "EndGameResultBanner" || n == "AlliedSpectateHUD" ||
                 go.GetComponent<Button>() != null ||
                 go.GetComponent<InputField>() != null ||
+                go.GetComponentInParent<Button>() != null ||
+                go.GetComponentInParent<InputField>() != null ||
                 go.GetComponent<Slider>() != null ||
                 go.GetComponent<Toggle>() != null ||
                 go.GetComponent<Scrollbar>() != null ||
@@ -476,6 +665,53 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         }
     }
 
+    public void OnClickAutoRunToggle()
+    {
+        if (isEditingHUDLayout) return;
+        isAutoRunEnabled = !isAutoRunEnabled;
+        UpdateAutoRunBtnLabel();
+    }
+
+    public void CancelAutoRun()
+    {
+        if (!isAutoRunEnabled) return;
+        isAutoRunEnabled = false;
+        if (!isDragging && joystickHandleRect != null)
+        {
+            joystickHandleRect.anchoredPosition = Vector2.zero;
+        }
+        UpdateAutoRunBtnLabel();
+    }
+
+    private void UpdateAutoRunBtnLabel()
+    {
+        if (autoRunBtnText != null)
+        {
+            if (isAutoRunEnabled)
+            {
+                autoRunBtnText.text = "ĐANG CHẠY";
+                autoRunBtnText.color = Color.white;
+            }
+            else
+            {
+                autoRunBtnText.text = "TỰ CHẠY";
+                autoRunBtnText.color = new Color(0.55f, 0.96f, 1.0f, 0.98f);
+            }
+        }
+        if (autoRunBtnBg != null)
+        {
+            autoRunBtnBg.color = isAutoRunEnabled
+                ? new Color(0.18f, 0.85f, 0.52f, 0.98f)
+                : Color.white;
+        }
+        if (autoRunIconImg != null)
+        {
+            autoRunIconImg.color = isAutoRunEnabled
+                ? new Color(1.0f, 0.95f, 0.35f, 1.0f)
+                : new Color(0.88f, 0.98f, 1.0f, 0.96f);
+        }
+    }
+
     public void ToggleCursorState()
     {
         if (Cursor.lockState == CursorLockMode.Locked)
@@ -522,6 +758,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         if (joystickHandleSprite == null) joystickHandleSprite = CreateJoystickHandleSprite(128);
         if (fppCapsuleSprite == null) fppCapsuleSprite = CreateCapsuleSprite(160, 64, 30);
         if (cameraIconSprite == null) cameraIconSprite = CreateCameraIconSprite(48);
+        if (autoRunIconSprite == null) autoRunIconSprite = CreateRunIconSprite(48);
         if (jumpButtonSprite == null) jumpButtonSprite = CreateJumpButtonSprite(256);
         if (punchButtonSprite == null) punchButtonSprite = CreatePunchButtonSprite(256);
         if (crosshairSprite == null) crosshairSprite = CreateCrosshairSprite(64);
@@ -565,6 +802,9 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
         // 4. Nút [ 📷 FPP ] (Nằm bên phải joystick ở đáy màn hình)
         CreateFPPButtonUI(canvasGo.transform);
+
+        // 4.1. Nút Tự Chạy (Auto-Run / Sprint Lock) nằm ngay cạnh Joystick
+        CreateAutoRunButtonUI(canvasGo.transform);
 
         // 5. Nút Nhảy [ ⏫ ] (Góc dưới bên phải, phía trên nút Đấm)
         CreateJumpButtonUI(canvasGo.transform);
@@ -674,11 +914,13 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         downEntry.callback.AddListener((data) =>
         {
             if (isEditingHUDLayout) return;
+            CancelAutoRun();
             PointerEventData ped = (PointerEventData)data;
             if (!isDragging)
             {
                 isDragging = true;
                 joystickPointerId = ped.pointerId;
+                RecordJoystickRawTouchFromPointerPos(ped.position);
                 UpdateJoystickMovement(ped);
             }
         });
@@ -689,6 +931,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         dragEntry.callback.AddListener((data) =>
         {
             if (isEditingHUDLayout) return;
+            CancelAutoRun();
             PointerEventData ped = (PointerEventData)data;
             if (isDragging && ped.pointerId == joystickPointerId)
             {
@@ -707,17 +950,23 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
             isDragging = false;
             joystickPointerId = -1;
-            joystickHandleRect.anchoredPosition = Vector2.zero;
+            joystickRawTouchId = -1;
+            joystickHandleRect.anchoredPosition = isAutoRunEnabled
+                ? new Vector2(0f, joystickBaseRadius * 0.78f)
+                : Vector2.zero;
             currentDragVector = Vector2.zero;
 
-            if (ThirdPersonPlayerController.Instance != null)
+            if (!isAutoRunEnabled)
             {
-                ThirdPersonPlayerController.Instance.SetVirtualJoystick(Vector2.zero);
-            }
-            PumpkinGhostAI ghost = GetActivePlayerGhost();
-            if (ghost != null)
-            {
-                ghost.SetVirtualMove(Vector2.zero);
+                if (ThirdPersonPlayerController.Instance != null)
+                {
+                    ThirdPersonPlayerController.Instance.SetVirtualJoystick(Vector2.zero);
+                }
+                PumpkinGhostAI ghost = GetActivePlayerGhost();
+                if (ghost != null)
+                {
+                    ghost.SetVirtualMove(Vector2.zero);
+                }
             }
         });
         trigger.triggers.Add(upEntry);
@@ -733,7 +982,66 @@ public class VirtualJoystickTouchUI : MonoBehaviour
             Vector2 clamped = Vector2.ClampMagnitude(localPoint, joystickBaseRadius);
             joystickHandleRect.anchoredPosition = clamped;
             currentDragVector = clamped / joystickBaseRadius;
+            CancelAutoRun();
         }
+    }
+
+    private void CreateAutoRunButtonUI(Transform parent)
+    {
+        GameObject btnGo = new GameObject("Btn_AutoRun_Sprint");
+        btnGo.transform.SetParent(parent, false);
+
+        autoRunBtnRect = btnGo.AddComponent<RectTransform>();
+        autoRunBtnRect.anchorMin = new Vector2(0f, 0f);
+        autoRunBtnRect.anchorMax = new Vector2(0f, 0f);
+        autoRunBtnRect.pivot = new Vector2(0.5f, 0.5f);
+        autoRunBtnRect.anchoredPosition = new Vector2(338f, 132f); // Nằm cạnh phải Joystick, phía trên nút FPP
+        autoRunBtnRect.sizeDelta = new Vector2(138f, 46f);
+
+        autoRunBtnBg = btnGo.AddComponent<Image>();
+        autoRunBtnBg.sprite = fppCapsuleSprite;
+        autoRunBtnBg.color = Color.white;
+
+        autoRunBtn = btnGo.AddComponent<Button>();
+        autoRunBtn.onClick.AddListener(OnClickAutoRunToggle);
+
+        GameObject iconGo = new GameObject("RunIcon");
+        iconGo.transform.SetParent(btnGo.transform, false);
+        RectTransform irt = iconGo.AddComponent<RectTransform>();
+        irt.anchorMin = new Vector2(0f, 0.5f);
+        irt.anchorMax = new Vector2(0f, 0.5f);
+        irt.pivot = new Vector2(0.5f, 0.5f);
+        irt.anchoredPosition = new Vector2(24f, 0f);
+        irt.sizeDelta = new Vector2(24f, 24f);
+
+        autoRunIconImg = iconGo.AddComponent<Image>();
+        autoRunIconImg.sprite = autoRunIconSprite;
+        autoRunIconImg.color = new Color(0.88f, 0.98f, 1.0f, 0.96f);
+        autoRunIconImg.raycastTarget = false;
+
+        GameObject textGo = new GameObject("Text");
+        textGo.transform.SetParent(btnGo.transform, false);
+        RectTransform trt = textGo.AddComponent<RectTransform>();
+        trt.anchorMin = new Vector2(0f, 0f);
+        trt.anchorMax = new Vector2(1f, 1f);
+        trt.offsetMin = new Vector2(38f, 0f);
+        trt.offsetMax = new Vector2(-8f, 0f);
+
+        autoRunBtnText = textGo.AddComponent<Text>();
+        autoRunBtnText.font = cachedFont;
+        autoRunBtnText.text = "TỰ CHẠY";
+        autoRunBtnText.fontSize = 14;
+        autoRunBtnText.fontStyle = FontStyle.Bold;
+        autoRunBtnText.alignment = TextAnchor.MiddleCenter;
+        autoRunBtnText.color = new Color(0.55f, 0.96f, 1.0f, 0.98f);
+        autoRunBtnText.raycastTarget = false;
+
+        Shadow shadow = textGo.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        shadow.effectDistance = new Vector2(1.5f, -1.5f);
+
+        UpdateAutoRunBtnLabel();
+        RegisterCustomHUDTarget(btnGo, "AutoRun", "Nút Tự Chạy (Auto-Run)", autoRunBtnRect, null, new Vector2(338f, 132f), 1f);
     }
 
     private void CreateFPPButtonUI(Transform parent)
@@ -885,6 +1193,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         downEntry.callback.AddListener((data) =>
         {
             if (isEditingHUDLayout) return;
+            CancelAutoRun();
             punchBtnRect.localScale = Vector3.one * (punchConfiguredScale * 0.93f);
             isPunchHeld = true;
 
@@ -1022,7 +1331,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         chatProxyRect.anchorMax = new Vector2(0f, 0f);
         chatProxyRect.pivot = new Vector2(0f, 0f);
         chatProxyRect.anchoredPosition = new Vector2(18f, 335f);
-        chatProxyRect.sizeDelta = new Vector2(390f, 80f);
+        chatProxyRect.sizeDelta = new Vector2(420f, 94f);
 
         Image bg = proxyGo.AddComponent<Image>();
         bg.color = new Color(0.08f, 0.16f, 0.28f, 0.72f);
@@ -2041,6 +2350,69 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         }
         tex.Apply();
         return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private static Sprite CreateRunIconSprite(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        ClearSpriteTexture(tex);
+
+        float s = size;
+        // Đầu người chạy (nghiêng tiến tới bên phải)
+        Vector2 head = new Vector2(s * 0.62f, s * 0.78f);
+        float headR = s * 0.11f;
+
+        // Thân, tay và chân tạo dáng chạy nước rút năng động
+        Vector2 shoulder = new Vector2(s * 0.55f, s * 0.60f);
+        Vector2 hip = new Vector2(s * 0.44f, s * 0.40f);
+        Vector2 armFront = new Vector2(s * 0.74f, s * 0.55f);
+        Vector2 armBack = new Vector2(s * 0.34f, s * 0.58f);
+        Vector2 legFrontKnee = new Vector2(s * 0.65f, s * 0.28f);
+        Vector2 legFrontFoot = new Vector2(s * 0.78f, s * 0.16f);
+        Vector2 legBackFoot = new Vector2(s * 0.24f, s * 0.18f);
+
+        // Hai vạch gió tốc độ phía sau bên trái
+        Vector2 wind1A = new Vector2(s * 0.12f, s * 0.66f);
+        Vector2 wind1B = new Vector2(s * 0.30f, s * 0.66f);
+        Vector2 wind2A = new Vector2(s * 0.08f, s * 0.48f);
+        Vector2 wind2B = new Vector2(s * 0.26f, s * 0.48f);
+
+        float limbWidth = Mathf.Max(1.8f, s * 0.065f);
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                float dHead = Vector2.Distance(p, head) - headR;
+                float dBody = DistToSegment(p, shoulder, hip) - limbWidth * 1.1f;
+                float dArm1 = DistToSegment(p, shoulder, armFront) - limbWidth * 0.85f;
+                float dArm2 = DistToSegment(p, shoulder, armBack) - limbWidth * 0.85f;
+                float dLeg1 = Mathf.Min(DistToSegment(p, hip, legFrontKnee), DistToSegment(p, legFrontKnee, legFrontFoot)) - limbWidth * 0.9f;
+                float dLeg2 = DistToSegment(p, hip, legBackFoot) - limbWidth * 0.9f;
+                float dWind = Mathf.Min(DistToSegment(p, wind1A, wind1B), DistToSegment(p, wind2A, wind2B)) - limbWidth * 0.55f;
+
+                float d = Mathf.Min(Mathf.Min(dHead, dBody), Mathf.Min(Mathf.Min(dArm1, dArm2), Mathf.Min(dLeg1, dLeg2)));
+                float aBody = Mathf.Clamp01(1.0f - d);
+                float aWind = Mathf.Clamp01(0.75f - dWind) * 0.82f;
+                float a = Mathf.Clamp01(Mathf.Max(aBody, aWind));
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+            }
+        }
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private static void ClearSpriteTexture(Texture2D tex)
+    {
+        Color trans = new Color(0f, 0f, 0f, 0f);
+        for (int y = 0; y < tex.height; y++)
+        {
+            for (int x = 0; x < tex.width; x++)
+            {
+                tex.SetPixel(x, y, trans);
+            }
+        }
     }
 
     private static Color ColorBlendOver(Color under, Color over, float overAlpha)

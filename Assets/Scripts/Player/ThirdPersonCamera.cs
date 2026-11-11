@@ -26,6 +26,8 @@ public class ThirdPersonCamera : MonoBehaviour
     [Tooltip("Độ lệch trọng tâm ngắm vào thân/đầu nhân vật (m)")]
     public Vector3 targetOffset = new Vector3(0f, 1.45f, 0f);
 
+    public const float MaxWideZoomMultiplier = 1.5f;
+
     [Header("Khoảng Cách & Zoom")]
     [Tooltip("Khoảng cách mặc định từ Camera tới Player (m)")]
     [Range(2f, 10f)]
@@ -39,6 +41,9 @@ public class ThirdPersonCamera : MonoBehaviour
 
     [Tooltip("Tốc độ zoom bằng con lăn chuột")]
     public float zoomSpeed = 2.5f;
+
+    [Tooltip("Tốc độ nội suy mượt khi thu/phóng góc rộng camera (tối đa 1.5x)")]
+    public float zoomSmoothSpeed = 7.5f;
 
     [Header("Độ Nhạy & Góc Quay Chuột")]
     [Tooltip("Độ nhạy xoay ngang (Yaw)")]
@@ -134,22 +139,45 @@ public class ThirdPersonCamera : MonoBehaviour
         }
     }
 
-    // Góc quay hiện tại
+    // Góc quay hiện tại & trạng thái thu phóng góc rộng mượt (1.0x -> tối đa 1.5x)
     private float currentYaw = 0f;
     private float currentPitch = 15f;
     private float currentDistance;
+    private float baseDefaultDistance = 4.6f;
+    private float baseDefaultFov = 60f;
+    private float targetZoomScale = 1f;
+    private float currentZoomScale = 1f;
+    public bool IsSpectatingTarget { get; private set; }
     private static readonly RaycastHit[] s_CameraHitBuffer = new RaycastHit[8];
 
     private void Awake()
     {
         Instance = this;
         _manualUIPanelOpen = false;
+        baseDefaultDistance = Mathf.Max(0.5f, distance);
+        targetZoomScale = 1f;
+        currentZoomScale = 1f;
     }
 
     /// <summary>
-    /// Chuyển đổi mục tiêu theo dõi của Camera (ví dụ: chuyển sang PumpkinGhost khi Player tử trận)
+    /// Chuyển đổi mục tiêu theo dõi của Camera (ví dụ: chuyển sang nhân vật local hoặc Ma Bí Ngô offline)
     /// </summary>
     public void SetTarget(Transform newTarget, Vector3? newTargetOffset = null)
+    {
+        IsSpectatingTarget = false;
+        ApplyCameraTargetInternal(newTarget, newTargetOffset, true);
+    }
+
+    /// <summary>
+    /// Chuyển Camera sang chế độ Quan Sát Đồng Đội (giữ nguyên mức zoom góc rộng của người chơi)
+    /// </summary>
+    public void SetSpectateTarget(Transform newTarget, Vector3? newTargetOffset = null)
+    {
+        IsSpectatingTarget = (newTarget != null);
+        ApplyCameraTargetInternal(newTarget, newTargetOffset, false);
+    }
+
+    private void ApplyCameraTargetInternal(Transform newTarget, Vector3? newTargetOffset, bool resetDistanceImmediate)
     {
         target = newTarget;
         if (newTargetOffset.HasValue)
@@ -157,7 +185,7 @@ public class ThirdPersonCamera : MonoBehaviour
             targetOffset = newTargetOffset.Value;
         }
 
-        // Tự động tắt góc nhìn thứ nhất để người chơi chiêm ngưỡng nhân vật mới
+        // Tự động tắt góc nhìn thứ nhất để quan sát trọn vẹn mục tiêu
         IsFirstPerson = false;
         viewBlend = 0f;
         SetBodyHidden(false);
@@ -166,10 +194,33 @@ public class ThirdPersonCamera : MonoBehaviour
 
         if (target != null)
         {
-            // Reset góc ngắm và khoảng cách tối ưu
-            currentDistance = distance;
+            if (resetDistanceImmediate)
+            {
+                currentDistance = distance;
+            }
             currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
         }
+    }
+
+    private float GetMinZoomScale()
+    {
+        if (IsFirstPerson) return 1.0f;
+        return Mathf.Clamp(minDistance / Mathf.Max(0.5f, baseDefaultDistance), 0.3f, 1.0f);
+    }
+
+    /// <summary>
+    /// Nhận độ lệch chụm/tách 2 ngón tay trên màn hình cảm ứng:
+    /// Chụm ngón vào (deltaPixels &lt; 0, thu màn hình nhỏ lại) -> mở góc nhìn rộng dần lên tối đa 1.5x.
+    /// </summary>
+    public void AddPinchZoomDelta(float deltaPixels)
+    {
+        if (isUIPanelOpen || Mathf.Abs(deltaPixels) < 0.01f) return;
+
+        float normScreen = Mathf.Min(Screen.width, Screen.height);
+        if (normScreen < 100f) normScreen = 1080f;
+
+        float scaleDelta = -(deltaPixels / (normScreen * 0.42f));
+        targetZoomScale = Mathf.Clamp(targetZoomScale + scaleDelta, GetMinZoomScale(), MaxWideZoomMultiplier);
     }
 
     private void Start()
@@ -202,7 +253,14 @@ public class ThirdPersonCamera : MonoBehaviour
         }
 
         cachedCamera = GetComponent<Camera>();
-        if (cachedCamera != null) defaultNearClip = cachedCamera.nearClipPlane;
+        if (cachedCamera != null)
+        {
+            defaultNearClip = cachedCamera.nearClipPlane;
+            if (cachedCamera.fieldOfView > 1f) baseDefaultFov = cachedCamera.fieldOfView;
+        }
+        baseDefaultDistance = Mathf.Max(0.5f, distance);
+        targetZoomScale = 1f;
+        currentZoomScale = 1f;
 
         IsFirstPerson = startInFirstPerson;
         viewBlend = IsFirstPerson ? 1f : 0f;
@@ -227,7 +285,7 @@ public class ThirdPersonCamera : MonoBehaviour
     /// </summary>
     private void HandleViewToggle()
     {
-        if (isUIPanelOpen) return; // Đang gõ chat / mở cài đặt thì không đổi góc nhìn
+        if (isUIPanelOpen || IsSpectatingTarget) return; // Đang gõ chat / mở cài đặt / xem đồng đội thì không đổi góc nhìn
 
         if (ReadToggleViewPressed())
         {
@@ -240,8 +298,14 @@ public class ThirdPersonCamera : MonoBehaviour
     /// </summary>
     public void TogglePerspective()
     {
+        if (IsSpectatingTarget) return;
+
         IsFirstPerson = !IsFirstPerson;
-        if (!IsFirstPerson)
+        if (IsFirstPerson)
+        {
+            targetZoomScale = Mathf.Clamp(targetZoomScale, 1.0f, MaxWideZoomMultiplier);
+        }
+        else
         {
             currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
         }
@@ -292,13 +356,17 @@ public class ThirdPersonCamera : MonoBehaviour
         {
             if (PlayerHealth.Instance != null && PlayerHealth.Instance.isDead)
             {
-                if (PumpkinGhostAI.ActiveGhosts != null && PumpkinGhostAI.ActiveGhosts.Count > 0)
+                PlayerHealth.Instance.EnsureValidSpectateTarget();
+                if (target == null
+                    && (PhotonMultiplayerChatVoice.Instance == null || !PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom)
+                    && PumpkinGhostAI.ActiveGhosts != null && PumpkinGhostAI.ActiveGhosts.Count > 0)
                 {
                     target = PumpkinGhostAI.ActiveGhosts[0].transform;
                 }
             }
             else if (ThirdPersonPlayerController.Instance != null)
             {
+                IsSpectatingTarget = false;
                 target = ThirdPersonPlayerController.Instance.transform;
             }
 
@@ -321,8 +389,8 @@ public class ThirdPersonCamera : MonoBehaviour
             Cursor.visible = true;
             return;
         }
-        // Khi bảng UI/Cài đặt đang mở, luôn giữ chuột mở tự do để thao tác button
-        if (isUIPanelOpen)
+        // Khi bảng UI/Cài đặt đang mở hoặc trận đã kết thúc (chờ xác nhận chơi lại), luôn giữ chuột mở tự do
+        if (isUIPanelOpen || (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished))
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -419,12 +487,36 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void HandleCameraZoom()
     {
-        if (isUIPanelOpen || IsFirstPerson) return;
-
-        float scroll = ReadMouseScroll();
-        if (Mathf.Abs(scroll) > 0.01f)
+        if (!isUIPanelOpen)
         {
-            distance = Mathf.Clamp(distance - scroll * zoomSpeed * 0.1f, minDistance, maxDistance);
+            // Khi đang mở chuột tự do trên bảng chat/UI cuộn, tránh cuộn nhầm vào zoom camera
+            bool pointerBlockedByUI = Cursor.lockState != CursorLockMode.Locked
+                && UnityEngine.EventSystems.EventSystem.current != null
+                && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject();
+
+            if (!pointerBlockedByUI)
+            {
+                float scroll = ReadMouseScroll();
+                if (Mathf.Abs(scroll) > 0.001f)
+                {
+                    float notchStep = 0.08f * (zoomSpeed / 2.5f);
+                    targetZoomScale = Mathf.Clamp(targetZoomScale - scroll * notchStep, GetMinZoomScale(), MaxWideZoomMultiplier);
+                }
+            }
+        }
+
+        // Nội suy mượt từ từ khoảng cách & góc nhìn rộng tối đa gấp 1.5 lần
+        currentZoomScale = Mathf.Lerp(currentZoomScale, targetZoomScale, Time.unscaledDeltaTime * Mathf.Max(1f, zoomSmoothSpeed));
+        float effectiveMaxDist = Mathf.Max(maxDistance, baseDefaultDistance * MaxWideZoomMultiplier);
+        distance = Mathf.Clamp(baseDefaultDistance * currentZoomScale, minDistance, effectiveMaxDist);
+
+        if (cachedCamera != null)
+        {
+            float fovMult = currentZoomScale > 1f
+                ? Mathf.Clamp(currentZoomScale, 1f, MaxWideZoomMultiplier)
+                : 1f;
+            float targetFov = Mathf.Min(112f, baseDefaultFov * fovMult);
+            cachedCamera.fieldOfView = Mathf.Lerp(cachedCamera.fieldOfView, targetFov, Time.unscaledDeltaTime * Mathf.Max(1f, zoomSmoothSpeed));
         }
     }
 
@@ -474,8 +566,8 @@ public class ThirdPersonCamera : MonoBehaviour
 
         if (smoothBlend > 0.0001f)
         {
-            // Trong góc nhìn thứ nhất: nhân vật luôn quay theo hướng camera (yaw)
-            if (IsFirstPerson)
+            // Trong góc nhìn thứ nhất: chỉ xoay nhân vật local, không bao giờ ép xoay avatar đồng đội đang xem
+            if (IsFirstPerson && !IsSpectatingTarget)
             {
                 target.rotation = Quaternion.Euler(0f, currentYaw, 0f);
             }
@@ -573,7 +665,10 @@ public class ThirdPersonCamera : MonoBehaviour
         var mouse = Mouse.current;
         if (mouse != null)
         {
-            return mouse.scroll.ReadValue().y * 0.1f;
+            float rawY = mouse.scroll.ReadValue().y;
+            if (Mathf.Abs(rawY) < 0.0001f) return 0f;
+            // Chuẩn hóa con lăn chuột New Input System (~120 mỗi nấc) về +/-1.0 mỗi nấc
+            return Mathf.Abs(rawY) >= 15f ? (rawY / 120f) : (rawY * 0.1f);
         }
 #endif
 

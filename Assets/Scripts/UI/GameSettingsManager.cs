@@ -195,12 +195,15 @@ public class GameSettingsManager : MonoBehaviour
 
     private void HandleShortcutInput()
     {
-        bool allowF1Settings = PhotonMultiplayerChatVoice.Instance == null;
+        if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsTypingChat())
+        {
+            return;
+        }
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb != null)
         {
-            if (kb.tabKey.wasPressedThisFrame || (allowF1Settings && kb.f1Key.wasPressedThisFrame))
+            if (kb.tabKey.wasPressedThisFrame)
             {
                 ToggleDashboard();
             }
@@ -212,7 +215,7 @@ public class GameSettingsManager : MonoBehaviour
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(KeyCode.Tab) || (allowF1Settings && Input.GetKeyDown(KeyCode.F1)))
+        if (Input.GetKeyDown(KeyCode.Tab))
         {
             ToggleDashboard();
         }
@@ -273,8 +276,9 @@ public class GameSettingsManager : MonoBehaviour
         if (dashboardPanel != null) dashboardPanel.SetActive(false);
         bool typing = PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsTypingChat();
         bool editingHUD = VirtualJoystickTouchUI.Instance != null && VirtualJoystickTouchUI.Instance.IsEditingHUDLayout;
+        bool matchFinished = SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished;
         ThirdPersonCamera.isUIPanelOpen = typing || editingHUD;
-        if (!Application.isMobilePlatform && !editingHUD)
+        if (!Application.isMobilePlatform && !editingHUD && !typing && !matchFinished)
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;

@@ -91,9 +91,17 @@ public class SurvivalTimerUI : MonoBehaviour
     public bool IsFinished => isFinished;
 
     private GameObject endResultBannerObj;
+    private Text endReplayStatusText;
+    private Button endReplayButton;
+    private Image endReplayBtnImage;
+    private Text endReplayBtnText;
     private GameObject floatingNoticeBannerObj;
     private Text floatingNoticeText;
     private float floatingNoticeTimer = 0f;
+
+    // Nút Bắt Đầu / Test Lại [F1] nổi bật trên màn hình
+    private GameObject quickTestBtnObj;
+    private Text quickTestBtnText;
 
     // Hiệu ứng vòng tròn rào chắn giữa map
     private GameObject startCircleVFXRoot;
@@ -107,7 +115,12 @@ public class SurvivalTimerUI : MonoBehaviour
     private readonly Color circleLineColor = new Color(0.10f, 0.85f, 1.00f, 0.95f);
 
     private PumpkinGhostAI cachedGhostVessel;
+    private PumpkinGhostAI secondaryOfflineTestGhost;
     public PumpkinGhostAI CachedGhostVessel => cachedGhostVessel;
+    private bool IsSoloBotMatch => PhotonMultiplayerChatVoice.IsSoloPlayMode && !PhotonMultiplayerChatVoice.IsFullMultiplayerMatchActive;
+    private bool IsOfflineQuickTestMatch => PhotonMultiplayerChatVoice.IsOfflineQuickTestMode && !PhotonMultiplayerChatVoice.IsFullMultiplayerMatchActive;
+    private float EffectiveCircleWaitDuration => IsSoloBotMatch ? Mathf.Min(4f, circleWaitDuration) : circleWaitDuration;
+    private float EffectiveHideDuration => IsSoloBotMatch ? Mathf.Min(6f, hideDuration) : hideDuration;
 
     private void Awake()
     {
@@ -130,6 +143,7 @@ public class SurvivalTimerUI : MonoBehaviour
     /// </summary>
     public void CacheAndHideSceneGhostVessel()
     {
+        secondaryOfflineTestGhost = null;
         PumpkinGhostAI[] allGhosts = Object.FindObjectsByType<PumpkinGhostAI>(FindObjectsInactive.Include);
         if (allGhosts != null && allGhosts.Length > 0)
         {
@@ -147,9 +161,34 @@ public class SurvivalTimerUI : MonoBehaviour
                 else
                 {
                     allGhosts[i].isPlayerControlled = false;
+                    allGhosts[i].enableSoloBotAI = false;
                     allGhosts[i].gameObject.SetActive(false);
                 }
             }
+        }
+    }
+
+    private void SpawnAndActivateTwoOfflineTestGhosts(Vector3 center)
+    {
+        if (cachedGhostVessel == null)
+        {
+            PumpkinGhostAI[] all = Object.FindObjectsByType<PumpkinGhostAI>(FindObjectsInactive.Include);
+            if (all != null && all.Length > 0) cachedGhostVessel = all[0];
+        }
+        if (cachedGhostVessel == null) return;
+
+        if (secondaryOfflineTestGhost == null)
+        {
+            GameObject cloneGo = Instantiate(cachedGhostVessel.gameObject);
+            cloneGo.name = "PumpkinGhost_OfflineTest_2";
+            secondaryOfflineTestGhost = cloneGo.GetComponent<PumpkinGhostAI>();
+        }
+
+        // Đặt cả 2 Ma Bí Ngô ở 2 cánh an toàn trên mặt đảo Central Plaza (bán kính ~12.7m < 16m, tránh rìa vực)
+        cachedGhostVessel.ActivateAsSoloAIBot(center + new Vector3(-9.5f, 0f, -8.5f));
+        if (secondaryOfflineTestGhost != null)
+        {
+            secondaryOfflineTestGhost.ActivateAsSoloAIBot(center + new Vector3(9.5f, 0f, -8.5f));
         }
     }
 
@@ -157,6 +196,7 @@ public class SurvivalTimerUI : MonoBehaviour
     {
         AutoBindReferencesIfNeeded();
         CacheAndHideSceneGhostVessel();
+        EnsureQuickTestF1Button();
         autoStart = false;
         isRunning = false;
         currentPhase = MatchPhase.Lobby;
@@ -189,10 +229,11 @@ public class SurvivalTimerUI : MonoBehaviour
 
     private void Update()
     {
-        // 1. Cho phép bấm phím P để chơi lại khi trận đấu đã kết thúc
+        // 1. Cho phép bấm phím P để xác nhận đồng ý chơi lại (khi không gõ Chat)
         if (isFinished)
         {
-            if (ReadRestartInputDown())
+            bool isTyping = PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsTypingChat();
+            if (!isTyping && ReadRestartInputDown())
             {
                 RestartMatch();
             }
@@ -246,20 +287,26 @@ public class SurvivalTimerUI : MonoBehaviour
                 }
             }
 
-            if (timerProgressFill != null && circleWaitDuration > 0f)
+            float effWait = EffectiveCircleWaitDuration;
+            if (timerProgressFill != null && effWait > 0f)
             {
-                float ratio = Mathf.Clamp01(phaseTimer / circleWaitDuration);
+                float ratio = Mathf.Clamp01(phaseTimer / effWait);
                 SetProgressRatio(ratio);
             }
 
             if (phaseTimer <= 0f)
             {
-                // Hết 10s -> Chuyển sang Pha 2: Mở vòng tròn cho 2 Người Sống Sót chạy trốn!
+                // Hết pha chờ vòng tròn -> Chuyển sang Pha 2: Mở vòng tròn chạy trốn!
                 currentPhase = MatchPhase.Hide_20s;
-                phaseTimer = hideDuration;
+                phaseTimer = EffectiveHideDuration;
                 lastDisplayedSecond = -1;
 
-                if (localRole == PlayerRole.Ghost)
+                if (IsSoloBotMatch)
+                {
+                    if (startCircleVFXRoot != null) startCircleVFXRoot.SetActive(false);
+                    ShowFloatingBanner("🏃 VÒNG TRÒN ĐÃ MỞ! CHẠY TẢN RA!\n(AI Ma Bí Ngô sẽ tỉnh dậy đi săn sau 6s — chờ 3 bạn khác SS để ghép trận 4 người)", new Color(0.15f, 0.95f, 0.75f), 4.5f);
+                }
+                else if (localRole == PlayerRole.Ghost)
                 {
                     // 2 Người làm Ma tiếp tục đứng trong vòng tròn chờ 20s để 2 Người kia đi trốn
                     if (startCircleVFXRoot != null) startCircleVFXRoot.SetActive(true);
@@ -271,7 +318,7 @@ public class SurvivalTimerUI : MonoBehaviour
                     if (startCircleVFXRoot != null) startCircleVFXRoot.SetActive(false);
                     ShowFloatingBanner("🏃 VÒNG TRÒN ĐÃ MỞ! HÃY TỎA RA MÊ CUNG CHẠY & TRỐN HÚ!\n(2 Người chơi Ma Bí Ngô sẽ hóa thân đi săn sau 20s)", new Color(0.15f, 0.95f, 0.75f), 4.5f);
                 }
-                Debug.Log("<color=#2ECC71>====================================================\n🏃 [GIAI ĐOẠN 2] VÒNG TRÒN ĐÃ MỞ! 2 NGƯỜI SỐNG SÓT CÓ 20 GIÂY ĐỂ TRỐN HÚ!\n====================================================</color>");
+                Debug.Log("<color=#2ECC71>====================================================\n🏃 [GIAI ĐOẠN 2] VÒNG TRÒN ĐÃ MỞ! NGƯỜI SỐNG SÓT BẮT ĐẦU TẢN RA TRỐN HÚ!\n====================================================</color>");
             }
             return;
         }
@@ -313,15 +360,16 @@ public class SurvivalTimerUI : MonoBehaviour
                 }
             }
 
-            if (timerProgressFill != null && hideDuration > 0f)
+            float effHide = EffectiveHideDuration;
+            if (timerProgressFill != null && effHide > 0f)
             {
-                float ratio = Mathf.Clamp01(phaseTimer / hideDuration);
+                float ratio = Mathf.Clamp01(phaseTimer / effHide);
                 SetProgressRatio(ratio);
             }
 
             if (phaseTimer <= 0f)
             {
-                // Hết 30s (10s + 20s) -> Chuyển sang Pha 3: 2 NGƯỜI CHƠI MA HÓA THÂN ĐI SĂN!
+                // Hết pha trốn -> Chuyển sang Pha 3: Ma Bí Ngô xuất hiện đi săn!
                 currentPhase = MatchPhase.Hunting_3Min;
                 remainingTime = huntingDuration;
                 lastDisplayedSecond = -1;
@@ -333,22 +381,36 @@ public class SurvivalTimerUI : MonoBehaviour
 
                 PumpkinGhostAI.IsGhostHunting = true;
 
-                // 2 Người chơi được random chọn làm Ma Bí Ngô hóa thân thành Ma!
-                if (localRole == PlayerRole.Ghost)
+                if (IsSoloBotMatch)
                 {
-                    TransformLocalPlayerToGhost(localGhostSlot);
+                    localRole = PlayerRole.Human;
+                    KeepLocalPlayerAsHuman();
+                    if (cachedGhostVessel != null)
+                    {
+                        Vector3 botSpawn = ResolveMapCenter() + new Vector3(0f, 0f, -20f);
+                        cachedGhostVessel.ActivateAsSoloAIBot(botSpawn);
+                    }
+                    ShowFloatingBanner("🎃 MA BÍ NGÔ AI ĐÃ THỨC TỈNH ĐI SĂN!\nHãy né đòn & dùng ngọc phép đẩy lùi trong lúc chờ 3 bạn khác SS vào trận!", new Color(1f, 0.55f, 0.15f), 5.0f);
                 }
                 else
                 {
-                    KeepLocalPlayerAsHuman();
+                    // 2 Người chơi được random chọn làm Ma Bí Ngô hóa thân thành Ma!
+                    if (localRole == PlayerRole.Ghost)
+                    {
+                        TransformLocalPlayerToGhost(localGhostSlot);
+                    }
+                    else
+                    {
+                        KeepLocalPlayerAsHuman();
+                    }
+
+                    if (PhotonMultiplayerChatVoice.Instance != null)
+                    {
+                        PhotonMultiplayerChatVoice.Instance.OnEnterHuntingVoiceIsolation();
+                    }
                 }
 
-                if (PhotonMultiplayerChatVoice.Instance != null)
-                {
-                    PhotonMultiplayerChatVoice.Instance.OnEnterHuntingVoiceIsolation();
-                }
-
-                Debug.Log("<color=#FF4757>====================================================\n🔥 [GIAI ĐOẠN 3] HẾT 30 GIÂY: 2 NGƯỜI CHƠI MA BÍ NGÔ ĐÃ HÓA THÂN! BẮT ĐẦU SĂN 2 NGƯỜI SỐNG SÓT TRONG 3 PHÚT!\n====================================================</color>");
+                Debug.Log("<color=#FF4757>====================================================\n🔥 [GIAI ĐOẠN 3] MA BÍ NGÔ ĐÃ XUẤT HIỆN! BẮT ĐẦU SĂN TRONG 3 PHÚT!\n====================================================</color>");
             }
             return;
         }
@@ -442,7 +504,7 @@ public class SurvivalTimerUI : MonoBehaviour
         isFinished = false;
         isRunning = true;
         currentPhase = MatchPhase.CircleWait_10s;
-        phaseTimer = circleWaitDuration;
+        phaseTimer = EffectiveCircleWaitDuration;
         remainingTime = huntingDuration;
         lastDisplayedSecond = -1;
 
@@ -451,7 +513,7 @@ public class SurvivalTimerUI : MonoBehaviour
             Destroy(endResultBannerObj);
         }
 
-        // Xóa bỏ hoàn toàn AI Ma Bí Ngô tự động trên map, ẩn thân xác Ma chờ đến giây 30
+        // Ẩn thân xác Ma chờ đến khi hết pha trốn mới hóa Ma hoặc kích hoạt AI Chơi Đơn
         CacheAndHideSceneGhostVessel();
         PumpkinGhostAI.IsGhostHunting = false;
 
@@ -460,6 +522,11 @@ public class SurvivalTimerUI : MonoBehaviour
         {
             PhotonMultiplayerChatVoice.Instance.OnExitHuntingVoiceIsolation(false);
             PhotonMultiplayerChatVoice.Instance.SyncRoleWithSurvivalTimer();
+        }
+
+        if (IsSoloBotMatch)
+        {
+            localRole = PlayerRole.Human;
         }
 
         // Đảm bảo nhân vật người hiển thị lúc đầu trận
@@ -488,6 +555,51 @@ public class SurvivalTimerUI : MonoBehaviour
             SafeTeleport(ThirdPersonPlayerController.Instance.gameObject, center + randomOffset, Quaternion.identity);
         }
 
+        EnsureQuickTestF1Button();
+        UpdateQuickTestButtonLabel();
+
+        // Nếu là chế độ Test nhanh Offline [F1]: Tạo luôn 2 Ma Bí Ngô AI & 1 Con Người ngay lập tức!
+        if (IsOfflineQuickTestMatch)
+        {
+            localRole = PlayerRole.Human;
+            currentPhase = MatchPhase.Hunting_3Min;
+            remainingTime = huntingDuration;
+            lastDisplayedSecond = -1;
+            isRunning = true;
+            isFinished = false;
+
+            ThirdPersonCamera.isUIPanelOpen = false;
+            if (!Application.isMobilePlatform)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+
+            if (startCircleVFXRoot != null)
+            {
+                startCircleVFXRoot.SetActive(false);
+            }
+
+            if (ThirdPersonPlayerController.Instance != null)
+            {
+                SafeTeleport(ThirdPersonPlayerController.Instance.gameObject, center + new Vector3(0f, 0f, 5.5f), Quaternion.Euler(0f, 180f, 0f));
+            }
+
+            PumpkinGhostAI.IsGhostHunting = true;
+            SpawnAndActivateTwoOfflineTestGhosts(center);
+
+            if (timerLabelText != null)
+            {
+                timerLabelText.text = "⏱ TEST OFFLINE: SINH TỒN TRƯỚC 2 MA BÍ NGÔ";
+                timerLabelText.color = new Color(0.85f, 0.92f, 1.0f, 0.95f);
+            }
+
+            UpdateQuickTestButtonLabel();
+
+            ShowFloatingBanner("🧪 [TEST OFFLINE F1] ĐÃ TẠO 2 MA BÍ NGÔ AI & 1 CON NGƯỜI!\nChạy, ném ngọc phép, lăn chuột/chụm ngón zoom 1.5x hoặc nhấn [F1] để tạo lại nhanh!", new Color(0f, 1f, 0.62f), 5.5f);
+            return;
+        }
+
         // Kích hoạt hiệu ứng rào chắn vòng tròn ma thuật bao quanh đảo
         EnsureStartCircleVFX();
         if (startCircleVFXRoot != null)
@@ -499,7 +611,12 @@ public class SurvivalTimerUI : MonoBehaviour
             ? PhotonMultiplayerChatVoice.Instance.playerName
             : "Bạn";
 
-        if (localRole == PlayerRole.Ghost)
+        if (IsSoloBotMatch)
+        {
+            string rId = PhotonMultiplayerChatVoice.Instance != null ? PhotonMultiplayerChatVoice.Instance.roomName : "";
+            ShowFloatingBanner($"<color=#00FF9D>🎮 [CHƠI ĐƠN] Người chơi [{pName}] đã vào Map (ID Phòng: {rId})!</color>\n<color=#7BED9F>(Đấu với AI Ma Bí Ngô sau 10s — chờ 3 bạn khác nhập ID & SS để vào trận 4 người)</color>", new Color(0f, 1f, 0.62f), 5.5f);
+        }
+        else if (localRole == PlayerRole.Ghost)
         {
             ShowFloatingBanner($"<color=#00FF9D>🎮 Người chơi [{pName}] đã vào trận!</color>\n<color=#FFA502>(BẠN ĐƯỢC RANDOM LÀM MA BÍ NGÔ - Hóa Ma đi săn sau 30s)</color>", new Color(0f, 1f, 0.62f), 5.0f);
         }
@@ -764,6 +881,12 @@ public class SurvivalTimerUI : MonoBehaviour
         StartCoroutine(RoutineCheckAllHumansDead());
     }
 
+    public void OnRemoteHumanDiedCheck()
+    {
+        if (isFinished || currentPhase != MatchPhase.Hunting_3Min) return;
+        StartCoroutine(RoutineCheckAllHumansDead());
+    }
+
     private IEnumerator RoutineCheckAllHumansDead()
     {
         yield return new WaitForSeconds(0.6f);
@@ -790,10 +913,26 @@ public class SurvivalTimerUI : MonoBehaviour
         isFinished = true;
         isRunning = false;
         currentPhase = MatchPhase.Finished;
+        UpdateQuickTestButtonLabel();
 
         if (PhotonMultiplayerChatVoice.Instance != null)
         {
             PhotonMultiplayerChatVoice.Instance.OnExitHuntingVoiceIsolation(true);
+            PhotonMultiplayerChatVoice.Instance.ResetReplayVotesForFinishedMatch();
+        }
+        if (PlayerHealth.Instance != null)
+        {
+            PlayerHealth.Instance.StopSpectateUIOnMatchFinished();
+        }
+        GameObject takeoverBanner = GameObject.Find("GhostTakeoverBanner");
+        if (takeoverBanner != null)
+        {
+            takeoverBanner.SetActive(false);
+        }
+        if (!Application.isMobilePlatform)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
 
         if (timerDigitsText != null)
@@ -866,10 +1005,26 @@ public class SurvivalTimerUI : MonoBehaviour
         isFinished = true;
         isRunning = false;
         currentPhase = MatchPhase.Finished;
+        UpdateQuickTestButtonLabel();
 
         if (PhotonMultiplayerChatVoice.Instance != null)
         {
             PhotonMultiplayerChatVoice.Instance.OnExitHuntingVoiceIsolation(true);
+            PhotonMultiplayerChatVoice.Instance.ResetReplayVotesForFinishedMatch();
+        }
+        if (PlayerHealth.Instance != null)
+        {
+            PlayerHealth.Instance.StopSpectateUIOnMatchFinished();
+        }
+        GameObject takeoverBanner = GameObject.Find("GhostTakeoverBanner");
+        if (takeoverBanner != null)
+        {
+            takeoverBanner.SetActive(false);
+        }
+        if (!Application.isMobilePlatform)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
 
         if (timerDigitsText != null)
@@ -916,6 +1071,13 @@ public class SurvivalTimerUI : MonoBehaviour
     /// </summary>
     public int GetAliveHumanPlayerCount()
     {
+        if (PhotonMultiplayerChatVoice.Instance != null
+            && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom
+            && PhotonMultiplayerChatVoice.GhostActorNumbers.Count > 0)
+        {
+            return PhotonMultiplayerChatVoice.Instance.GetAliveRoomHumanCount();
+        }
+
         PlayerHealth[] allHealth = Object.FindObjectsByType<PlayerHealth>();
         int alive = 0;
         for (int i = 0; i < allHealth.Length; i++)
@@ -954,6 +1116,12 @@ public class SurvivalTimerUI : MonoBehaviour
         targetGo.transform.rotation = rotation;
 
         if (cc != null) cc.enabled = true;
+
+        ThirdPersonPlayerController pc = targetGo.GetComponent<ThirdPersonPlayerController>();
+        if (pc != null)
+        {
+            pc.ValidateAndRepairController();
+        }
     }
 
     /// <summary>
@@ -1032,8 +1200,8 @@ public class SurvivalTimerUI : MonoBehaviour
         panelRt.anchorMin = new Vector2(0.5f, 0.5f);
         panelRt.anchorMax = new Vector2(0.5f, 0.5f);
         panelRt.pivot = new Vector2(0.5f, 0.5f);
-        panelRt.anchoredPosition = new Vector2(0f, 40f);
-        panelRt.sizeDelta = new Vector2(720f, 220f);
+        panelRt.anchoredPosition = new Vector2(0f, 35f);
+        panelRt.sizeDelta = new Vector2(760f, 275f);
 
         Image bgImage = endResultBannerObj.AddComponent<Image>();
         bgImage.color = new Color(0.04f, 0.05f, 0.09f, 0.94f);
@@ -1043,22 +1211,25 @@ public class SurvivalTimerUI : MonoBehaviour
         outline.effectColor = outlineColor;
         outline.effectDistance = new Vector2(3f, -3f);
 
+        Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
         // 1. Text Tiêu đề (NGƯỜI WIN / MA WIN)
         GameObject titleObj = new GameObject("TitleText");
         titleObj.transform.SetParent(endResultBannerObj.transform, false);
         RectTransform titleRt = titleObj.AddComponent<RectTransform>();
-        titleRt.anchorMin = new Vector2(0f, 0.5f);
+        titleRt.anchorMin = new Vector2(0f, 0.62f);
         titleRt.anchorMax = new Vector2(1f, 1f);
         titleRt.offsetMin = new Vector2(15f, 0f);
-        titleRt.offsetMax = new Vector2(-15f, -15f);
+        titleRt.offsetMax = new Vector2(-15f, -12f);
 
         Text titleTxt = titleObj.AddComponent<Text>();
-        titleTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        titleTxt.font = defaultFont;
         titleTxt.text = title;
-        titleTxt.fontSize = 46;
+        titleTxt.fontSize = 44;
         titleTxt.fontStyle = FontStyle.Bold;
         titleTxt.alignment = TextAnchor.MiddleCenter;
         titleTxt.color = titleColor;
+        titleTxt.raycastTarget = false;
 
         Outline titleOutline = titleObj.AddComponent<Outline>();
         titleOutline.effectColor = Color.black;
@@ -1068,37 +1239,205 @@ public class SurvivalTimerUI : MonoBehaviour
         GameObject subObj = new GameObject("SubtitleText");
         subObj.transform.SetParent(endResultBannerObj.transform, false);
         RectTransform subRt = subObj.AddComponent<RectTransform>();
-        subRt.anchorMin = new Vector2(0f, 0.20f);
-        subRt.anchorMax = new Vector2(1f, 0.52f);
+        subRt.anchorMin = new Vector2(0f, 0.44f);
+        subRt.anchorMax = new Vector2(1f, 0.63f);
         subRt.offsetMin = new Vector2(20f, 0f);
         subRt.offsetMax = new Vector2(-20f, 0f);
 
         Text subTxt = subObj.AddComponent<Text>();
-        subTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        subTxt.font = defaultFont;
         subTxt.text = subtitle;
-        subTxt.fontSize = 20;
+        subTxt.fontSize = 18;
         subTxt.fontStyle = FontStyle.Bold;
         subTxt.alignment = TextAnchor.MiddleCenter;
         subTxt.color = new Color(0.88f, 0.92f, 0.98f, 0.95f);
+        subTxt.raycastTarget = false;
 
-        // 3. Text Hướng dẫn chơi lại & Nút Click Chơi Lại
-        GameObject hintObj = new GameObject("HintText");
-        hintObj.transform.SetParent(endResultBannerObj.transform, false);
-        RectTransform hintRt = hintObj.AddComponent<RectTransform>();
-        hintRt.anchorMin = new Vector2(0f, 0f);
-        hintRt.anchorMax = new Vector2(1f, 0.22f);
-        hintRt.offsetMin = new Vector2(10f, 10f);
-        hintRt.offsetMax = new Vector2(-10f, 0f);
+        // 3. Trạng thái xác nhận chơi lại (X / 4 người đồng ý)
+        GameObject voteStatusObj = new GameObject("ReplayStatusText");
+        voteStatusObj.transform.SetParent(endResultBannerObj.transform, false);
+        RectTransform voteStatusRt = voteStatusObj.AddComponent<RectTransform>();
+        voteStatusRt.anchorMin = new Vector2(0.03f, 0.24f);
+        voteStatusRt.anchorMax = new Vector2(0.97f, 0.44f);
+        voteStatusRt.offsetMin = Vector2.zero;
+        voteStatusRt.offsetMax = Vector2.zero;
 
-        Text hintTxt = hintObj.AddComponent<Text>();
-        hintTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        hintTxt.text = "👉 Nhấn phím [ P ] hoặc Click vào đây để Chơi Lại";
-        hintTxt.fontSize = 15;
-        hintTxt.alignment = TextAnchor.MiddleCenter;
-        hintTxt.color = new Color(0.95f, 0.85f, 0.35f, 0.95f);
+        endReplayStatusText = voteStatusObj.AddComponent<Text>();
+        endReplayStatusText.font = defaultFont;
+        endReplayStatusText.fontSize = 14;
+        endReplayStatusText.fontStyle = FontStyle.Bold;
+        endReplayStatusText.alignment = TextAnchor.MiddleCenter;
+        endReplayStatusText.supportRichText = true;
+        endReplayStatusText.color = new Color(0.95f, 0.85f, 0.45f, 1f);
+        endReplayStatusText.raycastTarget = false;
 
-        Button clickBtn = hintObj.AddComponent<Button>();
-        clickBtn.onClick.AddListener(RestartMatch);
+        // 4. Hàng nút: [👍 ĐỒNG Ý CHƠI LẠI] + [🏠 VỀ SẢNH CHỜ]
+        GameObject actionRow = new GameObject("ReplayActionRow");
+        actionRow.transform.SetParent(endResultBannerObj.transform, false);
+        RectTransform actionRt = actionRow.AddComponent<RectTransform>();
+        actionRt.anchorMin = new Vector2(0.04f, 0.05f);
+        actionRt.anchorMax = new Vector2(0.96f, 0.22f);
+        actionRt.offsetMin = Vector2.zero;
+        actionRt.offsetMax = Vector2.zero;
+
+        GameObject agreeBtnObj = new GameObject("AgreeReplayButton");
+        agreeBtnObj.transform.SetParent(actionRow.transform, false);
+        RectTransform agreeRt = agreeBtnObj.AddComponent<RectTransform>();
+        agreeRt.anchorMin = new Vector2(0f, 0f);
+        agreeRt.anchorMax = new Vector2(0.67f, 1f);
+        agreeRt.offsetMin = Vector2.zero;
+        agreeRt.offsetMax = new Vector2(-6f, 0f);
+
+        endReplayBtnImage = agreeBtnObj.AddComponent<Image>();
+        endReplayBtnImage.color = new Color(0.18f, 0.56f, 0.92f, 0.96f);
+
+        endReplayButton = agreeBtnObj.AddComponent<Button>();
+        endReplayButton.onClick.AddListener(RestartMatch);
+
+        GameObject agreeTxtObj = new GameObject("Text");
+        agreeTxtObj.transform.SetParent(agreeBtnObj.transform, false);
+        RectTransform agreeTxtRt = agreeTxtObj.AddComponent<RectTransform>();
+        agreeTxtRt.anchorMin = Vector2.zero;
+        agreeTxtRt.anchorMax = Vector2.one;
+        agreeTxtRt.offsetMin = new Vector2(8f, 2f);
+        agreeTxtRt.offsetMax = new Vector2(-8f, -2f);
+
+        endReplayBtnText = agreeTxtObj.AddComponent<Text>();
+        endReplayBtnText.font = defaultFont;
+        endReplayBtnText.fontSize = 16;
+        endReplayBtnText.fontStyle = FontStyle.Bold;
+        endReplayBtnText.alignment = TextAnchor.MiddleCenter;
+        endReplayBtnText.color = Color.white;
+        endReplayBtnText.text = "👍 ĐỒNG Ý CHƠI LẠI [ P ]";
+
+        GameObject lobbyBtnObj = new GameObject("LeaveToLobbyButton");
+        lobbyBtnObj.transform.SetParent(actionRow.transform, false);
+        RectTransform lobbyRt = lobbyBtnObj.AddComponent<RectTransform>();
+        lobbyRt.anchorMin = new Vector2(0.68f, 0f);
+        lobbyRt.anchorMax = new Vector2(1f, 1f);
+        lobbyRt.offsetMin = new Vector2(6f, 0f);
+        lobbyRt.offsetMax = Vector2.zero;
+
+        Image lobbyBg = lobbyBtnObj.AddComponent<Image>();
+        lobbyBg.color = new Color(0.55f, 0.18f, 0.22f, 0.92f);
+
+        Button lobbyBtn = lobbyBtnObj.AddComponent<Button>();
+        lobbyBtn.onClick.AddListener(ReturnToLobbyFromMatchEnd);
+
+        GameObject lobbyTxtObj = new GameObject("Text");
+        lobbyTxtObj.transform.SetParent(lobbyBtnObj.transform, false);
+        RectTransform lobbyTxtRt = lobbyTxtObj.AddComponent<RectTransform>();
+        lobbyTxtRt.anchorMin = Vector2.zero;
+        lobbyTxtRt.anchorMax = Vector2.one;
+        lobbyTxtRt.offsetMin = Vector2.zero;
+        lobbyTxtRt.offsetMax = Vector2.zero;
+
+        Text lobbyTxt = lobbyTxtObj.AddComponent<Text>();
+        lobbyTxt.font = defaultFont;
+        lobbyTxt.fontSize = 15;
+        lobbyTxt.fontStyle = FontStyle.Bold;
+        lobbyTxt.alignment = TextAnchor.MiddleCenter;
+        lobbyTxt.color = Color.white;
+        lobbyTxt.text = "🏠 VỀ SẢNH CHỜ";
+
+        RefreshEndGameReplayUI();
+    }
+
+    public void RefreshEndGameReplayUI()
+    {
+        if (endResultBannerObj == null) return;
+
+        var net = PhotonMultiplayerChatVoice.Instance;
+        if (net != null && net.IsInPhotonRoom && IsSoloBotMatch)
+        {
+            if (endReplayStatusText != null)
+            {
+                int readyCount = net.GetReadyPlayersCount();
+                endReplayStatusText.text = $"🎮 <color=#55E6C1>CHẾ ĐỘ CHƠI ĐƠN</color> (Phòng <color=#FFD32A>{net.roomName}</color> — Bạn bè SS: {readyCount}/{net.requiredPlayersToStart})\nBấm [P] hoặc Click để chơi lại đơn ngay (đủ 4/4 SS sẽ tự ghép trận 4 người)!";
+            }
+            if (endReplayBtnImage != null)
+            {
+                endReplayBtnImage.color = new Color(0.18f, 0.56f, 0.92f, 0.96f);
+            }
+            if (endReplayBtnText != null)
+            {
+                endReplayBtnText.text = "🔄 CHƠI LẠI ĐƠN NGAY [ P ]";
+            }
+        }
+        else if (net != null && net.IsInPhotonRoom)
+        {
+            net.GetReplayVoteSummary(out int agreed, out int required, out string detailNames);
+            bool localAgreed = PhotonMultiplayerChatVoice.IsLocalReplayAgreed;
+
+            if (endReplayStatusText != null)
+            {
+                string targetLabel = required >= 4
+                    ? $"⏳ ĐỢI ĐỦ {required}/{required} NGƯỜI CÙNG ĐỒNG Ý CHƠI LẠI: <color=#00FF9D>{agreed} / {required}</color>"
+                    : $"⏳ ĐỢI CẢ PHÒNG XÁC NHẬN CHƠI LẠI: <color=#00FF9D>{agreed} / {required}</color>";
+                if (agreed >= required && required > 0)
+                {
+                    targetLabel = $"<color=#00FF9D>🚀 ĐÃ ĐỦ {agreed}/{required} NGƯỜI ĐỒNG Ý! ĐANG TẠO LẠI TRÒ CHƠI...</color>";
+                }
+                endReplayStatusText.text = string.IsNullOrEmpty(detailNames) ? targetLabel : $"{targetLabel}\n<size=12>{detailNames}</size>";
+            }
+
+            if (endReplayBtnImage != null)
+            {
+                endReplayBtnImage.color = localAgreed
+                    ? new Color(0.14f, 0.65f, 0.34f, 0.96f)
+                    : new Color(0.18f, 0.56f, 0.92f, 0.96f);
+            }
+
+            if (endReplayBtnText != null)
+            {
+                endReplayBtnText.text = localAgreed
+                    ? $"✅ ĐÃ XÁC NHẬN CHƠI LẠI ({agreed}/{required}) — Nhấn [P] để hủy"
+                    : $"👍 ĐỒNG Ý CHƠI LẠI [ P ] ({agreed}/{required})";
+            }
+        }
+        else
+        {
+            if (endReplayStatusText != null)
+            {
+                endReplayStatusText.text = "Chế độ đơn offline: Có thể nhấn [P] hoặc Click để chơi lại ngay.";
+            }
+            if (endReplayBtnText != null)
+            {
+                endReplayBtnText.text = "🔄 CHƠI LẠI NGAY [ P ]";
+            }
+        }
+    }
+
+    public void NotifyStartingReplayTransition(int totalPlayers)
+    {
+        if (endReplayStatusText != null)
+        {
+            endReplayStatusText.text = $"<color=#00FF9D>🚀 ĐỦ {totalPlayers}/{totalPlayers} NGƯỜI ĐỒNG Ý! ĐANG TẠO VÁN MỚI...</color>";
+        }
+        if (endReplayButton != null)
+        {
+            endReplayButton.interactable = false;
+        }
+        if (endReplayBtnImage != null)
+        {
+            endReplayBtnImage.color = new Color(0.12f, 0.72f, 0.38f, 0.96f);
+        }
+        if (endReplayBtnText != null)
+        {
+            endReplayBtnText.text = "⏳ ĐANG TẠO LẠI VÁN MỚI...";
+        }
+    }
+
+    private void ReturnToLobbyFromMatchEnd()
+    {
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.LeaveRoomAndReturnToMenu();
+        }
+        else
+        {
+            SceneManager.LoadScene("LobbyScene");
+        }
     }
 
     /// <summary>
@@ -1121,10 +1460,15 @@ public class SurvivalTimerUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Tải lại trận đấu
+    /// Xác nhận đồng ý chơi lại (trong phòng nhiều người phải đợi đủ tất cả người chơi đồng ý mới tạo lại trò chơi)
     /// </summary>
     public void RestartMatch()
     {
+        if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom)
+        {
+            PhotonMultiplayerChatVoice.Instance.ToggleLocalReplayVote();
+            return;
+        }
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
@@ -1146,6 +1490,106 @@ public class SurvivalTimerUI : MonoBehaviour
         {
             GameObject go = GameObject.Find("TimerProgressFill");
             if (go != null) timerProgressFill = go.GetComponent<RectTransform>();
+        }
+    }
+
+    /// <summary>
+    /// Khởi tạo nút bấm Test nhanh [F1] trực tiếp trên màn hình UI để người chơi có thể click chuột / chạm mà không cần bấm bàn phím
+    /// </summary>
+    public void EnsureQuickTestF1Button()
+    {
+        if (quickTestBtnObj != null) return;
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null) canvas = Object.FindAnyObjectByType<Canvas>();
+        if (canvas == null) return;
+
+        quickTestBtnObj = new GameObject("Btn_QuickTestF1");
+        quickTestBtnObj.transform.SetParent(canvas.transform, false);
+
+        RectTransform rt = quickTestBtnObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(25f, -146f);
+        rt.sizeDelta = new Vector2(230f, 44f);
+
+        Image bg = quickTestBtnObj.AddComponent<Image>();
+        bg.color = new Color(0.06f, 0.12f, 0.20f, 0.92f);
+        bg.raycastTarget = true;
+
+        Outline outline = quickTestBtnObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 1f, 0.62f, 0.95f);
+        outline.effectDistance = new Vector2(2f, -2f);
+
+        Button btn = quickTestBtnObj.AddComponent<Button>();
+        btn.targetGraphic = bg;
+        ColorBlock cb = btn.colors;
+        cb.normalColor = Color.white;
+        cb.highlightedColor = new Color(0.85f, 1.25f, 1.15f, 1f);
+        cb.pressedColor = new Color(0.6f, 0.9f, 0.75f, 1f);
+        btn.colors = cb;
+        btn.onClick.AddListener(TriggerQuickTestFromUI);
+
+        GameObject textGo = new GameObject("Text");
+        textGo.transform.SetParent(quickTestBtnObj.transform, false);
+        RectTransform trt = textGo.AddComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero;
+        trt.anchorMax = Vector2.one;
+        trt.offsetMin = new Vector2(6f, 2f);
+        trt.offsetMax = new Vector2(-6f, -2f);
+
+        quickTestBtnText = textGo.AddComponent<Text>();
+        quickTestBtnText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Font.CreateDynamicFontFromOSFont("Arial", 14);
+        quickTestBtnText.fontSize = 15;
+        quickTestBtnText.fontStyle = FontStyle.Bold;
+        quickTestBtnText.alignment = TextAnchor.MiddleCenter;
+        quickTestBtnText.supportRichText = true;
+        quickTestBtnText.color = new Color(0f, 1f, 0.62f, 1f);
+        quickTestBtnText.raycastTarget = false;
+
+        UpdateQuickTestButtonLabel();
+    }
+
+    /// <summary>
+    /// Cập nhật nhãn của nút Test trên màn hình (Bắt đầu Test hoặc Test Lại)
+    /// </summary>
+    public void UpdateQuickTestButtonLabel()
+    {
+        if (quickTestBtnText == null) return;
+        if (IsOfflineQuickTestMatch || (isRunning && currentPhase == MatchPhase.Hunting_3Min))
+        {
+            quickTestBtnText.text = "🔄 TEST LẠI [F1]";
+        }
+        else
+        {
+            quickTestBtnText.text = "🧪 BẮT ĐẦU TEST [F1]";
+        }
+    }
+
+    /// <summary>
+    /// Kích hoạt chế độ test offline khi người chơi click vào nút trên màn hình
+    /// </summary>
+    public void TriggerQuickTestFromUI()
+    {
+        Debug.Log("<color=#00FFAA>[Test UI] Người chơi bấm nút Test nhanh trên màn hình!</color>");
+        ThirdPersonCamera.isUIPanelOpen = false;
+
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.StartOfflineQuickTestWithTwoGhosts();
+        }
+        else
+        {
+            ResetTimer(true);
+        }
+
+        UpdateQuickTestButtonLabel();
+
+        if (!Application.isMobilePlatform)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
     }
 }

@@ -13,6 +13,8 @@ public class PumpkinGhostAI : MonoBehaviour
     [Header("0. Điều Khiển Bởi Người Chơi (Player Controlled)")]
     [Tooltip("Khi bật, con ma bí ngô sẽ do người chơi trực tiếp điều khiển qua WASD, Chuột trái (Cào), Space (Vồ), Chuột phải/E (Ẩn thân)")]
     public bool isPlayerControlled = false;
+    [Tooltip("Bật AI Ma tự động săn đuổi trong chế độ Chơi Đơn")]
+    public bool enableSoloBotAI = false;
 
     [Header("Virtual / Mobile Touch Input Cho Ma Bí Ngô")]
     public Vector2 virtualMoveInput = Vector2.zero;
@@ -21,10 +23,16 @@ public class PumpkinGhostAI : MonoBehaviour
     public bool virtualLeapTriggered = false;
     public bool virtualLeapHeld = false;
     public bool virtualVanishTriggered = false;
+    public bool virtualSprintHeld = false;
 
     public void SetVirtualMove(Vector2 dir)
     {
         virtualMoveInput = Vector2.ClampMagnitude(dir, 1f);
+    }
+
+    public void SetVirtualSprint(bool held)
+    {
+        virtualSprintHeld = held;
     }
 
     public void TriggerVirtualAttack()
@@ -361,6 +369,34 @@ public class PumpkinGhostAI : MonoBehaviour
     {
         if (!isPlayerControlled)
         {
+            if (!enableSoloBotAI) return;
+
+            CheckAbyssProtection();
+            ApplyGravity();
+
+            if (!IsGhostHunting || isFrozen || (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished))
+            {
+                if (freezeVFXRoot != null && freezeVFXRoot.activeSelf)
+                {
+                    freezeVFXRoot.transform.Rotate(0f, 150f * Time.deltaTime, 0f);
+                }
+                return;
+            }
+
+            if (activeActionRoutine != null) return;
+
+            switch (currentState)
+            {
+                case GhostState.Patrol:
+                    UpdatePatrol();
+                    break;
+                case GhostState.Suspicious:
+                    UpdateSuspicious();
+                    break;
+                case GhostState.Chase:
+                    UpdateChase();
+                    break;
+            }
             return;
         }
 
@@ -1660,8 +1696,32 @@ public class PumpkinGhostAI : MonoBehaviour
     /// <summary>
     /// Chuyển Ma Bí Ngô sang chế độ điều khiển trực tiếp bởi người chơi (sau khi nhân vật người tử trận)
     /// </summary>
+    public void ActivateAsSoloAIBot(Vector3 spawnPos)
+    {
+        isPlayerControlled = false;
+        enableSoloBotAI = true;
+        isFrozen = false;
+        isLeaping = false;
+        SetFreezeVFX(false);
+        SetGhostBodyVisible(true);
+        gameObject.SetActive(true);
+        SurvivalTimerUI.SafeTeleport(gameObject, spawnPos, Quaternion.identity);
+        spawnPosition = spawnPos;
+        FindPlayerTarget();
+        if (config != null && config.defaultChasePlayer)
+        {
+            EnterChaseState();
+        }
+        else
+        {
+            currentState = GhostState.Patrol;
+            PickNewPatrolDestination();
+        }
+    }
+
     public void TakeOverAsPlayer()
     {
+        enableSoloBotAI = false;
         isPlayerControlled = true;
         PlayerControlledGhost = this;
 
@@ -1711,8 +1771,9 @@ public class PumpkinGhostAI : MonoBehaviour
             return;
         }
 
-        Vector2 input = ReadPlayerMoveInput();
-        bool isSprinting = ReadPlayerSprintInput();
+        bool uiBlocksMove = ThirdPersonCamera.isUIPanelOpen;
+        Vector2 input = uiBlocksMove ? Vector2.zero : ReadPlayerMoveInput();
+        bool isSprinting = !uiBlocksMove && ReadPlayerSprintInput();
 
         Transform cam = Camera.main != null ? Camera.main.transform : null;
         Vector3 moveDirection = Vector3.zero;
@@ -1758,10 +1819,17 @@ public class PumpkinGhostAI : MonoBehaviour
         // Kỹ năng: Chuột trái = Cào xé (Attack) - Cooldown 0.25s theo yêu cầu
         float playerAttackCooldown = 0.25f;
         bool wantsToAttack = ReadPlayerAttackInputDown() || ReadPlayerAttackInputHold();
-        if (wantsToAttack && Time.time >= lastAttackTime + playerAttackCooldown)
+        if (wantsToAttack)
         {
-            StartAction(RoutinePlayerControlledAttack());
-            return;
+            if (VirtualJoystickTouchUI.Instance != null)
+            {
+                VirtualJoystickTouchUI.Instance.CancelAutoRun();
+            }
+            if (Time.time >= lastAttackTime + playerAttackCooldown)
+            {
+                StartAction(RoutinePlayerControlledAttack());
+                return;
+            }
         }
 
         // Kỹ năng: Phím Space = Nhảy vồ
@@ -1983,6 +2051,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private bool ReadPlayerSprintInput()
     {
+        if (virtualSprintHeld) return true;
 #if ENABLE_INPUT_SYSTEM
         var kb = Keyboard.current;
         if (kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed)) return true;

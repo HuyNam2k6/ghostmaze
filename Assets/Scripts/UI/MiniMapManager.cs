@@ -254,13 +254,22 @@ namespace GhostMaze.UI
                 if (targetPlayer == null) return;
             }
 
-            Vector3 targetPos = targetPlayer.position;
+            Transform activeMiniMapFocus = targetPlayer;
+            if (PlayerHealth.Instance != null && PlayerHealth.Instance.isDead
+                && ThirdPersonCamera.Instance != null
+                && ThirdPersonCamera.Instance.IsSpectatingTarget
+                && ThirdPersonCamera.Instance.target != null)
+            {
+                activeMiniMapFocus = ThirdPersonCamera.Instance.target;
+            }
+
+            Vector3 targetPos = activeMiniMapFocus.position;
 
             // 1. Cập nhật vị trí Camera Mini Map
             miniMapCamera.transform.position = new Vector3(targetPos.x, targetPos.y + cameraHeight, targetPos.z);
             miniMapCamera.orthographicSize = currentZoom;
 
-            float playerYaw = targetPlayer.eulerAngles.y;
+            float playerYaw = activeMiniMapFocus.eulerAngles.y;
 
             // 2. Xoay Camera hoặc Xoay Icon theo chế độ
             if (rotateMapWithPlayer)

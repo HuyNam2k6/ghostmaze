@@ -240,6 +240,17 @@ public class MagicWaveOrb : MonoBehaviour
             }
         }
 
+        if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom)
+        {
+            Vector3 pushDir = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
+            pushDir = pushDir.sqrMagnitude > 0.001f ? pushDir.normalized : transform.forward;
+            if (PhotonMultiplayerChatVoice.Instance.TryCheckAndStunRemoteGhost(nextPos, hitRadius + 0.65f, pushDir, knockbackDistance, stunDuration))
+            {
+                RecycleOrb();
+                return;
+            }
+        }
+
         // 3. Quét va chạm môi trường (tường, bia mộ, mặt đất)
         int hitCount = Physics.SphereCastNonAlloc(
             transform.position,
@@ -293,6 +304,13 @@ public class MagicWaveOrb : MonoBehaviour
                     return;
                 }
             }
+        }
+
+        if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom)
+        {
+            Vector3 pushDir = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
+            pushDir = pushDir.sqrMagnitude > 0.001f ? pushDir.normalized : transform.forward;
+            PhotonMultiplayerChatVoice.Instance.TryCheckAndStunRemoteGhost(impactPoint, aoeExplosionRadius, pushDir, knockbackDistance, stunDuration);
         }
     }
 

@@ -696,7 +696,11 @@ public class ThirdPersonPlayerController : MonoBehaviour
             isCastingMagic = false;
         }
 
-        if (!PhotonMultiplayerChatVoice.IsGameStarted)
+        bool isMatchRunning = PhotonMultiplayerChatVoice.IsGameStarted
+            || PhotonMultiplayerChatVoice.IsOfflineQuickTestMode
+            || (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.isRunning);
+
+        if (!isMatchRunning)
         {
             if (isAimingThrow) CancelMagicAim();
             if (isBlocking) CancelBlock();
@@ -959,6 +963,10 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private void StartAimingMagic()
     {
+        if (VirtualJoystickTouchUI.Instance != null)
+        {
+            VirtualJoystickTouchUI.Instance.CancelAutoRun();
+        }
         isAimingThrow = true;
         hasCastOrbThisAttack = false;
         aimStartTime = Time.time;
@@ -1458,13 +1466,17 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 }
             }
 
-            if (cameraTransform != null)
+            Transform activeCam = cameraTransform != null
+                ? cameraTransform
+                : (ThirdPersonCamera.Instance != null ? ThirdPersonCamera.Instance.transform : (Camera.main != null ? Camera.main.transform : null));
+
+            if (activeCam != null)
             {
-                Vector3 camForward = cameraTransform.forward;
+                Vector3 camForward = activeCam.forward;
                 camForward.y = 0f;
                 camForward.Normalize();
 
-                Vector3 camRight = cameraTransform.right;
+                Vector3 camRight = activeCam.right;
                 camRight.y = 0f;
                 camRight.Normalize();
 
@@ -1527,7 +1539,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     /// </summary>
     private void HandleJumpAndGravity()
     {
-        if (isGrounded && ReadJumpInput() && !isBlocking && !isCastingMagic && !isJumpAnticipating)
+        if (!ThirdPersonCamera.isUIPanelOpen && isGrounded && ReadJumpInput() && !isBlocking && !isCastingMagic && !isJumpAnticipating)
         {
             if (Time.time >= lastJumpTime + jumpCooldown)
             {

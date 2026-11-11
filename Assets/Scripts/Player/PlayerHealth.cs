@@ -1,5 +1,9 @@
-﻿using UnityEngine;
+using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public class PlayerHealth : MonoBehaviour
 {
@@ -52,6 +56,17 @@ public class PlayerHealth : MonoBehaviour
     private readonly Color warningColor = new Color(0.95f, 0.75f, 0.18f, 1f); // Vàng cam
     private readonly Color dangerColor  = new Color(0.92f, 0.18f, 0.22f, 1f); // Đỏ máu
 
+    // Trạng thái Camera Quan Sát Đồng Đội khi đã tử trận
+    public bool IsSpectatingAllies { get; private set; } = false;
+    private readonly List<PhotonMultiplayerChatVoice.AlliedSpectateTarget> spectateTargets = new List<PhotonMultiplayerChatVoice.AlliedSpectateTarget>();
+    private int spectatedActorNumber = -1;
+    private int spectateIndex = 0;
+    private GameObject spectateHudObj;
+    private Text spectateTitleText;
+    private Text spectateHintText;
+    private Button spectatePrevBtn;
+    private Button spectateNextBtn;
+
     private void Awake()
     {
         Instance = this;
@@ -64,6 +79,11 @@ public class PlayerHealth : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (spectateHudObj != null)
+        {
+            Destroy(spectateHudObj);
+            spectateHudObj = null;
+        }
         if (Instance == this) Instance = null;
     }
 
@@ -105,6 +125,34 @@ public class PlayerHealth : MonoBehaviour
                 clawScratchImage.gameObject.SetActive(false);
             }
         }
+
+        // Cho phép đổi camera quan sát đồng đội bằng phím [Q]/[Mũi tên trái] và [E]/[Mũi tên phải]
+        if (isDead && IsSpectatingAllies && !ThirdPersonCamera.isUIPanelOpen
+            && (SurvivalTimerUI.Instance == null || !SurvivalTimerUI.Instance.IsFinished))
+        {
+            HandleSpectateKeyboardSwitch();
+        }
+    }
+
+    private void HandleSpectateKeyboardSwitch()
+    {
+        bool prevPressed = false;
+        bool nextPressed = false;
+
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null)
+        {
+            if (kb.qKey.wasPressedThisFrame || kb.leftArrowKey.wasPressedThisFrame) prevPressed = true;
+            if (kb.eKey.wasPressedThisFrame || kb.rightArrowKey.wasPressedThisFrame) nextPressed = true;
+        }
+#elif ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.Q) || Input.GetKeyDown(KeyCode.LeftArrow)) prevPressed = true;
+        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.RightArrow)) nextPressed = true;
+#endif
+
+        if (prevPressed) SwitchSpectateTarget(-1);
+        else if (nextPressed) SwitchSpectateTarget(1);
     }
 
     /// <summary>
@@ -204,8 +252,22 @@ public class PlayerHealth : MonoBehaviour
                 characterController.enabled = false;
             }
 
-            // Chuyển sang điều khiển Ma Bí Ngô
-            TransferControlToPumpkinGhost();
+            // Thông báo chết lên mạng Photon trước khi khởi động camera quan sát đồng đội
+            if (PhotonMultiplayerChatVoice.Instance != null)
+            {
+                PhotonMultiplayerChatVoice.Instance.NotifyLocalHumanDied();
+            }
+
+            // Nếu đang trong phòng Multiplayer: chuyển sang Camera Quan Sát Đồng Đội cùng phe (không cướp Ma Bí Ngô)
+            if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom)
+            {
+                EnterAlliedSpectateMode();
+            }
+            else
+            {
+                // Chế độ Offline đơn thuần: giữ fallback chuyển sang Ma Bí Ngô
+                TransferControlToPumpkinGhost();
+            }
 
             // Thông báo cho SurvivalTimerUI kiểm tra điều kiện kết thúc trận đấu (Nếu hết người -> Ma Win!)
             if (SurvivalTimerUI.Instance != null)
@@ -221,6 +283,12 @@ public class PlayerHealth : MonoBehaviour
     public void ResetHealth()
     {
         isDead = false;
+        IsSpectatingAllies = false;
+        spectatedActorNumber = -1;
+        spectateIndex = 0;
+        spectateTargets.Clear();
+        if (spectateHudObj != null) spectateHudObj.SetActive(false);
+
         currentHealth = maxHealth;
         displayedHealthRatio = 1f;
         vignetteAlpha = 0f;
@@ -268,6 +336,266 @@ public class PlayerHealth : MonoBehaviour
         }
 
         UpdateHealthText();
+    }
+
+    private void EnterAlliedSpectateMode()
+    {
+        IsSpectatingAllies = true;
+        spectatedActorNumber = -1;
+        spectateIndex = 0;
+
+        if (healthValueText != null)
+        {
+            healthValueText.text = "💀 ĐÃ TỬ TRẬN";
+        }
+
+        RefreshSpectateTargetListAndUI();
+    }
+
+    /// <summary>
+    /// Gọi khi có đồng đội mới xuất hiện, bị hạ, hoặc rời phòng để tự động chuyển cam sang đồng đội khác còn sống.
+    /// </summary>
+    public void OnSpectateRosterChanged()
+    {
+        if (!isDead) return;
+        if (PhotonMultiplayerChatVoice.Instance == null || !PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom) return;
+        RefreshSpectateTargetListAndUI();
+    }
+
+    public void EnsureValidSpectateTarget()
+    {
+        if (!isDead) return;
+        if (PhotonMultiplayerChatVoice.Instance == null || !PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom) return;
+        RefreshSpectateTargetListAndUI();
+    }
+
+    public void StopSpectateUIOnMatchFinished()
+    {
+        IsSpectatingAllies = false;
+        if (spectateHudObj != null)
+        {
+            spectateHudObj.SetActive(false);
+        }
+    }
+
+    public void SwitchSpectateTarget(int step)
+    {
+        if (!isDead || !IsSpectatingAllies) return;
+        if (PhotonMultiplayerChatVoice.Instance == null) return;
+
+        PhotonMultiplayerChatVoice.Instance.GetAlliedAliveSpectateTargets(spectateTargets);
+        if (spectateTargets.Count == 0)
+        {
+            UpdateSpectateHUDDisplay();
+            return;
+        }
+
+        int curIdx = spectateTargets.FindIndex(t => t.actorNumber == spectatedActorNumber);
+        if (curIdx < 0) curIdx = Mathf.Clamp(spectateIndex, 0, spectateTargets.Count - 1);
+
+        spectateIndex = ((curIdx + step) % spectateTargets.Count + spectateTargets.Count) % spectateTargets.Count;
+        AttachCameraToSpectateIndex(spectateIndex);
+        UpdateSpectateHUDDisplay();
+    }
+
+    private void RefreshSpectateTargetListAndUI()
+    {
+        if (PhotonMultiplayerChatVoice.Instance == null) return;
+        PhotonMultiplayerChatVoice.Instance.GetAlliedAliveSpectateTargets(spectateTargets);
+
+        if (spectateTargets.Count == 0)
+        {
+            spectatedActorNumber = -1;
+            spectateIndex = 0;
+            UpdateSpectateHUDDisplay();
+            return;
+        }
+
+        int existingIdx = spectatedActorNumber > 0
+            ? spectateTargets.FindIndex(t => t.actorNumber == spectatedActorNumber)
+            : -1;
+
+        spectateIndex = (existingIdx >= 0) ? existingIdx : (Mathf.Clamp(spectateIndex, 0, spectateTargets.Count - 1));
+        AttachCameraToSpectateIndex(spectateIndex);
+        UpdateSpectateHUDDisplay();
+    }
+
+    private void AttachCameraToSpectateIndex(int index)
+    {
+        if (index < 0 || index >= spectateTargets.Count) return;
+
+        var chosen = spectateTargets[index];
+        spectatedActorNumber = chosen.actorNumber;
+
+        ThirdPersonCamera cam = ThirdPersonCamera.Instance != null
+            ? ThirdPersonCamera.Instance
+            : (Camera.main != null ? Camera.main.GetComponent<ThirdPersonCamera>() : null);
+
+        if (cam != null && chosen.targetTransform != null)
+        {
+            cam.SetSpectateTarget(chosen.targetTransform, new Vector3(0f, 1.45f, 0f));
+        }
+    }
+
+    private void UpdateSpectateHUDDisplay()
+    {
+        if (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished)
+        {
+            if (spectateHudObj != null) spectateHudObj.SetActive(false);
+            return;
+        }
+
+        EnsureSpectateHUDBuilt();
+        if (spectateHudObj == null) return;
+        spectateHudObj.SetActive(true);
+
+        int count = spectateTargets.Count;
+        bool canSwitch = count > 1;
+        if (spectatePrevBtn != null) spectatePrevBtn.interactable = canSwitch;
+        if (spectateNextBtn != null) spectateNextBtn.interactable = canSwitch;
+
+        if (spectateTitleText != null)
+        {
+            if (count > 0 && spectateIndex >= 0 && spectateIndex < count)
+            {
+                var cur = spectateTargets[spectateIndex];
+                spectateTitleText.text = $"👁 ĐANG XEM ĐỒNG ĐỘI: {cur.nickName} ({spectateIndex + 1}/{count})";
+                spectateTitleText.color = new Color(0.55f, 0.96f, 1f, 1f);
+            }
+            else
+            {
+                spectateTitleText.text = "💀 ĐÃ TỬ TRẬN — KHÔNG CÒN ĐỒNG ĐỘI CÙNG PHE";
+                spectateTitleText.color = new Color(1f, 0.55f, 0.45f, 1f);
+            }
+        }
+
+        if (spectateHintText != null)
+        {
+            spectateHintText.text = count > 1
+                ? (Application.isMobilePlatform
+                    ? "Bấm nút 2 bên để đổi đồng đội  •  Chụm 2 ngón thu phóng rộng (1.5x)"
+                    : "[Q] / [E] hoặc bấm nút để đổi đồng đội  •  Lăn chuột chỉnh góc rộng (1.5x)")
+                : (Application.isMobilePlatform
+                    ? "Vuốt để xoay góc nhìn  •  Chụm 2 ngón thu phóng rộng (1.5x)"
+                    : "Chờ đồng đội chiến đấu  •  Lăn chuột chỉnh góc nhìn rộng (1.5x)");
+        }
+    }
+
+    private void EnsureSpectateHUDBuilt()
+    {
+        if (spectateHudObj != null) return;
+
+        Canvas canvas = FindAnyObjectByType<Canvas>();
+        if (canvas == null) return;
+
+        spectateHudObj = new GameObject("AlliedSpectateHUD");
+        spectateHudObj.transform.SetParent(canvas.transform, false);
+
+        RectTransform rt = spectateHudObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0f);
+        rt.anchorMax = new Vector2(0.5f, 0f);
+        rt.pivot = new Vector2(0.5f, 0f);
+        rt.anchoredPosition = new Vector2(0f, 22f);
+        rt.sizeDelta = new Vector2(600f, 88f);
+
+        Image bg = spectateHudObj.AddComponent<Image>();
+        bg.color = new Color(0.05f, 0.08f, 0.13f, 0.90f);
+        bg.raycastTarget = true;
+
+        Outline outline = spectateHudObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0.20f, 0.85f, 1.0f, 0.88f);
+        outline.effectDistance = new Vector2(2f, -2f);
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (font == null) font = Font.CreateDynamicFontFromOSFont("Arial", 16);
+
+        spectatePrevBtn = CreateSpectateNavButton(
+            spectateHudObj.transform, "Btn_SpectatePrev", "◀ TRƯỚC",
+            new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
+            new Vector2(12f, 0f), font, () => SwitchSpectateTarget(-1));
+
+        spectateNextBtn = CreateSpectateNavButton(
+            spectateHudObj.transform, "Btn_SpectateNext", "SAU ▶",
+            new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
+            new Vector2(-12f, 0f), font, () => SwitchSpectateTarget(1));
+
+        GameObject centerInfoGo = new GameObject("SpectateInfo");
+        centerInfoGo.transform.SetParent(spectateHudObj.transform, false);
+        RectTransform infoRt = centerInfoGo.AddComponent<RectTransform>();
+        infoRt.anchorMin = new Vector2(0f, 0f);
+        infoRt.anchorMax = new Vector2(1f, 1f);
+        infoRt.offsetMin = new Vector2(126f, 8f);
+        infoRt.offsetMax = new Vector2(-126f, -8f);
+
+        GameObject titleGo = new GameObject("SpectateTitle");
+        titleGo.transform.SetParent(centerInfoGo.transform, false);
+        RectTransform titleRt = titleGo.AddComponent<RectTransform>();
+        titleRt.anchorMin = new Vector2(0f, 0.45f);
+        titleRt.anchorMax = new Vector2(1f, 1f);
+        titleRt.offsetMin = Vector2.zero;
+        titleRt.offsetMax = Vector2.zero;
+
+        spectateTitleText = titleGo.AddComponent<Text>();
+        spectateTitleText.font = font;
+        spectateTitleText.fontSize = 18;
+        spectateTitleText.fontStyle = FontStyle.Bold;
+        spectateTitleText.alignment = TextAnchor.MiddleCenter;
+        spectateTitleText.raycastTarget = false;
+
+        GameObject hintGo = new GameObject("SpectateHint");
+        hintGo.transform.SetParent(centerInfoGo.transform, false);
+        RectTransform hintRt = hintGo.AddComponent<RectTransform>();
+        hintRt.anchorMin = new Vector2(0f, 0f);
+        hintRt.anchorMax = new Vector2(1f, 0.45f);
+        hintRt.offsetMin = Vector2.zero;
+        hintRt.offsetMax = Vector2.zero;
+
+        spectateHintText = hintGo.AddComponent<Text>();
+        spectateHintText.font = font;
+        spectateHintText.fontSize = 12;
+        spectateHintText.alignment = TextAnchor.MiddleCenter;
+        spectateHintText.color = new Color(0.82f, 0.90f, 0.96f, 0.85f);
+        spectateHintText.raycastTarget = false;
+    }
+
+    private Button CreateSpectateNavButton(
+        Transform parent, string name, string label,
+        Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
+        Vector2 anchoredPos, Font font, UnityEngine.Events.UnityAction onClick)
+    {
+        GameObject btnGo = new GameObject(name);
+        btnGo.transform.SetParent(parent, false);
+        RectTransform rt = btnGo.AddComponent<RectTransform>();
+        rt.anchorMin = anchorMin;
+        rt.anchorMax = anchorMax;
+        rt.pivot = pivot;
+        rt.anchoredPosition = anchoredPos;
+        rt.sizeDelta = new Vector2(104f, 52f);
+
+        Image img = btnGo.AddComponent<Image>();
+        img.color = new Color(0.14f, 0.36f, 0.56f, 0.96f);
+
+        Button btn = btnGo.AddComponent<Button>();
+        btn.onClick.AddListener(onClick);
+
+        GameObject txtGo = new GameObject("Label");
+        txtGo.transform.SetParent(btnGo.transform, false);
+        RectTransform txtRt = txtGo.AddComponent<RectTransform>();
+        txtRt.anchorMin = Vector2.zero;
+        txtRt.anchorMax = Vector2.one;
+        txtRt.offsetMin = new Vector2(4f, 2f);
+        txtRt.offsetMax = new Vector2(-4f, -2f);
+
+        Text txt = txtGo.AddComponent<Text>();
+        txt.font = font;
+        txt.fontSize = 14;
+        txt.fontStyle = FontStyle.Bold;
+        txt.alignment = TextAnchor.MiddleCenter;
+        txt.color = Color.white;
+        txt.text = label;
+        txt.raycastTarget = false;
+
+        return btn;
     }
 
     /// <summary>
@@ -499,7 +827,8 @@ public class PlayerHealth : MonoBehaviour
             }
             else
             {
-                Canvas canvas = FindAnyObjectByType<Canvas>();
+                Canvas canvas = GameSettingsManager.Instance != null ? GameSettingsManager.Instance.GetComponent<Canvas>() : null;
+                if (canvas == null) canvas = FindAnyObjectByType<Canvas>();
                 if (canvas != null)
                 {
                     GameObject newScratchGo = new GameObject("PlayerClawScratch");
@@ -525,6 +854,10 @@ public class PlayerHealth : MonoBehaviour
 #if UNITY_EDITOR
                         img.sprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Textures/ClawScratch.png");
 #endif
+                        if (img.sprite == null)
+                        {
+                            img.sprite = CreateFallbackClawScratchSprite();
+                        }
                     }
 
                     img.color = new Color(1f, 1f, 1f, 0f);
@@ -533,5 +866,52 @@ public class PlayerHealth : MonoBehaviour
                 }
             }
         }
+    }
+
+    private static Sprite s_FallbackClawScratchSprite;
+
+    private static Sprite CreateFallbackClawScratchSprite()
+    {
+        if (s_FallbackClawScratchSprite != null) return s_FallbackClawScratchSprite;
+
+        const int size = 128;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        Color[] pixels = new Color[size * size];
+        for (int i = 0; i < pixels.Length; i++) pixels[i] = new Color(0f, 0f, 0f, 0f);
+
+        Vector2[] starts = { new Vector2(18f, 108f), new Vector2(36f, 114f), new Vector2(56f, 104f) };
+        Vector2[] ends   = { new Vector2(96f, 22f),  new Vector2(112f, 30f), new Vector2(114f, 48f) };
+
+        for (int s = 0; s < 3; s++)
+        {
+            Vector2 a = starts[s];
+            Vector2 b = ends[s];
+            Vector2 ab = b - a;
+            float lenSq = Mathf.Max(1f, ab.sqrMagnitude);
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    Vector2 p = new Vector2(x, y);
+                    float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / lenSq);
+                    Vector2 proj = a + ab * t;
+                    float dist = Vector2.Distance(p, proj);
+                    float width = Mathf.Sin(t * Mathf.PI) * 5.2f + 1.2f;
+                    if (dist <= width)
+                    {
+                        float alpha = Mathf.Clamp01(1f - dist / width) * Mathf.Clamp01(Mathf.Sin(t * Mathf.PI) * 1.25f);
+                        Color col = new Color(0.95f, 0.14f, 0.12f, alpha);
+                        int idx = y * size + x;
+                        if (col.a > pixels[idx].a) pixels[idx] = col;
+                    }
+                }
+            }
+        }
+
+        tex.SetPixels(pixels);
+        tex.Apply();
+        s_FallbackClawScratchSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+        return s_FallbackClawScratchSprite;
     }
 }

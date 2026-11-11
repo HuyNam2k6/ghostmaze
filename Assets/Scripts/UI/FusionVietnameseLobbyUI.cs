@@ -80,8 +80,28 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Sprite[] sprCardIcons = new Sprite[6];
     private Sprite sprGraveyardBottom;
 
+    private static bool hasRegisteredLobbySceneHook = false;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoInitialize()
+    {
+        if (!hasRegisteredLobbySceneHook)
+        {
+            hasRegisteredLobbySceneHook = true;
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnLobbySceneLoadedCallback;
+        }
+        EnsureLobbyUIIfInLobbyScene();
+    }
+
+    private static void OnLobbySceneLoadedCallback(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (scene.name == "LobbyScene")
+        {
+            EnsureLobbyUIIfInLobbyScene();
+        }
+    }
+
+    public static void EnsureLobbyUIIfInLobbyScene()
     {
         // CHá»ˆ KHá»žI Táº O á»ž Sáº¢NH CHá»œ (LobbyScene) â€” HOÃ€N TOÃ€N KHÃ”NG HIá»†N á»ž TRANG GAME (SampleScene) TRÃNH Bá»Š LáºªN!
         string curScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
@@ -129,6 +149,24 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             Instance = null;
             FusionBootstrapDebugGUI.HideDefaultGUI = false;
+        }
+    }
+
+    private void OnEnable()
+    {
+        PhotonMultiplayerChatVoice.OnRoomJoinFailedAction += HandleRoomJoinFailedFromPhoton;
+    }
+
+    private void OnDisable()
+    {
+        PhotonMultiplayerChatVoice.OnRoomJoinFailedAction -= HandleRoomJoinFailedFromPhoton;
+    }
+
+    private void HandleRoomJoinFailedFromPhoton(short returnCode, string message)
+    {
+        if (isInsideWaitingRoom)
+        {
+            SwitchToMainCardsView();
         }
     }
 
@@ -674,7 +712,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     private void EnsureEventSystemExists()
     {
-        if (FindAnyObjectByType<EventSystem>() == null)
+        EventSystem[] allSystems = FindObjectsByType<EventSystem>(FindObjectsInactive.Include);
+        if (allSystems == null || allSystems.Length == 0)
         {
             GameObject es = new GameObject("EventSystem");
             es.AddComponent<EventSystem>();
@@ -683,7 +722,23 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 #else
             es.AddComponent<StandaloneInputModule>();
 #endif
-            DontDestroyOnLoad(es);
+        }
+        else if (allSystems.Length > 1)
+        {
+            // Giữ lại duy nhất 1 EventSystem đang bật để tránh xung đột click UI khi quay về Sảnh
+            EventSystem keep = allSystems[0];
+            for (int i = 0; i < allSystems.Length; i++)
+            {
+                if (allSystems[i].gameObject.scene == gameObject.scene)
+                {
+                    keep = allSystems[i];
+                    break;
+                }
+            }
+            for (int i = 0; i < allSystems.Length; i++)
+            {
+                if (allSystems[i] != keep) Destroy(allSystems[i].gameObject);
+            }
         }
     }
 
@@ -1010,8 +1065,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         string[] cardTitles = new string[]
         {
-            "Bắt đầu\nmột người chơi",
-            "Bắt đầu\nchế độ nhiều\nngười chơi",
+            "Đấu Đơn / Ghép Trận\n(Tìm trận 4 người)",
+            "Đấu Tổ Đội\n(Ghép bạn bè & người lẻ)",
             "Bắt đầu\nmáy chủ",
             "Bắt đầu\nlàm chủ phòng",
             "Bắt đầu\nlàm khách",
@@ -1731,6 +1786,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     // Các nút bấm ở Sảnh Chính
     public void OnCreateRoomClicked()
     {
+        PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         // Khi nhấn Tạo phòng: Nếu chưa nhập ID thì tự sinh ID 5 chữ số mới và đưa ngay vào Phòng Chờ!
         string rid = roomIdInputField != null ? roomIdInputField.text.Trim() : "";
         if (string.IsNullOrEmpty(rid))
@@ -1743,6 +1799,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnJoinRoomClicked()
     {
+        PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         string rid = GetOrGenerateRoomId(false);
         Debug.Log($"<color=#A29BFE>[Lobby] THAM GIA PHÒNG - ID Phòng: {(string.IsNullOrEmpty(rid) ? "Tự động tìm phòng đang mở" : rid)}</color>");
         EnterWaitingRoomWithId(rid, false);
@@ -1750,20 +1807,23 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnCard1_StartSinglePlayer()
     {
+        PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         string rid = GetOrGenerateRoomId(true);
-        Debug.Log($"<color=#3498DB>[Lobby] Chế độ một người chơi - Mở phòng: {rid}</color>");
+        Debug.Log($"<color=#3498DB>[Lobby] Chế độ Đấu Đơn / Ghép Trận - Phòng chuẩn bị ID: {rid}</color>");
         EnterWaitingRoomWithId(rid, true);
     }
 
     public void OnCard2_StartSharedClient()
     {
-        string rid = GetOrGenerateRoomId(false);
-        Debug.Log($"<color=#1ABC9C>[Lobby] Chế độ nhiều người chơi - Vào Phòng Chờ ID: {(string.IsNullOrEmpty(rid) ? "Tự động ghép phòng" : rid)}</color>");
-        EnterWaitingRoomWithId(rid, false);
+        PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
+        string rid = GetOrGenerateRoomId(true);
+        Debug.Log($"<color=#1ABC9C>[Lobby] Chế độ Đấu Tổ Đội - Phòng Chờ ID: {rid}</color>");
+        EnterWaitingRoomWithId(rid, true);
     }
 
     public void OnCard3_StartServer()
     {
+        PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         string rid = GetOrGenerateRoomId(true);
         Debug.Log($"<color=#9B59B6>[Lobby] Bắt đầu máy chủ - Phòng Chờ ID: {rid}</color>");
         EnterWaitingRoomWithId(rid, true);
@@ -1782,6 +1842,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnCard6_StartAutoClient()
     {
+        PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         string rid = GetOrGenerateRoomId(false);
         Debug.Log($"<color=#E056FD>[Lobby] Tự động làm chủ hoặc làm khách - Phòng Chờ ID: {(string.IsNullOrEmpty(rid) ? "Tự động ghép phòng" : rid)}</color>");
         EnterWaitingRoomWithId(rid, false);
@@ -1790,6 +1851,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     public void HideImmediatelyForMatchStart()
     {
         isInsideWaitingRoom = false;
+        ThirdPersonCamera.isUIPanelOpen = false;
         if (lobbyRootObj != null && lobbyRootObj.activeSelf)
         {
             lobbyRootObj.SetActive(false);
@@ -1807,6 +1869,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     public void OnLeaveWaitingRoomClicked()
     {
         Debug.Log("<color=yellow>[Lobby] Rời phòng chờ, quay lại sảnh chọn chế độ.</color>");
+        currentRoomId = "";
+        if (roomIdInputField != null)
+        {
+            roomIdInputField.text = "";
+        }
         if (PhotonMultiplayerChatVoice.Instance != null)
         {
             PhotonMultiplayerChatVoice.Instance.LeaveRoomAndReturnToMenu();
@@ -1820,9 +1887,53 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnToggleReadyClicked()
     {
-        if (PhotonMultiplayerChatVoice.Instance != null)
+        var photonMgr = PhotonMultiplayerChatVoice.Instance;
+        if (photonMgr == null) return;
+
+        int currentCount = photonMgr.CurrentRoomPlayersCount;
+
+        // 1. Nếu đang trong trạng thái tìm trận -> Bấm nút là HỦY TÌM TRẬN
+        if (PhotonMultiplayerChatVoice.IsMatchmakingSearching)
         {
-            PhotonMultiplayerChatVoice.Instance.ToggleLocalPlayerReady();
+            photonMgr.CancelSoloPartyMatchmaking();
+            UpdateWaitingRoomUI();
+            return;
+        }
+
+        // 2. Nếu phòng đã đủ 4 người -> Bật/tắt sẵn sàng để vào trận ngay
+        if (currentCount >= 4)
+        {
+            photonMgr.ToggleLocalPlayerReady();
+            UpdateWaitingRoomUI();
+            return;
+        }
+
+        // 3. Nếu phòng chưa đủ 4 người (1, 2 hoặc 3 người):
+        // Nếu là người đi đơn 1 mình (Solo) -> Bắt đầu tìm trận ngay!
+        if (currentCount <= 1)
+        {
+            photonMgr.StartSoloPartyMatchmaking();
+            UpdateWaitingRoomUI();
+            return;
+        }
+
+        // Nếu là tổ đội (2 hoặc 3 người):
+        if (!photonMgr.IsLocalMaster)
+        {
+            // Thành viên trong đội: bật/tắt sẵn sàng
+            photonMgr.ToggleLocalPlayerReady();
+        }
+        else
+        {
+            // Chủ phòng tổ đội: kiểm tra xem các thành viên đã sẵn sàng hết chưa
+            if (photonMgr.AreAllOtherPlayersReady())
+            {
+                photonMgr.StartSoloPartyMatchmaking();
+            }
+            else
+            {
+                photonMgr.AddSystemMessage("⚠️ Hãy nhắc đồng đội trong tổ đội bấm [Sẵn Sàng] trước khi Bắt Đầu Tìm Trận!");
+            }
         }
         UpdateWaitingRoomUI();
     }
@@ -1870,13 +1981,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             if (isPhotonConnected)
             {
-                connectionStatusBadgeText.text = "Đã kết nối";
+                string reg = photonMgr != null ? photonMgr.ConnectedRegionName : "";
+                connectionStatusBadgeText.text = string.IsNullOrEmpty(reg) ? "Đã kết nối" : $"Đã kết nối ({reg})";
                 connectionStatusBadgeText.color = colConnected;
                 connectionStatusDotImage.color = colConnected;
             }
             else
             {
-                connectionStatusBadgeText.text = "Đang kết nối...";
+                string st = (photonMgr != null && !string.IsNullOrEmpty(photonMgr.LastLobbyStatus))
+                    ? photonMgr.LastLobbyStatus
+                    : "Đang kết nối...";
+                connectionStatusBadgeText.text = st;
                 connectionStatusBadgeText.color = colConnecting;
                 connectionStatusDotImage.color = colConnecting;
             }
@@ -1922,9 +2037,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             ? currentRoomId
             : (photonMgr != null && !string.IsNullOrEmpty(photonMgr.roomName) ? photonMgr.roomName : "Đang tìm...");
 
+        bool inRoom = photonMgr != null && photonMgr.IsInPhotonRoom;
         if (waitingRoomIdText != null)
         {
-            waitingRoomIdText.text = $"🚪 ID PHÒNG:  <color=#FFF275>{displayRoomId}</color>";
+            string statusSuffix = inRoom ? "" : " <color=#FFD43B>(Đang vào phòng...)</color>";
+            waitingRoomIdText.text = $"🚪 ID PHÒNG:  <color=#FFF275>{displayRoomId}</color>{statusSuffix}";
         }
 
         if (waitingPlayerNameInput != null && !waitingPlayerNameInput.isFocused && photonMgr != null)
@@ -1990,10 +2107,18 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
                     string rolePrefix = p.isMaster ? "👑 Chủ Phòng" : "🟢 Thành Viên";
                     string readyTxt = p.isReady ? "✔ Đã sẵn sàng" : "⏳ Chưa sẵn sàng";
-                    slot.playerRoleStatusText.text = $"{rolePrefix}  ●  {readyTxt}";
-                    slot.playerRoleStatusText.color = p.isReady
-                        ? new Color(0.25f, 0.98f, 0.62f, 1f)
-                        : new Color(1.0f, 0.85f, 0.30f, 1f);
+                    if (!inRoom)
+                    {
+                        slot.playerRoleStatusText.text = "⏳ Đang kết nối máy chủ phòng...";
+                        slot.playerRoleStatusText.color = new Color(1.0f, 0.85f, 0.30f, 1f);
+                    }
+                    else
+                    {
+                        slot.playerRoleStatusText.text = $"{rolePrefix}  ●  {readyTxt}";
+                        slot.playerRoleStatusText.color = p.isReady
+                            ? new Color(0.25f, 0.98f, 0.62f, 1f)
+                            : new Color(1.0f, 0.85f, 0.30f, 1f);
+                    }
                 }
                 else
                 {
@@ -2032,35 +2157,71 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 slot.slotBadgeText.text = $"VỊ TRÍ #{i + 1} (CÒN TRỐNG)";
                 slot.slotBadgeText.color = new Color(0.52f, 0.60f, 0.76f, 0.85f);
 
-                slot.playerNameText.text = "Đang chờ người chơi...";
-                slot.playerNameText.color = new Color(0.48f, 0.56f, 0.72f, 0.75f);
+                bool isSearching = PhotonMultiplayerChatVoice.IsMatchmakingSearching;
+                slot.playerNameText.text = isSearching ? "🔍 Đang ghép người..." : "Đang chờ người chơi...";
+                slot.playerNameText.color = isSearching ? new Color(0.20f, 0.95f, 0.65f, 0.85f) : new Color(0.48f, 0.56f, 0.72f, 0.75f);
 
-                slot.playerRoleStatusText.text = $"⏳ Hãy gửi ID [{displayRoomId}] cho bạn bè";
+                slot.playerRoleStatusText.text = isSearching
+                    ? "⏳ Đang quét người chơi lẻ trên server"
+                    : $"⏳ Nhập ID [{displayRoomId}] hoặc bấm Tìm trận";
                 slot.playerRoleStatusText.color = new Color(0.55f, 0.65f, 0.82f, 0.75f);
             }
         }
 
-        // Cập nhật thông báo đếm ngược hoặc chờ đủ 4 người
+        // Cập nhật thông báo đếm ngược hoặc tìm trận
         if (waitingStatusBannerText != null)
         {
             float remCountdown = photonMgr != null ? photonMgr.RemainingCountdown : -1f;
+            bool isSearching = PhotonMultiplayerChatVoice.IsMatchmakingSearching;
+            int secDuration = Mathf.FloorToInt(PhotonMultiplayerChatVoice.MatchmakingSearchDuration);
+            string timeStr = $"{secDuration / 60:D2}:{secDuration % 60:D2}";
+
             if (remCountdown >= 0f)
             {
                 int sec = Mathf.CeilToInt(remCountdown);
-                waitingStatusBannerText.text = $"🔥 ĐÃ ĐỦ {required}/{required} NGƯỜI CHƠI! TRẬN ĐẤU TỰ ĐỘNG BẮT ĐẦU TRONG: {sec} GIÂY! 🔥";
+                waitingStatusBannerText.text = $"🔥 ĐÃ GHÉP ĐỦ {required}/{required} NGƯỜI CHƠI! TRẬN ĐẤU BẮT ĐẦU TRONG: {sec} GIÂY! 🔥";
                 waitingStatusBannerText.color = new Color(0.25f, 1.0f, 0.58f, 1f);
+            }
+            else if (isSearching)
+            {
+                if (currentCount <= 1)
+                {
+                    waitingStatusBannerText.text = $"🔍 ĐANG TÌM TRẬN ĐẤU [{timeStr}]... Đang quét tìm các người chơi đơn khác trên máy chủ Châu Á...";
+                    waitingStatusBannerText.color = new Color(1.0f, 0.72f, 0.20f, 1f);
+                }
+                else
+                {
+                    waitingStatusBannerText.text = $"🔍 ĐANG TÌM TRẬN ĐẤU [{timeStr}]... Đã ghép: <color=#00FF9D>{currentCount}/{required} người</color> (Đang tìm thêm {required - currentCount} bạn lẻ)...";
+                    waitingStatusBannerText.color = new Color(0.25f, 0.95f, 1.0f, 1f);
+                }
             }
             else if (currentCount < required)
             {
-                int missing = required - currentCount;
-                bool inCloudRoom = photonMgr != null && photonMgr.IsInPhotonRoom;
-                string connNote = inCloudRoom ? "Đã mở phòng trực tuyến" : "Đang đồng bộ phòng lên máy chủ Photon...";
-                waitingStatusBannerText.text = $"🔒 Game chưa chạy ({connNote}) — Đang chờ thêm {missing} người chơi nữa để đủ {required}/{required} người!";
-                waitingStatusBannerText.color = new Color(1.0f, 0.84f, 0.28f, 1f);
+                if (currentCount <= 1)
+                {
+                    waitingStatusBannerText.text = $"🎮 PHÒNG CHUẨN BỊ (ĐẤU ĐƠN): Bấm [⚔️ BẮT ĐẦU TÌM TRẬN] để tự động ghép cặp cùng 3 người chơi khác!";
+                    waitingStatusBannerText.color = new Color(0.40f, 0.75f, 1.0f, 1f);
+                }
+                else
+                {
+                    bool allOthers = photonMgr != null && photonMgr.AreAllOtherPlayersReady();
+                    if (photonMgr != null && photonMgr.IsLocalMaster)
+                    {
+                        waitingStatusBannerText.text = allOthers
+                            ? $"⚡ TẤT CẢ ĐỒNG ĐỘI ĐÃ SẴN SÀNG! Đội trưởng hãy bấm [BẮT ĐẦU TÌM TRẬN] để ghép thêm {required - currentCount} bạn lẻ!"
+                            : $"⏳ PHÒNG TỔ ĐỘI ({currentCount}/{required} NGƯỜI): Đang chờ đồng đội bấm ✔ SẴN SÀNG...";
+                        waitingStatusBannerText.color = allOthers ? new Color(0.20f, 1.0f, 0.65f, 1f) : new Color(1.0f, 0.84f, 0.28f, 1f);
+                    }
+                    else
+                    {
+                        waitingStatusBannerText.text = $"🎮 PHÒNG TỔ ĐỘI ({currentCount}/{required} NGƯỜI): Hãy bấm ✔ SẴN SÀNG để Đội trưởng bắt đầu tìm trận!";
+                        waitingStatusBannerText.color = new Color(0.35f, 0.95f, 1.0f, 1f);
+                    }
+                }
             }
             else
             {
-                waitingStatusBannerText.text = "⚡ Đã đủ 4 người chơi! Đang mở cổng mê cung...";
+                waitingStatusBannerText.text = $"🎉 ĐÃ ĐỦ {required}/{required} NGƯỜI TRONG PHÒNG! Bấm ✔ SẴN SÀNG để bắt đầu trận đấu ngay!";
                 waitingStatusBannerText.color = new Color(0.25f, 1.0f, 0.58f, 1f);
             }
         }
@@ -2073,18 +2234,86 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         if (waitingReadyBtnText != null)
         {
+            float remCountdown = photonMgr != null ? photonMgr.RemainingCountdown : -1f;
+            bool isSearching = PhotonMultiplayerChatVoice.IsMatchmakingSearching;
             bool isMeReady = PhotonMultiplayerChatVoice.IsLocalPlayerReady;
-            if (isMeReady)
+            int secDuration = Mathf.FloorToInt(PhotonMultiplayerChatVoice.MatchmakingSearchDuration);
+            string timeStr = $"{secDuration / 60:D2}:{secDuration % 60:D2}";
+
+            if (remCountdown >= 0f)
             {
-                waitingReadyBtnText.text = "✔ BẠN ĐÃ XÁC NHẬN (Click để hủy)";
+                waitingReadyBtnText.text = $"⚡ ĐANG VÀO TRẬN ({Mathf.CeilToInt(remCountdown)}s)...";
                 if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.16f, 0.62f, 0.36f, 0.95f);
                 if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.98f, 0.62f, 1f);
             }
+            else if (isSearching)
+            {
+                if (photonMgr == null || photonMgr.IsLocalMaster || currentCount <= 1)
+                {
+                    waitingReadyBtnText.text = $"❌ ĐANG TÌM TRẬN [{timeStr}] (BẤM ĐỂ HỦY)";
+                    if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.85f, 0.26f, 0.18f, 0.95f);
+                    if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.0f, 0.45f, 0.35f, 1f);
+                }
+                else
+                {
+                    waitingReadyBtnText.text = $"⏳ ĐANG TÌM TRẬN CÙNG ĐỘI [{timeStr}]...";
+                    if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.85f, 0.55f, 0.15f, 0.95f);
+                    if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.0f, 0.75f, 0.30f, 1f);
+                }
+            }
+            else if (currentCount >= required)
+            {
+                if (isMeReady)
+                {
+                    waitingReadyBtnText.text = "✔ BẠN ĐÃ SẴN SÀNG (Click để hủy)";
+                    if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.16f, 0.62f, 0.36f, 0.95f);
+                    if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.98f, 0.62f, 1f);
+                }
+                else
+                {
+                    waitingReadyBtnText.text = "✔ BẤM ĐỂ XÁC NHẬN SẴN SÀNG (VÀO TRẬN)";
+                    if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.18f, 0.45f, 0.85f, 0.95f);
+                    if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.70f, 1.00f, 1f);
+                }
+            }
             else
             {
-                waitingReadyBtnText.text = "✔ BẤM ĐỂ XÁC NHẬN SẴN SÀNG";
-                if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.18f, 0.45f, 0.85f, 0.95f);
-                if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.70f, 1.00f, 1f);
+                // Chưa đủ 4 người
+                if (currentCount <= 1)
+                {
+                    // Người chơi đơn 1 mình
+                    waitingReadyBtnText.text = "⚔️ BẮT ĐẦU TÌM TRẬN (SẴN SÀNG)";
+                    if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.95f, 0.52f, 0.10f, 0.95f);
+                    if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.00f, 0.75f, 0.25f, 1f);
+                }
+                else
+                {
+                    // Tổ đội (2 hoặc 3 người)
+                    if (photonMgr != null && !photonMgr.IsLocalMaster)
+                    {
+                        // Thành viên trong đội
+                        waitingReadyBtnText.text = isMeReady ? "✔ ĐÃ SẴN SÀNG (Click để hủy)" : "✔ BẤM ĐỂ SẴN SÀNG";
+                        if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = isMeReady ? new Color(0.16f, 0.62f, 0.36f, 0.95f) : new Color(0.18f, 0.45f, 0.85f, 0.95f);
+                        if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = isMeReady ? new Color(0.35f, 0.98f, 0.62f, 1f) : new Color(0.35f, 0.70f, 1.00f, 1f);
+                    }
+                    else
+                    {
+                        // Chủ phòng tổ đội
+                        bool allOthers = photonMgr != null && photonMgr.AreAllOtherPlayersReady();
+                        if (allOthers)
+                        {
+                            waitingReadyBtnText.text = $"⚔️ BẮT ĐẦU TÌM TRẬN (GHÉP THÊM {required - currentCount} BẠN)";
+                            if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.95f, 0.52f, 0.10f, 0.95f);
+                            if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.00f, 0.75f, 0.25f, 1f);
+                        }
+                        else
+                        {
+                            waitingReadyBtnText.text = "⏳ CHỜ TỔ ĐỘI SẴN SÀNG...";
+                            if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.35f, 0.40f, 0.50f, 0.95f);
+                            if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.50f, 0.55f, 0.65f, 1f);
+                        }
+                    }
+                }
             }
         }
     }
@@ -2110,9 +2339,28 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             OnLeaveWaitingRoomClicked();
         }
-        else if (f1Pressed && isInsideWaitingRoom && !PhotonMultiplayerChatVoice.IsGameStarted)
+        else if (f1Pressed)
         {
-            OnHostForceStartClicked();
+            var net = PhotonMultiplayerChatVoice.Instance;
+            bool inPhotonWaitingRoom = isInsideWaitingRoom && net != null && net.IsInPhotonRoom && !PhotonMultiplayerChatVoice.IsGameStarted;
+            if (inPhotonWaitingRoom)
+            {
+                OnHostForceStartClicked();
+            }
+            else
+            {
+                bool lobbyInputFocused = (roomIdInputField != null && roomIdInputField.isFocused)
+                    || (waitingPlayerNameInput != null && waitingPlayerNameInput.isFocused);
+                if (!lobbyInputFocused)
+                {
+                    if (net == null)
+                    {
+                        GameObject go = new GameObject("Photon_Multiplayer_VoiceChat");
+                        net = go.AddComponent<PhotonMultiplayerChatVoice>();
+                    }
+                    net.StartOfflineQuickTestWithTwoGhosts();
+                }
+            }
         }
     }
 }
