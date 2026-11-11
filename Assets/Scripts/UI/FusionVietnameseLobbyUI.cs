@@ -59,6 +59,15 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private bool isDirectMatchmakingActive = false;
     private Text topRightPlayerNameText;
 
+    // Quản lý Đa Ngôn Ngữ & Tag 18+ (Localization & 18+ Age Rating)
+    private Text headerLanguageBtnText;
+    private Text headerAgeRatingText;
+    private Text headerSubtitleText;
+    private Text bottomDisclaimerText;
+    private readonly Text[] cardTitleTexts = new Text[6];
+    private readonly Text[] cardBadgeTexts = new Text[6];
+    private readonly Text[] cardBtnTexts = new Text[6];
+
     private struct PlayerSlotUI
     {
         public GameObject rootObj;
@@ -152,10 +161,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         GenerateProceduralSprites();
         BuildCompleteLobbyUI();
+
+        // Đăng ký nhận thông báo thay đổi ngôn ngữ
+        GameLocalizationManager.OnLanguageChanged += HandleLobbyLanguageChanged;
     }
 
     private void OnDestroy()
     {
+        GameLocalizationManager.OnLanguageChanged -= HandleLobbyLanguageChanged;
         if (Instance == this)
         {
             Instance = null;
@@ -784,6 +797,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         // 5. Thanh HUD ID Phòng Nhỏ Gọn Góc Trên Phải Khi Đã Bắt Đầu Trận Đấu
         BuildInGameRoomHUD(lobbyCanvas.transform, font);
 
+        // 6. Dải Banner Cảnh Báo Bản Quyền & Phân Loại 18+ (Bảo Hộ Pháp Lý Dưới Đáy Màn Hình)
+        BuildBottomLegalDisclaimer(lobbyRootObj.transform, font);
+
+        // Khởi tạo text ngôn ngữ đồng bộ
+        UpdateAllLobbyLocalizedTexts();
+
         // Khởi đầu ở Sảnh Chính
         SwitchToMainCardsView();
     }
@@ -917,6 +936,47 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     private void BuildTopRightPlayerBadge(Transform parent, Font font)
     {
+        // 1. Nút chuyển đổi nhanh Ngôn Ngữ (Quick Language Switcher Button)
+        GameObject langBtnObj = new GameObject("QuickLanguageSwitcherBtn");
+        langBtnObj.transform.SetParent(parent, false);
+        RectTransform lrt = langBtnObj.AddComponent<RectTransform>();
+        lrt.anchorMin = new Vector2(1f, 1f);
+        lrt.anchorMax = new Vector2(1f, 1f);
+        lrt.pivot = new Vector2(1f, 1f);
+        lrt.anchoredPosition = new Vector2(-330f, -28f);
+        lrt.sizeDelta = new Vector2(180f, 52f);
+
+        Image lbg = langBtnObj.AddComponent<Image>();
+        lbg.color = new Color(0.06f, 0.12f, 0.24f, 0.95f);
+
+        Outline lol = langBtnObj.AddComponent<Outline>();
+        lol.effectColor = new Color(0.35f, 0.65f, 0.95f, 0.85f);
+        lol.effectDistance = new Vector2(2f, 2f);
+
+        Button lbtn = langBtnObj.AddComponent<Button>();
+        lbtn.onClick.AddListener(() =>
+        {
+            GameLocalizationManager.CycleNextLanguage();
+        });
+
+        GameObject ltxtObj = new GameObject("Text");
+        ltxtObj.transform.SetParent(langBtnObj.transform, false);
+        RectTransform ltrt = ltxtObj.AddComponent<RectTransform>();
+        ltrt.anchorMin = Vector2.zero;
+        ltrt.anchorMax = Vector2.one;
+        ltrt.offsetMin = Vector2.zero;
+        ltrt.offsetMax = Vector2.zero;
+
+        headerLanguageBtnText = ltxtObj.AddComponent<Text>();
+        headerLanguageBtnText.font = font;
+        headerLanguageBtnText.fontSize = 15;
+        headerLanguageBtnText.fontStyle = FontStyle.Bold;
+        headerLanguageBtnText.alignment = TextAnchor.MiddleCenter;
+        headerLanguageBtnText.color = new Color(0.92f, 0.96f, 1f);
+        headerLanguageBtnText.supportRichText = true;
+        UpdateLanguageButtonLabel();
+
+        // 2. Badge Hồ sơ người chơi
         GameObject badgeObj = new GameObject("PlayerProfileBadge");
         badgeObj.transform.SetParent(parent, false);
         RectTransform bRect = badgeObj.AddComponent<RectTransform>();
@@ -1030,6 +1090,45 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         subTxt.supportRichText = true;
         subTxt.color = new Color(0.65f, 0.88f, 1f, 0.95f);
         subTxt.text = "⚡  MÊ CUNG HUYỀN BÍ  ●  SINH TỒN TỔ ĐỘI 4 NGƯỜI  ⚡";
+
+        Outline subOut = subObj.AddComponent<Outline>();
+        subOut.effectColor = new Color(0.04f, 0.08f, 0.20f, 0.95f);
+        subOut.effectDistance = new Vector2(1.5f, -1.5f);
+        headerSubtitleText = subTxt;
+
+        // 3. Tag 18+ Bảo Hộ Pháp Lý (Official Age Rating 18+ Pill Badge)
+        GameObject ageObj = new GameObject("AgeRatingBadge18Plus");
+        ageObj.transform.SetParent(logoObj.transform, false);
+        RectTransform art = ageObj.AddComponent<RectTransform>();
+        art.anchorMin = new Vector2(1f, 1f);
+        art.anchorMax = new Vector2(1f, 1f);
+        art.pivot = new Vector2(1f, 1f);
+        art.anchoredPosition = new Vector2(-15f, -6f);
+        art.sizeDelta = new Vector2(145f, 32f);
+
+        Image ageBg = ageObj.AddComponent<Image>();
+        ageBg.color = new Color(0.85f, 0.12f, 0.15f, 0.95f); // Đỏ tươi cảnh báo 18+
+
+        Outline ageOut = ageObj.AddComponent<Outline>();
+        ageOut.effectColor = new Color(1f, 0.85f, 0.25f, 0.95f); // Viền vàng neon nổi bật
+        ageOut.effectDistance = new Vector2(1.5f, -1.5f);
+
+        GameObject ageTxtObj = new GameObject("Text");
+        ageTxtObj.transform.SetParent(ageObj.transform, false);
+        RectTransform atrt = ageTxtObj.AddComponent<RectTransform>();
+        atrt.anchorMin = Vector2.zero;
+        atrt.anchorMax = Vector2.one;
+        atrt.offsetMin = Vector2.zero;
+        atrt.offsetMax = Vector2.zero;
+
+        headerAgeRatingText = ageTxtObj.AddComponent<Text>();
+        headerAgeRatingText.font = font;
+        headerAgeRatingText.fontSize = 13;
+        headerAgeRatingText.fontStyle = FontStyle.Bold;
+        headerAgeRatingText.alignment = TextAnchor.MiddleCenter;
+        headerAgeRatingText.color = Color.white;
+        headerAgeRatingText.supportRichText = true;
+        headerAgeRatingText.text = "🔞 <b>18+</b> | MATURE";
 
         Outline subOut = subObj.AddComponent<Outline>();
         subOut.effectColor = new Color(0.04f, 0.08f, 0.20f, 0.95f);
@@ -1402,6 +1501,10 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         bgTxt.alignment = TextAnchor.MiddleCenter;
         bgTxt.color = Color.Lerp(themeColor, Color.white, 0.45f);
         bgTxt.text = badgeText;
+        if (index >= 0 && index < cardBadgeTexts.Length)
+        {
+            cardBadgeTexts[index] = bgTxt;
+        }
 
         // 3. Đỉnh chóp Gothic phía trên thẻ (Crest ornament)
         GameObject topCrest = new GameObject("TopGothicCrest");
@@ -1473,13 +1576,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         ttTxt.supportRichText = true;
         ttTxt.color = isRoyalCenterCard ? new Color(1f, 0.94f, 0.72f, 1f) : new Color(0.92f, 0.96f, 1f, 1f);
         ttTxt.text = titleText;
+        if (index >= 0 && index < cardTitleTexts.Length)
+        {
+            cardTitleTexts[index] = ttTxt;
+        }
 
         Outline ttOut = titleObj.AddComponent<Outline>();
         ttOut.effectColor = new Color(0f, 0f, 0f, 0.85f);
         ttOut.effectDistance = new Vector2(1.5f, -1.5f);
 
         // Nút hành động trực tiếp ở đáy thẻ
-        CreateStyledActionButton(
+        Button actBtn = CreateStyledActionButton(
             innerBody.transform,
             "CardActionButton",
             new Vector2(0.5f, 0f),
@@ -1493,6 +1600,10 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             16,
             () => onClickAction?.Invoke()
         );
+        if (index >= 0 && index < cardBtnTexts.Length)
+        {
+            cardBtnTexts[index] = actBtn != null ? actBtn.GetComponentInChildren<Text>() : null;
+        }
 
         // 8. Sự kiện Click & Hiệu ứng Hover sáng bừng
         Button btn = cardObj.AddComponent<Button>();
@@ -2879,5 +2990,91 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 }
             }
         }
+    }
+
+    // =========================================================================
+    // 7. HỆ THỐNG ĐA NGÔN NGỮ (VI/EN/ES/ZH) & TAG 18+ BẢO HỘ PHÁP LÝ SẢNH CHỜ
+    // =========================================================================
+
+    private void BuildBottomLegalDisclaimer(Transform parent, Font font)
+    {
+        GameObject disGo = new GameObject("BottomLegalDisclaimer");
+        disGo.transform.SetParent(parent, false);
+        RectTransform drt = disGo.AddComponent<RectTransform>();
+        drt.anchorMin = new Vector2(0f, 0f);
+        drt.anchorMax = new Vector2(1f, 0f);
+        drt.pivot = new Vector2(0.5f, 0f);
+        drt.anchoredPosition = new Vector2(0f, 4f);
+        drt.sizeDelta = new Vector2(0f, 28f);
+
+        Image dbg = disGo.AddComponent<Image>();
+        dbg.color = new Color(0.04f, 0.06f, 0.10f, 0.88f);
+
+        GameObject txtGo = new GameObject("Text");
+        txtGo.transform.SetParent(disGo.transform, false);
+        RectTransform trt = txtGo.AddComponent<RectTransform>();
+        trt.anchorMin = Vector2.zero;
+        trt.anchorMax = Vector2.one;
+        trt.offsetMin = new Vector2(20f, 0f);
+        trt.offsetMax = new Vector2(-20f, 0f);
+
+        bottomDisclaimerText = txtGo.AddComponent<Text>();
+        bottomDisclaimerText.font = font;
+        bottomDisclaimerText.fontSize = 12;
+        bottomDisclaimerText.alignment = TextAnchor.MiddleCenter;
+        bottomDisclaimerText.color = new Color(0.72f, 0.78f, 0.85f, 0.90f);
+        bottomDisclaimerText.supportRichText = true;
+        bottomDisclaimerText.text = GameLocalizationManager.T("AGE_DISCLAIMER_FULL");
+    }
+
+    private void UpdateLanguageButtonLabel()
+    {
+        if (headerLanguageBtnText == null) return;
+        var lang = GameLocalizationManager.CurrentLanguage;
+        string flag = GameLocalizationManager.GetLanguageFlag(lang);
+        string code = GameLocalizationManager.GetLanguageCode(lang);
+        string name = GameLocalizationManager.GetLanguageNativeName(lang);
+        headerLanguageBtnText.text = $"🌐 [{code}] {flag} {name}";
+    }
+
+    private void UpdateAllLobbyLocalizedTexts()
+    {
+        UpdateLanguageButtonLabel();
+
+        if (headerSubtitleText != null)
+        {
+            headerSubtitleText.text = GameLocalizationManager.T("HEADER_SUBTITLE", "⚡  MÊ CUNG HUYỀN BÍ  ●  SINH TỒN TỔ ĐỘI 4 NGƯỜI  ⚡");
+        }
+
+        if (headerAgeRatingText != null)
+        {
+            headerAgeRatingText.text = GameLocalizationManager.T("AGE_TAG_PILL", "🔞 18+ MATURE");
+        }
+
+        if (bottomDisclaimerText != null)
+        {
+            bottomDisclaimerText.text = GameLocalizationManager.T("AGE_DISCLAIMER_FULL");
+        }
+
+        for (int i = 0; i < 6; i++)
+        {
+            if (i < cardTitleTexts.Length && cardTitleTexts[i] != null)
+            {
+                cardTitleTexts[i].text = GameLocalizationManager.T($"CARD_{i + 1}_TITLE");
+            }
+            if (i < cardBadgeTexts.Length && cardBadgeTexts[i] != null)
+            {
+                cardBadgeTexts[i].text = GameLocalizationManager.T($"CARD_{i + 1}_BADGE");
+            }
+            if (i < cardBtnTexts.Length && cardBtnTexts[i] != null)
+            {
+                cardBtnTexts[i].text = GameLocalizationManager.T($"CARD_{i + 1}_BTN");
+            }
+        }
+    }
+
+    private void HandleLobbyLanguageChanged(GameLocalizationManager.Language lang)
+    {
+        UpdateAllLobbyLocalizedTexts();
     }
 }

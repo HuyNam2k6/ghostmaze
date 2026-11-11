@@ -24,10 +24,23 @@ public class GameSettingsManager : MonoBehaviour
     public Button tabGraphicsButton;
     public Button tabAudioButton;
     public Button tabControlsButton;
+    [Tooltip("Tab Cài đặt Ngôn ngữ & Pháp lý 18+")]
+    public Button tabLanguageButton;
 
     public GameObject tabGraphicsContent;
     public GameObject tabAudioContent;
     public GameObject tabControlsContent;
+    [Tooltip("Nội dung Tab Ngôn ngữ")]
+    public GameObject tabLanguageContent;
+
+    private readonly Button[] langOptionButtons = new Button[4];
+    private readonly Text[] langOptionStatusTexts = new Text[4];
+    private readonly Image[] langOptionBgs = new Image[4];
+    private readonly Outline[] langOptionOutlines = new Outline[4];
+    private Text tabGraphicsBtnText;
+    private Text tabAudioBtnText;
+    private Text tabControlsBtnText;
+    private Text tabLanguageBtnText;
 
     [Header("1. Hình Ảnh (Graphics & FPS UI)")]
     public Text fpsCounterText;
@@ -180,11 +193,21 @@ public class GameSettingsManager : MonoBehaviour
         // Tự động bổ sung mục Cài Đặt Bố Cục Nút Bấm (kéo thả như Free Fire) vào Tab Điều Khiển
         InjectCustomHUDSettingsSection();
 
+        // Tự động tiêm thêm Tab Ngôn Ngữ (Language) & Bảo Hộ Pháp Lý 18+
+        InjectLanguageSettingsTab();
+        GameLocalizationManager.OnLanguageChanged += HandleLanguageChanged;
+        HandleLanguageChanged(GameLocalizationManager.CurrentLanguage);
+
         // Khởi tạo Tab đầu tiên
         SwitchTab(0);
         UpdateAudioLabels();
         UpdateControlLabels();
         UpdateStatusLabels();
+    }
+
+    private void OnDestroy()
+    {
+        GameLocalizationManager.OnLanguageChanged -= HandleLanguageChanged;
     }
 
     private void Update()
@@ -294,11 +317,13 @@ public class GameSettingsManager : MonoBehaviour
         if (tabGraphicsContent != null) tabGraphicsContent.SetActive(tabIndex == 0);
         if (tabAudioContent != null) tabAudioContent.SetActive(tabIndex == 1);
         if (tabControlsContent != null) tabControlsContent.SetActive(tabIndex == 2);
+        if (tabLanguageContent != null) tabLanguageContent.SetActive(tabIndex == 3);
 
         // Highlight tab đang chọn
         SetTabButtonStyle(tabGraphicsButton, tabIndex == 0, new Color(0.18f, 0.45f, 0.75f));
         SetTabButtonStyle(tabAudioButton, tabIndex == 1, new Color(0.68f, 0.42f, 0.15f));
         SetTabButtonStyle(tabControlsButton, tabIndex == 2, new Color(0.20f, 0.60f, 0.40f));
+        SetTabButtonStyle(tabLanguageButton, tabIndex == 3, new Color(0.52f, 0.22f, 0.72f));
     }
 
     private void SetTabButtonStyle(Button btn, bool isSelected, Color activeColor)
@@ -646,5 +671,319 @@ public class GameSettingsManager : MonoBehaviour
         t.alignment = TextAnchor.MiddleCenter;
         t.color = Color.white;
         t.raycastTarget = false;
+    }
+
+    // =========================================================================
+    // 5. CÀI ĐẶT NGÔN NGỮ & BẢO HỘ PHÁP LÝ 18+ (LANGUAGE & 18+ MATURE RATING)
+    // =========================================================================
+
+    private void InjectLanguageSettingsTab()
+    {
+        if (tabGraphicsButton == null || tabGraphicsContent == null) return;
+        Transform tabParent = tabGraphicsButton.transform.parent;
+        if (tabParent == null) return;
+
+        // Tối ưu hóa TabNavigationGroup bằng HorizontalLayoutGroup để chia đều 4 Tab
+        var hlg = tabParent.GetComponent<HorizontalLayoutGroup>();
+        if (hlg == null)
+        {
+            hlg = tabParent.gameObject.AddComponent<HorizontalLayoutGroup>();
+        }
+        hlg.spacing = 6f;
+        hlg.childControlWidth = true;
+        hlg.childControlHeight = true;
+        hlg.childForceExpandWidth = true;
+        hlg.childForceExpandHeight = true;
+        hlg.childAlignment = TextAnchor.MiddleCenter;
+
+        // Lưu text các nút tab ban đầu để cập nhật đa ngôn ngữ
+        if (tabGraphicsButton != null) tabGraphicsBtnText = tabGraphicsButton.GetComponentInChildren<Text>();
+        if (tabAudioButton != null) tabAudioBtnText = tabAudioButton.GetComponentInChildren<Text>();
+        if (tabControlsButton != null) tabControlsBtnText = tabControlsButton.GetComponentInChildren<Text>();
+
+        // Tạo nút Tab Ngôn Ngữ nếu chưa có
+        if (tabLanguageButton == null)
+        {
+            Transform existingTab = tabParent.Find("Tab_Language");
+            if (existingTab != null)
+            {
+                tabLanguageButton = existingTab.GetComponent<Button>();
+                tabLanguageBtnText = existingTab.GetComponentInChildren<Text>();
+            }
+            else
+            {
+                GameObject tabLangGo = new GameObject("Tab_Language");
+                tabLangGo.transform.SetParent(tabParent, false);
+
+                RectTransform rt = tabLangGo.AddComponent<RectTransform>();
+                rt.sizeDelta = new Vector2(105f, 42f);
+
+                Image bg = tabLangGo.AddComponent<Image>();
+                bg.color = new Color(0.12f, 0.16f, 0.24f, 0.90f);
+
+                Outline ol = tabLangGo.AddComponent<Outline>();
+                ol.effectColor = new Color(1f, 1f, 1f, 0.4f);
+                ol.effectDistance = new Vector2(1.5f, -1.5f);
+
+                tabLanguageButton = tabLangGo.AddComponent<Button>();
+
+                GameObject txtGo = new GameObject("Text");
+                txtGo.transform.SetParent(tabLangGo.transform, false);
+                RectTransform trt = txtGo.AddComponent<RectTransform>();
+                trt.anchorMin = Vector2.zero;
+                trt.anchorMax = Vector2.one;
+                trt.offsetMin = Vector2.zero;
+                trt.offsetMax = Vector2.zero;
+
+                tabLanguageBtnText = txtGo.AddComponent<Text>();
+                tabLanguageBtnText.font = UIFontHelper.GetCrispFont(13);
+                tabLanguageBtnText.text = GameLocalizationManager.T("SETTINGS_TAB_LANGUAGE", "NGÔN NGỮ");
+                tabLanguageBtnText.fontSize = 13;
+                tabLanguageBtnText.fontStyle = FontStyle.Bold;
+                tabLanguageBtnText.alignment = TextAnchor.MiddleCenter;
+                tabLanguageBtnText.color = Color.white;
+            }
+            if (tabLanguageButton != null)
+            {
+                tabLanguageButton.onClick.RemoveAllListeners();
+                tabLanguageButton.onClick.AddListener(() => SwitchTab(3));
+            }
+        }
+
+        // Tạo nội dung trang Tab Ngôn Ngữ nếu chưa có
+        Transform contentParent = tabGraphicsContent.transform.parent;
+        if (contentParent != null && tabLanguageContent == null)
+        {
+            Transform existingContent = contentParent.Find("TabContent_Language");
+            if (existingContent != null)
+            {
+                tabLanguageContent = existingContent.gameObject;
+            }
+            else
+            {
+                tabLanguageContent = new GameObject("TabContent_Language");
+                tabLanguageContent.transform.SetParent(contentParent, false);
+
+                RectTransform cRt = tabLanguageContent.AddComponent<RectTransform>();
+                RectTransform gRt = tabGraphicsContent.GetComponent<RectTransform>();
+                if (gRt != null)
+                {
+                    cRt.anchorMin = gRt.anchorMin;
+                    cRt.anchorMax = gRt.anchorMax;
+                    cRt.pivot = gRt.pivot;
+                    cRt.anchoredPosition = gRt.anchoredPosition;
+                    cRt.sizeDelta = gRt.sizeDelta;
+                }
+
+                BuildLanguageTabElements(tabLanguageContent.transform);
+                tabLanguageContent.SetActive(false);
+            }
+        }
+    }
+
+    private void BuildLanguageTabElements(Transform root)
+    {
+        Font font = UIFontHelper.GetCrispFont(14);
+
+        // 1. Tiêu đề mục Ngôn Ngữ
+        CreateControlLabel(root, "Lang_Header", new Vector2(0f, -10f), 26f,
+            "🌐 CÀI ĐẶT NGÔN NGỮ (LANGUAGE SETTINGS)", 15, FontStyle.Bold, new Color(0.35f, 0.85f, 1.0f), font);
+
+        CreateControlLabel(root, "Lang_Subtitle", new Vector2(0f, -38f), 24f,
+            "Chọn ngôn ngữ hiển thị trong game / Select display language:", 12, FontStyle.Italic, new Color(0.78f, 0.88f, 0.98f), font);
+
+        // 2. 4 Thẻ lựa chọn ngôn ngữ
+        string[] langLabels = new string[]
+        {
+            "🇻🇳  <b>Tiếng Việt</b>  <color=#88AACC>(Vietnamese - Mặc định)</color>",
+            "🇬🇧  <b>English</b>  <color=#88AACC>(English - Global)</color>",
+            "🇪🇸  <b>Español</b>  <color=#88AACC>(Spanish - Tiếng Tây Ban Nha)</color>",
+            "🇨🇳  <b>中文 (简体)</b>  <color=#88AACC>(Chinese - Tiếng Trung)</color>"
+        };
+
+        float startY = -72f;
+        float cardH = 50f;
+        float spacingY = 10f;
+
+        for (int i = 0; i < 4; i++)
+        {
+            int langIdx = i;
+            float curY = startY - i * (cardH + spacingY);
+
+            GameObject cardGo = new GameObject($"LangCard_{i}");
+            cardGo.transform.SetParent(root, false);
+            RectTransform crt = cardGo.AddComponent<RectTransform>();
+            crt.anchorMin = new Vector2(0.5f, 1f);
+            crt.anchorMax = new Vector2(0.5f, 1f);
+            crt.pivot = new Vector2(0.5f, 1f);
+            crt.anchoredPosition = new Vector2(0f, curY);
+            crt.sizeDelta = new Vector2(460f, cardH);
+
+            Image bg = cardGo.AddComponent<Image>();
+            bg.color = new Color(0.08f, 0.12f, 0.20f, 0.92f);
+            langOptionBgs[i] = bg;
+
+            Outline ol = cardGo.AddComponent<Outline>();
+            ol.effectColor = new Color(0.22f, 0.32f, 0.50f, 0.70f);
+            ol.effectDistance = new Vector2(1.5f, -1.5f);
+            langOptionOutlines[i] = ol;
+
+            Button btn = cardGo.AddComponent<Button>();
+            btn.onClick.AddListener(() =>
+            {
+                GameLocalizationManager.SetLanguage((GameLocalizationManager.Language)langIdx);
+            });
+            langOptionButtons[i] = btn;
+
+            // Nhãn tên ngôn ngữ bên trái
+            GameObject nameGo = new GameObject("LangName");
+            nameGo.transform.SetParent(cardGo.transform, false);
+            RectTransform nrt = nameGo.AddComponent<RectTransform>();
+            nrt.anchorMin = new Vector2(0f, 0f);
+            nrt.anchorMax = new Vector2(0.68f, 1f);
+            nrt.offsetMin = new Vector2(16f, 0f);
+            nrt.offsetMax = Vector2.zero;
+
+            Text nameTxt = nameGo.AddComponent<Text>();
+            nameTxt.font = font;
+            nameTxt.fontSize = 14;
+            nameTxt.alignment = TextAnchor.MiddleLeft;
+            nameTxt.supportRichText = true;
+            nameTxt.color = Color.white;
+            nameTxt.text = langLabels[i];
+            nameTxt.raycastTarget = false;
+
+            // Trạng thái đang chọn bên phải
+            GameObject stGo = new GameObject("StatusText");
+            stGo.transform.SetParent(cardGo.transform, false);
+            RectTransform srt = stGo.AddComponent<RectTransform>();
+            srt.anchorMin = new Vector2(0.68f, 0f);
+            srt.anchorMax = new Vector2(1f, 1f);
+            srt.offsetMin = Vector2.zero;
+            srt.offsetMax = new Vector2(-16f, 0f);
+
+            Text stTxt = stGo.AddComponent<Text>();
+            stTxt.font = font;
+            stTxt.fontSize = 12;
+            stTxt.fontStyle = FontStyle.Bold;
+            stTxt.alignment = TextAnchor.MiddleRight;
+            stTxt.supportRichText = true;
+            stTxt.color = new Color(0.65f, 0.75f, 0.85f);
+            stTxt.text = "CHỌN";
+            stTxt.raycastTarget = false;
+            langOptionStatusTexts[i] = stTxt;
+        }
+
+        // Đường kẻ phân cách
+        GameObject divGo = new GameObject("DividerLang");
+        divGo.transform.SetParent(root, false);
+        RectTransform drt = divGo.AddComponent<RectTransform>();
+        drt.anchorMin = new Vector2(0.5f, 1f);
+        drt.anchorMax = new Vector2(0.5f, 1f);
+        drt.pivot = new Vector2(0.5f, 1f);
+        drt.anchoredPosition = new Vector2(0f, -318f);
+        drt.sizeDelta = new Vector2(460f, 2f);
+        Image divImg = divGo.AddComponent<Image>();
+        divImg.color = new Color(0.25f, 0.35f, 0.50f, 0.6f);
+
+        // 3. Khung BẢO HỘ PHÁP LÝ & ĐỘ TUỔI 18+ (MATURE 18+ PROTECTION BOX)
+        GameObject legalBox = new GameObject("Box_18PlusLegalCompliance");
+        legalBox.transform.SetParent(root, false);
+        RectTransform lrt = legalBox.AddComponent<RectTransform>();
+        lrt.anchorMin = new Vector2(0.5f, 1f);
+        lrt.anchorMax = new Vector2(0.5f, 1f);
+        lrt.pivot = new Vector2(0.5f, 1f);
+        lrt.anchoredPosition = new Vector2(0f, -332f);
+        lrt.sizeDelta = new Vector2(460f, 165f);
+
+        Image lbg = legalBox.AddComponent<Image>();
+        lbg.color = new Color(0.18f, 0.04f, 0.06f, 0.95f);
+
+        Outline lol = legalBox.AddComponent<Outline>();
+        lol.effectColor = new Color(0.95f, 0.22f, 0.25f, 0.90f);
+        lol.effectDistance = new Vector2(2f, -2f);
+
+        // Header Tag 18+
+        CreateControlLabel(legalBox.transform, "LegalHeader", new Vector2(14f, -10f), 24f,
+            "🔞 BẢO HỘ PHÁP LÝ: PHÂN LOẠI ĐỘ TUỔI 18+ (MATURE)", 13, FontStyle.Bold, new Color(1.0f, 0.85f, 0.30f), font);
+
+        // Badges tiêu chuẩn quốc tế
+        CreateControlLabel(legalBox.transform, "LegalBadges", new Vector2(14f, -34f), 20f,
+            "<color=#FF6B6B>[IARC 18+]</color>   <color=#FFA502>[PEGI 18]</color>   <color=#ECCC68>[ESRB: M 17+]</color>   <color=#2ED573>[STORE COMPLIANT]</color>",
+            11, FontStyle.Bold, Color.white, font);
+
+        // Văn bản pháp lý bảo hộ
+        GameObject descGo = new GameObject("LegalDesc");
+        descGo.transform.SetParent(legalBox.transform, false);
+        RectTransform drt2 = descGo.AddComponent<RectTransform>();
+        drt2.anchorMin = new Vector2(0f, 0f);
+        drt2.anchorMax = new Vector2(1f, 1f);
+        drt2.offsetMin = new Vector2(14f, 10f);
+        drt2.offsetMax = new Vector2(-14f, -56f);
+
+        Text dt = descGo.AddComponent<Text>();
+        dt.font = font;
+        dt.fontSize = 11;
+        dt.lineSpacing = 1.2f;
+        dt.alignment = TextAnchor.UpperLeft;
+        dt.color = new Color(0.92f, 0.94f, 0.96f, 0.95f);
+        dt.supportRichText = true;
+        dt.text = "• Trò chơi chứa các phân cảnh kinh dị ma quái, hù dọa hồi hộp và âm thanh căng thẳng, không phù hợp cho trẻ vị thành niên.\n" +
+                  "• Đã gắn tag 18+ quốc tế để tuân thủ 100% Chính Sách Gia Đình (Families Policy) của Google Play và Apple App Store, loại bỏ hoàn toàn rủi ro bị từ chối hoặc gỡ ứng dụng.";
+        dt.raycastTarget = false;
+
+        // Footer bản quyền
+        CreateControlLabel(root, "Lang_FooterNotice", new Vector2(0f, -510f), 22f,
+            "Ghost Maze Studio © 2026 • Trò Chơi Đã Được Đăng Ký Bản Quyền", 11, FontStyle.Italic, new Color(0.55f, 0.65f, 0.78f), font);
+
+        RefreshLanguageTabVisuals();
+    }
+
+    private void RefreshLanguageTabVisuals()
+    {
+        GameLocalizationManager.Language cur = GameLocalizationManager.CurrentLanguage;
+        for (int i = 0; i < 4; i++)
+        {
+            if (langOptionBgs[i] == null) continue;
+            bool isSelected = (int)cur == i;
+            if (isSelected)
+            {
+                langOptionBgs[i].color = new Color(0.10f, 0.35f, 0.28f, 0.96f);
+                if (langOptionOutlines[i] != null)
+                {
+                    langOptionOutlines[i].effectColor = new Color(0.28f, 0.95f, 0.75f, 0.95f);
+                }
+                if (langOptionStatusTexts[i] != null)
+                {
+                    langOptionStatusTexts[i].text = "<color=#2EE87A>✔ ĐANG DÙNG</color>";
+                }
+            }
+            else
+            {
+                langOptionBgs[i].color = new Color(0.08f, 0.12f, 0.20f, 0.92f);
+                if (langOptionOutlines[i] != null)
+                {
+                    langOptionOutlines[i].effectColor = new Color(0.22f, 0.32f, 0.50f, 0.70f);
+                }
+                if (langOptionStatusTexts[i] != null)
+                {
+                    langOptionStatusTexts[i].text = "<color=#7F8C8D>CHỌN</color>";
+                }
+            }
+        }
+    }
+
+    private void HandleLanguageChanged(GameLocalizationManager.Language lang)
+    {
+        RefreshLanguageTabVisuals();
+
+        if (tabGraphicsBtnText != null) tabGraphicsBtnText.text = GameLocalizationManager.T("SETTINGS_TAB_GRAPHICS", "HÌNH ẢNH");
+        if (tabAudioBtnText != null) tabAudioBtnText.text = GameLocalizationManager.T("SETTINGS_TAB_AUDIO", "ÂM THANH");
+        if (tabControlsBtnText != null) tabControlsBtnText.text = GameLocalizationManager.T("SETTINGS_TAB_CONTROLS", "ĐIỀU KHIỂN");
+        if (tabLanguageBtnText != null) tabLanguageBtnText.text = GameLocalizationManager.T("SETTINGS_TAB_LANGUAGE", "NGÔN NGỮ");
+
+        UpdateAudioLabels();
+        UpdateControlLabels();
+        UpdateStatusLabels();
     }
 }
