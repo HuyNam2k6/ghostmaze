@@ -507,8 +507,7 @@ namespace GhostMaze.UI
             scaler.referencePixelsPerUnit = 100f;
             cGo.AddComponent<GraphicRaycaster>();
 
-            Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (defaultFont == null) defaultFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
+            Font defaultFont = UIFontHelper.GetCrispFont(14);
 
             // Khung chứa chính (MiniMap_Container)
             miniMapRoot = new GameObject("MiniMap_Container");

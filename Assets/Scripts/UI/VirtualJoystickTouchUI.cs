@@ -765,8 +765,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
         if (cachedFont == null)
         {
-            cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (cachedFont == null) cachedFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
+            cachedFont = UIFontHelper.GetCrispFont(14);
         }
     }
 

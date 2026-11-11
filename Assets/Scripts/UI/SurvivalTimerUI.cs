@@ -1163,7 +1163,7 @@ public class SurvivalTimerUI : MonoBehaviour
             textRt.offsetMax = new Vector2(-15f, -5f);
 
             floatingNoticeText = textGo.AddComponent<Text>();
-            floatingNoticeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            floatingNoticeText.font = UIFontHelper.GetCrispFont(20);
             floatingNoticeText.fontSize = 20;
             floatingNoticeText.fontStyle = FontStyle.Bold;
             floatingNoticeText.alignment = TextAnchor.MiddleCenter;
@@ -1212,7 +1212,7 @@ public class SurvivalTimerUI : MonoBehaviour
         outline.effectColor = outlineColor;
         outline.effectDistance = new Vector2(3f, -3f);
 
-        Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        Font defaultFont = UIFontHelper.GetCrispFont(28);
 
         // 1. Text Tiêu đề (NGƯỜI WIN / MA WIN)
         GameObject titleObj = new GameObject("TitleText");
@@ -1542,7 +1542,7 @@ public class SurvivalTimerUI : MonoBehaviour
         trt.offsetMax = new Vector2(-6f, -2f);
 
         quickTestBtnText = textGo.AddComponent<Text>();
-        quickTestBtnText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Font.CreateDynamicFontFromOSFont("Arial", 14);
+        quickTestBtnText.font = UIFontHelper.GetCrispFont(15);
         quickTestBtnText.fontSize = 15;
         quickTestBtnText.fontStyle = FontStyle.Bold;
         quickTestBtnText.alignment = TextAnchor.MiddleCenter;

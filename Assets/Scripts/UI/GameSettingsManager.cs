@@ -511,8 +511,7 @@ public class GameSettingsManager : MonoBehaviour
         Transform tRoot = tabControlsContent.transform;
         if (tRoot.Find("Btn_CustomizeHUD") != null) return;
 
-        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (font == null) font = Font.CreateDynamicFontFromOSFont("Arial", 14);
+        Font font = UIFontHelper.GetCrispFont(14);
 
         // Đẩy nhóm hướng dẫn bàn phím / cảm ứng xuống dưới để nhường chỗ cho mục Tùy Chỉnh Nút
         Transform divC = tRoot.Find("DividerC");

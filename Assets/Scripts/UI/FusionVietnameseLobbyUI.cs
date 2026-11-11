@@ -57,6 +57,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Button matchmakingSpinnerCancelBtn;
     private Sprite sprSpinnerArc;
     private bool isDirectMatchmakingActive = false;
+    private Text topRightPlayerNameText;
 
     private struct PlayerSlotUI
     {
@@ -210,40 +211,47 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     // =========================================================================
     private void GenerateProceduralSprites()
     {
-        sprBackdropSky = CreateGothicNightSkySprite(512, 256);
-        sprCardGradient = CreateVerticalCardGradientSprite(64, 256);
-        sprCircleBadge = CreateGlowingCircleSprite(64);
-        sprLinkIcon = CreateChainLinkIconSprite(64);
-        sprDoorIcon = CreatePortalDoorIconSprite(64);
-        sprGraveyardBottom = CreateGraveyardSilhouetteSprite(160, 48);
+        sprBackdropSky = CreateGothicNightSkySprite(1024, 576);
+        sprCardGradient = CreateVerticalCardGradientSprite(128, 512);
+        sprCircleBadge = CreateGlowingCircleSprite(128);
+        sprLinkIcon = CreateChainLinkIconSprite(128);
+        sprDoorIcon = CreatePortalDoorIconSprite(128);
+        sprGraveyardBottom = CreateGraveyardSilhouetteSprite(512, 96);
 
         for (int i = 0; i < 6; i++)
         {
-            sprCardIcons[i] = CreateModeIconSprite(i, 128);
+            sprCardIcons[i] = CreateModeIconSprite(i, 256);
         }
-        sprSpinnerArc = CreateSpinnerArcSprite(128);
+        sprSpinnerArc = CreateSpinnerArcSprite(256);
     }
 
     private Sprite CreateSpinnerArcSprite(int size)
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
         float outerR = size * 0.46f;
-        float innerR = size * 0.30f;
+        float innerR = size * 0.34f;
+        float thickness = (outerR - innerR) * 0.5f;
+        float midR = (outerR + innerR) * 0.5f;
 
         for (int y = 0; y < size; y++)
         {
             for (int x = 0; x < size; x++)
             {
-                Vector2 p = new Vector2(x, y);
+                Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
                 float dist = Vector2.Distance(p, center);
-                if (dist >= innerR && dist <= outerR)
+                if (dist >= innerR - 1.5f && dist <= outerR + 1.5f)
                 {
                     float angle = (Mathf.Atan2(y - center.y, x - center.x) * Mathf.Rad2Deg + 360f) % 360f;
-                    if (angle < 280f)
+                    if (angle < 285f)
                     {
-                        float alpha = Mathf.Clamp01(angle / 280f);
+                        float edgeDist = Mathf.Abs(dist - midR);
+                        float radialAlpha = Mathf.Clamp01(thickness - edgeDist + 0.75f);
+                        float angularAlpha = Mathf.Clamp01(angle / 285f);
+                        float alpha = radialAlpha * angularAlpha;
+
                         tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
                     }
                     else
@@ -265,14 +273,15 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     {
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
 
-        // Mặt trăng ở góc trên bên phải (giống bố cục thiết kế)
-        Vector2 moonCenter = new Vector2(w * 0.72f, h * 0.82f);
+        // Mặt trăng ở góc trên bên phải
+        Vector2 moonCenter = new Vector2(w * 0.75f, h * 0.80f);
         float moonRadius = h * 0.16f;
 
-        Color topSky = new Color(0.04f, 0.06f, 0.14f, 0.95f);
-        Color midSky = new Color(0.09f, 0.08f, 0.22f, 0.94f);
-        Color botMist = new Color(0.05f, 0.08f, 0.16f, 0.97f);
+        Color topSky = new Color(0.03f, 0.05f, 0.12f, 0.98f);
+        Color midSky = new Color(0.07f, 0.08f, 0.20f, 0.96f);
+        Color botMist = new Color(0.04f, 0.07f, 0.15f, 0.98f);
 
         for (int y = 0; y < h; y++)
         {
@@ -286,33 +295,33 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 float tx = x / (float)(w - 1);
                 Color c = baseRow;
 
-                // Hào quang mặt trăng
+                // Hào quang mặt trăng với SmoothStep
                 float distMoon = Vector2.Distance(new Vector2(x, y), moonCenter);
                 if (distMoon < moonRadius)
                 {
-                    float edge = Mathf.Clamp01((moonRadius - distMoon) / 2.5f);
-                    float crater = Mathf.PerlinNoise(x * 0.08f, y * 0.08f) * 0.12f;
-                    Color moonCol = new Color(0.88f - crater, 0.91f - crater, 0.98f, 0.96f);
-                    c = Color.Lerp(c, moonCol, edge * 0.85f);
+                    float edge = Mathf.SmoothStep(0f, 1f, (moonRadius - distMoon) / 2.5f);
+                    float crater = Mathf.PerlinNoise(x * 0.04f, y * 0.04f) * 0.10f;
+                    Color moonCol = new Color(0.90f - crater, 0.93f - crater, 1.0f, 0.98f);
+                    c = Color.Lerp(c, moonCol, edge * 0.88f);
                 }
-                else if (distMoon < moonRadius * 3.2f)
+                else if (distMoon < moonRadius * 3.5f)
                 {
-                    float glow = Mathf.Pow(1f - (distMoon - moonRadius) / (moonRadius * 2.2f), 2.2f);
-                    c += new Color(0.22f, 0.28f, 0.55f, 0f) * (glow * 0.45f);
+                    float glow = Mathf.Pow(1f - (distMoon - moonRadius) / (moonRadius * 2.5f), 2.2f);
+                    c += new Color(0.20f, 0.30f, 0.65f, 0f) * (glow * 0.50f);
                 }
 
                 // Sương mù ma mị ở nửa dưới
-                if (ty < 0.38f)
+                if (ty < 0.35f)
                 {
-                    float mistNoise = Mathf.PerlinNoise(tx * 6f + 1.3f, ty * 10f + 2.7f);
-                    float mistStrength = (1f - ty / 0.38f) * mistNoise * 0.18f;
-                    c += new Color(0.18f, 0.14f, 0.35f, 0f) * mistStrength;
+                    float mistNoise = Mathf.PerlinNoise(tx * 5f + 1.2f, ty * 8f + 2.4f);
+                    float mistStrength = (1f - ty / 0.35f) * mistNoise * 0.20f;
+                    c += new Color(0.14f, 0.18f, 0.38f, 0f) * mistStrength;
                 }
 
                 // Vignette 4 góc tối sâu
                 float vx = (tx - 0.5f) * 2f;
                 float vy = (ty - 0.5f) * 2f;
-                float vig = Mathf.Clamp01((vx * vx + vy * vy) * 0.35f);
+                float vig = Mathf.Clamp01((vx * vx + vy * vy) * 0.32f);
                 c.r *= (1f - vig * 0.45f);
                 c.g *= (1f - vig * 0.45f);
                 c.b *= (1f - vig * 0.35f);
@@ -328,18 +337,18 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     {
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
 
         for (int y = 0; y < h; y++)
         {
             float t = y / (float)(h - 1);
-            // Đậm ở giữa, sáng nhẹ ở đỉnh và đáy để nhân màu với màu chủ đạo của từng thẻ
-            float brightness = Mathf.Lerp(0.55f, 0.92f, Mathf.Abs(t - 0.45f) * 1.4f);
+            float brightness = Mathf.Lerp(0.55f, 0.95f, Mathf.Abs(t - 0.45f) * 1.3f);
             for (int x = 0; x < w; x++)
             {
                 float tx = x / (float)(w - 1);
-                float edgeGlow = Mathf.Pow(Mathf.Abs(tx - 0.5f) * 2f, 3f) * 0.25f;
+                float edgeGlow = Mathf.Pow(Mathf.Abs(tx - 0.5f) * 2f, 2.5f) * 0.28f;
                 float val = Mathf.Clamp01(brightness + edgeGlow);
-                tex.SetPixel(x, y, new Color(val, val, val, 0.94f));
+                tex.SetPixel(x, y, new Color(val, val, val, 0.96f));
             }
         }
         tex.Apply();
@@ -349,6 +358,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Sprite CreateGlowingCircleSprite(int size)
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
         float maxR = size * 0.46f;
         for (int y = 0; y < size; y++)
@@ -356,7 +367,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             for (int x = 0; x < size; x++)
             {
                 float d = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
-                float a = Mathf.Clamp01((maxR - d) / 2.0f);
+                float a = Mathf.SmoothStep(0f, 1f, (maxR - d + 0.5f) / 1.5f);
                 tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
             }
         }
@@ -367,8 +378,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Sprite CreateChainLinkIconSprite(int size)
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         ClearTex(tex, size, size);
-        // Vẽ 2 mắt xích lồng nhau nghiêng 45 độ
         DrawRotatedCapsuleRing(tex, size, new Vector2(size * 0.40f, size * 0.40f), size * 0.14f, size * 0.08f, 45f, size * 0.055f);
         DrawRotatedCapsuleRing(tex, size, new Vector2(size * 0.60f, size * 0.60f), size * 0.14f, size * 0.08f, 45f, size * 0.055f);
         tex.Apply();
@@ -378,11 +390,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Sprite CreatePortalDoorIconSprite(int size)
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         ClearTex(tex, size, size);
-        // Vẽ khung cửa và cánh cửa mở hé
         DrawRectRing(tex, size, new Rect(size * 0.22f, size * 0.12f, size * 0.52f, size * 0.76f), size * 0.06f);
         DrawFilledRect(tex, size, new Rect(size * 0.26f, size * 0.14f, size * 0.34f, size * 0.72f), new Color(1f, 1f, 1f, 0.92f));
-        // Tay nắm cửa tròn nhỏ
         DrawFilledCircle(tex, size, new Vector2(size * 0.52f, size * 0.50f), size * 0.04f, Color.clear);
         tex.Apply();
         return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
@@ -391,37 +403,41 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Sprite CreateGraveyardSilhouetteSprite(int w, int h)
     {
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         ClearTex(tex, w, h);
+
+        Color silCol = new Color(0.02f, 0.04f, 0.08f, 0.92f);
 
         for (int x = 0; x < w; x++)
         {
-            // Nền đất gồ ghề dưới đáy thẻ
-            float groundH = 8f + Mathf.Sin(x * 0.08f) * 3f;
-            // Hàng rào sắt nhọn và bia mộ
-            bool isFenceSpike = (x % 12 >= 4 && x % 12 <= 6);
-            float spikeH = isFenceSpike ? 20f : 11f;
-            bool isRail = (x > 4 && x < w - 4);
+            float groundH = 14f + Mathf.Sin(x * 0.05f) * 5f;
+            bool isFenceSpike = (x % 24 >= 10 && x % 24 <= 14);
+            float spikeH = isFenceSpike ? 38f : 20f;
+            bool isRail1 = true;
+            bool isRail2 = true;
 
-            // Bia mộ thánh giá ở hai bên
-            bool isTomb1 = (x >= 22 && x <= 36);
-            bool isTomb2 = (x >= w - 38 && x <= w - 24);
+            bool isTomb1 = (x >= 60 && x <= 95);
+            bool isTomb2 = (x >= w - 100 && x <= w - 65);
 
             for (int y = 0; y < h; y++)
             {
                 bool fill = false;
                 if (y <= groundH) fill = true;
                 else if (isFenceSpike && y <= spikeH) fill = true;
-                else if (isRail && (Mathf.Abs(y - 14f) <= 1.2f)) fill = true;
-                else if (isTomb1 && y <= 28f) fill = true;
-                else if (isTomb2 && y <= 25f) fill = true;
+                else if (isRail1 && Mathf.Abs(y - 25f) <= 2.2f) fill = true;
+                else if (isRail2 && Mathf.Abs(y - 15f) <= 2.2f) fill = true;
+                else if (isTomb1 && y <= 52f) fill = true;
+                else if (isTomb2 && y <= 48f) fill = true;
 
-                // Chữ thập trên đỉnh bia mộ
-                if ((Mathf.Abs(x - 29) <= 2 && y >= 28 && y <= 38) || (Mathf.Abs(x - 29) <= 6 && Mathf.Abs(y - 34) <= 2))
+                if ((Mathf.Abs(x - 77) <= 3 && y >= 52 && y <= 74) || (Mathf.Abs(x - 77) <= 12 && Mathf.Abs(y - 64) <= 3.5f))
+                    fill = true;
+                if ((Mathf.Abs(x - (w - 82)) <= 3 && y >= 48 && y <= 68) || (Mathf.Abs(x - (w - 82)) <= 11 && Mathf.Abs(y - 59) <= 3.5f))
                     fill = true;
 
                 if (fill)
                 {
-                    tex.SetPixel(x, y, new Color(0.02f, 0.03f, 0.07f, 0.88f));
+                    tex.SetPixel(x, y, silCol);
                 }
             }
         }
@@ -432,18 +448,20 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Sprite CreateModeIconSprite(int modeIndex, int size)
     {
         Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
         ClearTex(tex, size, size);
         Color white = new Color(1f, 1f, 1f, 0.96f);
 
         switch (modeIndex)
         {
-            case 0: // 1. Bắt đầu một người chơi: Hình người + Nút Play tròn góc phải dưới
+            case 0:
                 DrawPersonSilhouette(tex, size, new Vector2(size * 0.45f, size * 0.52f), size * 0.36f, white);
                 DrawFilledCircle(tex, size, new Vector2(size * 0.72f, size * 0.28f), size * 0.16f, white);
                 DrawPlayTriangle(tex, size, new Vector2(size * 0.73f, size * 0.28f), size * 0.08f, Color.clear);
                 break;
 
-            case 1: // 2. Bắt đầu chế độ nhiều người chơi: Nhóm 3 người + Dấu cộng
+            case 1:
                 DrawPersonSilhouette(tex, size, new Vector2(size * 0.26f, size * 0.54f), size * 0.25f, new Color(1f, 1f, 1f, 0.75f));
                 DrawPersonSilhouette(tex, size, new Vector2(size * 0.72f, size * 0.54f), size * 0.25f, new Color(1f, 1f, 1f, 0.75f));
                 DrawPersonSilhouette(tex, size, new Vector2(size * 0.48f, size * 0.50f), size * 0.34f, white);
@@ -451,28 +469,27 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 DrawPlusSign(tex, size, new Vector2(size * 0.76f, size * 0.24f), size * 0.08f, size * 0.03f, Color.clear);
                 break;
 
-            case 2: // 3. Bắt đầu máy chủ: 3 thanh Server Rack + Bánh răng
+            case 2:
                 for (int r = 0; r < 3; r++)
                 {
                     float ry = size * (0.68f - r * 0.20f);
                     DrawFilledRect(tex, size, new Rect(size * 0.18f, ry - size * 0.065f, size * 0.56f, size * 0.13f), white);
-                    // Đèn LED nhỏ trên thanh server
                     DrawFilledCircle(tex, size, new Vector2(size * 0.26f, ry), size * 0.025f, Color.clear);
                     DrawFilledCircle(tex, size, new Vector2(size * 0.34f, ry), size * 0.025f, Color.clear);
                 }
                 DrawGearBadge(tex, size, new Vector2(size * 0.74f, size * 0.26f), size * 0.16f, white);
                 break;
 
-            case 3: // 4. Bắt đầu làm chủ phòng: Vương miện 5 đỉnh Hoàng Gia (Crown)
+            case 3:
                 DrawRoyalCrown(tex, size, white);
                 break;
 
-            case 4: // 5. Bắt đầu làm khách: Hình người + Dấu cộng bên phải
+            case 4:
                 DrawPersonSilhouette(tex, size, new Vector2(size * 0.42f, size * 0.50f), size * 0.36f, white);
                 DrawPlusSign(tex, size, new Vector2(size * 0.76f, size * 0.52f), size * 0.13f, size * 0.045f, white);
                 break;
 
-            case 5: // 6. Tự động làm chủ hoặc làm khách: Vòng xoay 2 mũi tên đồng bộ
+            case 5:
                 DrawSyncArrows(tex, size, new Vector2(size * 0.50f, size * 0.52f), size * 0.28f, size * 0.075f, white);
                 break;
         }
@@ -706,15 +723,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         lobbyCanvas.sortingOrder = 42;
 
         CanvasScaler scaler = cGo.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.matchWidthOrHeight = 0.5f;
+        UIFontHelper.ConfigureCrispCanvasScaler(scaler);
         cGo.AddComponent<GraphicRaycaster>();
 
         EnsureEventSystemExists();
 
-        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (font == null) font = Font.CreateDynamicFontFromOSFont("Arial", 16);
+        Font font = UIFontHelper.GetCrispFont(24);
 
         // Khung gốc chứa Sảnh Chờ & Phòng Chờ
         lobbyRootObj = new GameObject("LobbyRoot");
@@ -737,8 +751,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         bgImg.sprite = sprBackdropSky;
         bgImg.color = Color.white;
 
-        // 2. Badge Trạng Thái Kết Nối (Góc trên bên trái, luôn hiển thị ở cả Sảnh Chính và Phòng Chờ)
+        // 2. Badge Trạng Thái Kết Nối (Góc trên bên trái)
         BuildTopLeftConnectionBadge(lobbyRootObj.transform, font);
+
+        // 2.1. Badge Hồ Sơ Người Chơi (Góc trên bên phải)
+        BuildTopRightPlayerBadge(lobbyRootObj.transform, font);
 
         // 3. MÀN HÌNH 1: SẢNH CHÍNH (Thanh ID Phòng + Nút Tham Gia/Tạo Phòng + 6 Thẻ Bài)
         mainCardsViewObj = new GameObject("MainCardsView");
@@ -749,7 +766,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         mvRect.offsetMin = Vector2.zero;
         mvRect.offsetMax = Vector2.zero;
 
+        // Tiêu đề Game: Logo GHOST MAZE chính giữa phía trên
+        BuildTopCenterGameLogo(mainCardsViewObj.transform, font);
+
+        // Thanh ID Phòng & Nút Tham Gia / Tạo Phòng
         BuildTopCenterRoomBar(mainCardsViewObj.transform, font);
+
+        // 6 Thẻ Chế Độ Chơi Gothic
         BuildSixGothicModeCards(mainCardsViewObj.transform, font);
 
         // 4. MÀN HÌNH 2: BÊN TRONG PHÒNG CHỜ (Waiting Room View - Hiển thị ID Phòng + 4 Người Chơi & Tôi Ở Đây)
@@ -798,7 +821,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     }
 
     // =========================================================================
-    // 3. BADGE TRẠNG THÁI KẾT NỐI GÓC TRÊN BÊN TRÁI (THIẾT KẾ GOTHIC)
+    // 3. BADGE TRẠNG THÁI KẾT NỐI GÓC TRÊN BÊN TRÁI & HỒ SƠ GÓC TRÊN BÊN PHẢI
     // =========================================================================
     private void BuildTopLeftConnectionBadge(Transform parent, Font font)
     {
@@ -808,8 +831,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         bRect.anchorMin = new Vector2(0f, 1f);
         bRect.anchorMax = new Vector2(0f, 1f);
         bRect.pivot = new Vector2(0f, 1f);
-        bRect.anchoredPosition = new Vector2(65f, -45f);
-        bRect.sizeDelta = new Vector2(450f, 68f);
+        bRect.anchoredPosition = new Vector2(40f, -28f);
+        bRect.sizeDelta = new Vector2(360f, 52f);
 
         Image bBg = badgeObj.AddComponent<Image>();
         bBg.color = new Color(0.06f, 0.09f, 0.18f, 0.94f);
@@ -824,8 +847,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         icRect.anchorMin = new Vector2(0f, 0.5f);
         icRect.anchorMax = new Vector2(0f, 0.5f);
         icRect.pivot = new Vector2(0.5f, 0.5f);
-        icRect.anchoredPosition = new Vector2(38f, 0f);
-        icRect.sizeDelta = new Vector2(48f, 48f);
+        icRect.anchoredPosition = new Vector2(26f, 0f);
+        icRect.sizeDelta = new Vector2(38f, 38f);
 
         Image icBg = iconCircle.AddComponent<Image>();
         icBg.sprite = sprCircleBadge;
@@ -836,8 +859,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform liRect = linkIcon.AddComponent<RectTransform>();
         liRect.anchorMin = Vector2.zero;
         liRect.anchorMax = Vector2.one;
-        liRect.offsetMin = new Vector2(8f, 8f);
-        liRect.offsetMax = new Vector2(-8f, -8f);
+        liRect.offsetMin = new Vector2(6f, 6f);
+        liRect.offsetMax = new Vector2(-6f, -6f);
         Image liImg = linkIcon.AddComponent<Image>();
         liImg.sprite = sprLinkIcon;
         liImg.color = new Color(0.55f, 0.82f, 1.0f, 1f);
@@ -849,26 +872,26 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         dRect.anchorMin = new Vector2(0f, 0.5f);
         dRect.anchorMax = new Vector2(0f, 0.5f);
         dRect.pivot = new Vector2(0.5f, 0.5f);
-        dRect.anchoredPosition = new Vector2(266f, 0f);
-        dRect.sizeDelta = new Vector2(16f, 16f);
+        dRect.anchoredPosition = new Vector2(195f, 0f);
+        dRect.sizeDelta = new Vector2(14f, 14f);
 
         connectionStatusDotImage = dotObj.AddComponent<Image>();
         connectionStatusDotImage.sprite = sprCircleBadge;
         connectionStatusDotImage.color = colConnected;
 
-        // Nhãn "Trạng thái kết nối:"
+        // Nhãn "Trạng thái:"
         GameObject lblObj = new GameObject("Label");
         lblObj.transform.SetParent(badgeObj.transform, false);
         RectTransform lRect = lblObj.AddComponent<RectTransform>();
         lRect.anchorMin = new Vector2(0f, 0f);
         lRect.anchorMax = new Vector2(0f, 1f);
         lRect.pivot = new Vector2(0f, 0.5f);
-        lRect.anchoredPosition = new Vector2(78f, 0f);
-        lRect.sizeDelta = new Vector2(180f, 0f);
+        lRect.anchoredPosition = new Vector2(56f, 0f);
+        lRect.sizeDelta = new Vector2(135f, 0f);
 
         Text lblTxt = lblObj.AddComponent<Text>();
         lblTxt.font = font;
-        lblTxt.fontSize = 18;
+        lblTxt.fontSize = 15;
         lblTxt.fontStyle = FontStyle.Bold;
         lblTxt.alignment = TextAnchor.MiddleLeft;
         lblTxt.color = new Color(0.78f, 0.85f, 0.96f, 1f);
@@ -880,16 +903,137 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform vRect = valObj.AddComponent<RectTransform>();
         vRect.anchorMin = new Vector2(0f, 0f);
         vRect.anchorMax = new Vector2(1f, 1f);
-        vRect.offsetMin = new Vector2(282f, 0f);
-        vRect.offsetMax = new Vector2(-12f, 0f);
+        vRect.offsetMin = new Vector2(215f, 0f);
+        vRect.offsetMax = new Vector2(-10f, 0f);
 
         connectionStatusBadgeText = valObj.AddComponent<Text>();
         connectionStatusBadgeText.font = font;
-        connectionStatusBadgeText.fontSize = 18;
+        connectionStatusBadgeText.fontSize = 15;
         connectionStatusBadgeText.fontStyle = FontStyle.Bold;
         connectionStatusBadgeText.alignment = TextAnchor.MiddleLeft;
         connectionStatusBadgeText.color = colConnected;
         connectionStatusBadgeText.text = "Đã kết nối";
+    }
+
+    private void BuildTopRightPlayerBadge(Transform parent, Font font)
+    {
+        GameObject badgeObj = new GameObject("PlayerProfileBadge");
+        badgeObj.transform.SetParent(parent, false);
+        RectTransform bRect = badgeObj.AddComponent<RectTransform>();
+        bRect.anchorMin = new Vector2(1f, 1f);
+        bRect.anchorMax = new Vector2(1f, 1f);
+        bRect.pivot = new Vector2(1f, 1f);
+        bRect.anchoredPosition = new Vector2(-40f, -28f);
+        bRect.sizeDelta = new Vector2(280f, 52f);
+
+        Image bBg = badgeObj.AddComponent<Image>();
+        bBg.color = new Color(0.06f, 0.09f, 0.18f, 0.94f);
+        Outline bOut1 = badgeObj.AddComponent<Outline>();
+        bOut1.effectColor = new Color(0.32f, 0.44f, 0.78f, 0.85f);
+        bOut1.effectDistance = new Vector2(2f, 2f);
+
+        // Icon Avatar
+        GameObject iconCircle = new GameObject("AvatarCircle");
+        iconCircle.transform.SetParent(badgeObj.transform, false);
+        RectTransform icRect = iconCircle.AddComponent<RectTransform>();
+        icRect.anchorMin = new Vector2(0f, 0.5f);
+        icRect.anchorMax = new Vector2(0f, 0.5f);
+        icRect.pivot = new Vector2(0.5f, 0.5f);
+        icRect.anchoredPosition = new Vector2(26f, 0f);
+        icRect.sizeDelta = new Vector2(36f, 36f);
+
+        Image icBg = iconCircle.AddComponent<Image>();
+        icBg.sprite = sprCircleBadge;
+        icBg.color = new Color(0.14f, 0.45f, 0.85f, 0.95f);
+
+        GameObject avIcon = new GameObject("Icon");
+        avIcon.transform.SetParent(iconCircle.transform, false);
+        RectTransform aiRect = avIcon.AddComponent<RectTransform>();
+        aiRect.anchorMin = Vector2.zero;
+        aiRect.anchorMax = Vector2.one;
+        aiRect.offsetMin = new Vector2(5f, 5f);
+        aiRect.offsetMax = new Vector2(-5f, -5f);
+        Image aiImg = avIcon.AddComponent<Image>();
+        aiImg.sprite = sprCardIcons[0];
+        aiImg.color = Color.white;
+
+        // Text Tên người chơi
+        GameObject nameObj = new GameObject("PlayerNameText");
+        nameObj.transform.SetParent(badgeObj.transform, false);
+        RectTransform nRect = nameObj.AddComponent<RectTransform>();
+        nRect.anchorMin = new Vector2(0f, 0f);
+        nRect.anchorMax = new Vector2(1f, 1f);
+        nRect.offsetMin = new Vector2(54f, 0f);
+        nRect.offsetMax = new Vector2(-10f, 0f);
+
+        topRightPlayerNameText = nameObj.AddComponent<Text>();
+        topRightPlayerNameText.font = font;
+        topRightPlayerNameText.fontSize = 16;
+        topRightPlayerNameText.fontStyle = FontStyle.Bold;
+        topRightPlayerNameText.alignment = TextAnchor.MiddleLeft;
+        topRightPlayerNameText.color = new Color(0.92f, 0.96f, 1f, 1f);
+        topRightPlayerNameText.supportRichText = true;
+        topRightPlayerNameText.text = "👤 Tôi";
+    }
+
+    private void BuildTopCenterGameLogo(Transform parent, Font font)
+    {
+        GameObject logoObj = new GameObject("GameLogoHeader");
+        logoObj.transform.SetParent(parent, false);
+        RectTransform rt = logoObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, -22f);
+        rt.sizeDelta = new Vector2(920f, 108f);
+
+        // 1. Text Tiêu đề Game: GHOST MAZE
+        GameObject titleObj = new GameObject("TitleText");
+        titleObj.transform.SetParent(logoObj.transform, false);
+        RectTransform trt = titleObj.AddComponent<RectTransform>();
+        trt.anchorMin = new Vector2(0f, 0.34f);
+        trt.anchorMax = new Vector2(1f, 1f);
+        trt.offsetMin = Vector2.zero;
+        trt.offsetMax = Vector2.zero;
+
+        Text titleTxt = titleObj.AddComponent<Text>();
+        titleTxt.font = font;
+        titleTxt.fontSize = 54;
+        titleTxt.fontStyle = FontStyle.Bold;
+        titleTxt.alignment = TextAnchor.MiddleCenter;
+        titleTxt.supportRichText = true;
+        titleTxt.color = new Color(1f, 0.88f, 0.35f, 1f);
+        titleTxt.text = "<color=#00E5FF>GHOST</color>  <color=#FFD700>MAZE</color>";
+
+        Outline outline = titleObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0.01f, 0.03f, 0.10f, 0.98f);
+        outline.effectDistance = new Vector2(3f, -3f);
+
+        Shadow shadow = titleObj.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0.85f, 1f, 0.45f);
+        shadow.effectDistance = new Vector2(0f, -3f);
+
+        // 2. Subtitle: MÊ CUNG HUYỀN BÍ ● SINH TỒN TỔ ĐỘI 4 NGƯỜI
+        GameObject subObj = new GameObject("SubtitleText");
+        subObj.transform.SetParent(logoObj.transform, false);
+        RectTransform srt = subObj.AddComponent<RectTransform>();
+        srt.anchorMin = new Vector2(0f, 0f);
+        srt.anchorMax = new Vector2(1f, 0.36f);
+        srt.offsetMin = Vector2.zero;
+        srt.offsetMax = Vector2.zero;
+
+        Text subTxt = subObj.AddComponent<Text>();
+        subTxt.font = font;
+        subTxt.fontSize = 17;
+        subTxt.fontStyle = FontStyle.Bold;
+        subTxt.alignment = TextAnchor.MiddleCenter;
+        subTxt.supportRichText = true;
+        subTxt.color = new Color(0.65f, 0.88f, 1f, 0.95f);
+        subTxt.text = "⚡  MÊ CUNG HUYỀN BÍ  ●  SINH TỒN TỔ ĐỘI 4 NGƯỜI  ⚡";
+
+        Outline subOut = subObj.AddComponent<Outline>();
+        subOut.effectColor = new Color(0.04f, 0.08f, 0.20f, 0.95f);
+        subOut.effectDistance = new Vector2(1.5f, -1.5f);
     }
 
     // =========================================================================
@@ -903,14 +1047,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         barRect.anchorMin = new Vector2(0.5f, 1f);
         barRect.anchorMax = new Vector2(0.5f, 1f);
         barRect.pivot = new Vector2(0.5f, 1f);
-        barRect.anchoredPosition = new Vector2(0f, -210f);
-        barRect.sizeDelta = new Vector2(1150f, 92f);
+        barRect.anchoredPosition = new Vector2(0f, -145f);
+        barRect.sizeDelta = new Vector2(1150f, 76f);
 
         Image barBg = barObj.AddComponent<Image>();
         barBg.color = new Color(0.06f, 0.08f, 0.16f, 0.95f);
         Outline barOut = barObj.AddComponent<Outline>();
         barOut.effectColor = new Color(0.45f, 0.36f, 0.82f, 0.90f);
-        barOut.effectDistance = new Vector2(2.5f, 2.5f);
+        barOut.effectDistance = new Vector2(2f, 2f);
 
         // Viền phát sáng bên trong
         GameObject innerBorder = new GameObject("InnerTrim");
@@ -918,8 +1062,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform ibRect = innerBorder.AddComponent<RectTransform>();
         ibRect.anchorMin = Vector2.zero;
         ibRect.anchorMax = Vector2.one;
-        ibRect.offsetMin = new Vector2(6f, 6f);
-        ibRect.offsetMax = new Vector2(-6f, -6f);
+        ibRect.offsetMin = new Vector2(4f, 4f);
+        ibRect.offsetMax = new Vector2(-4f, -4f);
         Image ibImg = innerBorder.AddComponent<Image>();
         ibImg.color = new Color(0.09f, 0.12f, 0.24f, 0.65f);
 
@@ -930,8 +1074,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         diRect.anchorMin = new Vector2(0f, 0.5f);
         diRect.anchorMax = new Vector2(0f, 0.5f);
         diRect.pivot = new Vector2(0.5f, 0.5f);
-        diRect.anchoredPosition = new Vector2(54f, 0f);
-        diRect.sizeDelta = new Vector2(46f, 46f);
+        diRect.anchoredPosition = new Vector2(42f, 0f);
+        diRect.sizeDelta = new Vector2(40f, 40f);
         Image diImg = doorIconObj.AddComponent<Image>();
         diImg.sprite = sprDoorIcon;
         diImg.color = new Color(0.75f, 0.85f, 1f, 0.95f);
@@ -942,12 +1086,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         lRect.anchorMin = new Vector2(0f, 0.5f);
         lRect.anchorMax = new Vector2(0f, 0.5f);
         lRect.pivot = new Vector2(0f, 0.5f);
-        lRect.anchoredPosition = new Vector2(92f, 0f);
-        lRect.sizeDelta = new Vector2(140f, 54f);
+        lRect.anchoredPosition = new Vector2(74f, 0f);
+        lRect.sizeDelta = new Vector2(130f, 50f);
 
         Text lTxt = labelObj.AddComponent<Text>();
         lTxt.font = font;
-        lTxt.fontSize = 23;
+        lTxt.fontSize = 20;
         lTxt.fontStyle = FontStyle.Bold;
         lTxt.alignment = TextAnchor.MiddleLeft;
         lTxt.color = new Color(0.95f, 0.96f, 1f, 1f);
@@ -960,8 +1104,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         inRect.anchorMin = new Vector2(0f, 0.5f);
         inRect.anchorMax = new Vector2(0f, 0.5f);
         inRect.pivot = new Vector2(0f, 0.5f);
-        inRect.anchoredPosition = new Vector2(235f, 0f);
-        inRect.sizeDelta = new Vector2(455f, 56f);
+        inRect.anchoredPosition = new Vector2(215f, 0f);
+        inRect.sizeDelta = new Vector2(470f, 52f);
 
         Image inBg = inputObj.AddComponent<Image>();
         inBg.color = new Color(0.03f, 0.04f, 0.09f, 0.96f);
@@ -974,12 +1118,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform itRect = inTextObj.AddComponent<RectTransform>();
         itRect.anchorMin = Vector2.zero;
         itRect.anchorMax = Vector2.one;
-        itRect.offsetMin = new Vector2(18f, 0f);
-        itRect.offsetMax = new Vector2(-18f, 0f);
+        itRect.offsetMin = new Vector2(16f, 0f);
+        itRect.offsetMax = new Vector2(-16f, 0f);
 
         Text inText = inTextObj.AddComponent<Text>();
         inText.font = font;
-        inText.fontSize = 22;
+        inText.fontSize = 20;
         inText.fontStyle = FontStyle.Bold;
         inText.alignment = TextAnchor.MiddleLeft;
         inText.color = new Color(1f, 0.90f, 0.35f, 1f);
@@ -990,16 +1134,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform phRect = phObj.AddComponent<RectTransform>();
         phRect.anchorMin = Vector2.zero;
         phRect.anchorMax = Vector2.one;
-        phRect.offsetMin = new Vector2(18f, 0f);
-        phRect.offsetMax = new Vector2(-18f, 0f);
+        phRect.offsetMin = new Vector2(16f, 0f);
+        phRect.offsetMax = new Vector2(-16f, 0f);
 
         Text phText = phObj.AddComponent<Text>();
         phText.font = font;
-        phText.fontSize = 20;
+        phText.fontSize = 18;
         phText.fontStyle = FontStyle.Italic;
         phText.alignment = TextAnchor.MiddleLeft;
         phText.color = new Color(0.45f, 0.52f, 0.72f, 0.75f);
-        phText.text = "Nhập ID phòng...";
+        phText.text = "Nhập ID phòng 5 số...";
 
         roomIdInputField = inputObj.AddComponent<InputField>();
         roomIdInputField.textComponent = inText;
@@ -1007,35 +1151,35 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         roomIdInputField.characterLimit = 25;
         roomIdInputField.onValueChanged.AddListener(OnRoomIdInputChanged);
 
-        // 3. Nút "[ ➔ Tham gia ]" (Màu tím neon đúng thiết kế)
+        // 3. Nút "[ ➔ Tham gia ]"
         CreateStyledActionButton(
             barObj.transform,
             "JoinRoomButton",
             new Vector2(0f, 0.5f),
             new Vector2(0f, 0.5f),
-            new Vector2(710f, 0f),
-            new Vector2(200f, 56f),
+            new Vector2(705f, 0f),
+            new Vector2(200f, 52f),
             new Color(0.38f, 0.20f, 0.85f, 0.96f),
             new Color(0.68f, 0.45f, 1.00f, 1f),
             "➔  Tham gia",
             font,
-            21,
+            19,
             OnJoinRoomClicked
         );
 
-        // 4. Nút "[ 👑 Tạo phòng ]" (Màu vàng hoàng gia nổi bật ngay bên cạnh để tạo phòng & mở Phòng Chờ ngay lập tức)
+        // 4. Nút "[ 👑 Tạo phòng ]"
         CreateStyledActionButton(
             barObj.transform,
             "CreateRoomButton",
             new Vector2(0f, 0.5f),
             new Vector2(0f, 0.5f),
             new Vector2(925f, 0f),
-            new Vector2(200f, 56f),
+            new Vector2(200f, 52f),
             new Color(0.78f, 0.52f, 0.08f, 0.96f),
             new Color(1.00f, 0.85f, 0.30f, 1f),
             "👑  Tạo phòng",
             font,
-            21,
+            19,
             OnCreateRoomClicked
         );
     }
@@ -1103,29 +1247,49 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         cRect.anchorMin = new Vector2(0.5f, 0.5f);
         cRect.anchorMax = new Vector2(0.5f, 0.5f);
         cRect.pivot = new Vector2(0.5f, 0.5f);
-        cRect.anchoredPosition = new Vector2(0f, -135f);
-        cRect.sizeDelta = new Vector2(1760f, 480f);
+        cRect.anchoredPosition = new Vector2(0f, -115f);
+        cRect.sizeDelta = new Vector2(1760f, 490f);
 
         float[] cardX = new float[] { -685f, -412f, -140f, 140f, 412f, 685f };
 
         Color[] cardThemeColors = new Color[]
         {
-            new Color(0.22f, 0.56f, 0.98f, 1f), // 1. Xanh dương (Một người chơi)
-            new Color(0.12f, 0.86f, 0.72f, 1f), // 2. Xanh ngọc (Nhiều người chơi)
+            new Color(0.20f, 0.65f, 1.00f, 1f), // 1. Xanh dương điện tử (Đấu Đơn)
+            new Color(0.12f, 0.86f, 0.72f, 1f), // 2. Xanh ngọc (Tổ Đội)
             new Color(0.62f, 0.32f, 0.98f, 1f), // 3. Tím đậm (Máy chủ)
-            new Color(1.00f, 0.78f, 0.18f, 1f), // 4. Vàng hoàng gia (Làm chủ phòng / Tạo phòng)
+            new Color(1.00f, 0.78f, 0.18f, 1f), // 4. Vàng hoàng gia (Làm chủ phòng)
             new Color(0.18f, 0.76f, 0.98f, 1f), // 5. Xanh băng (Làm khách)
-            new Color(0.84f, 0.32f, 0.98f, 1f)  // 6. Tím hồng neon (Tự động làm chủ hoặc khách)
+            new Color(0.88f, 0.32f, 0.98f, 1f)  // 6. Tím hồng neon (Tự động)
         };
 
         string[] cardTitles = new string[]
         {
-            "Đấu Đơn / Ghép Trận\n(Tìm trận 4 người)",
-            "Đấu Tổ Đội\n(Ghép bạn bè & người lẻ)",
-            "Bắt đầu\nmáy chủ",
-            "Bắt đầu\nlàm chủ phòng",
-            "Bắt đầu\nlàm khách",
-            "Tự động làm chủ\nhoặc làm khách"
+            "ĐẤU ĐƠN / GHÉP TRẬN\n<color=#2EE87A><size=15>(Tự động tìm 4 người)</size></color>",
+            "ĐẤU TỔ ĐỘI\n<color=#64D2FF><size=15>(Ghép bạn bè & người lẻ)</size></color>",
+            "BẮT ĐẦU\nMÁY CHỦ",
+            "BẮT ĐẦU\nLÀM CHỦ PHÒNG",
+            "BẮT ĐẦU\nLÀM KHÁCH",
+            "TỰ ĐỘNG LÀM CHỦ\nHOẶC LÀM KHÁCH"
+        };
+
+        string[] cardBadges = new string[]
+        {
+            "⭐ GHÉP NHANH ⭐",
+            "👥 TỔ ĐỘI",
+            "🌐 DEDICATED",
+            "👑 CHỦ PHÒNG",
+            "🚪 THEO ID",
+            "⚡ TỰ ĐỘNG"
+        };
+
+        string[] cardBtnLabels = new string[]
+        {
+            "⚡ TÌM TRẬN NGAY",
+            "👥 TẠO TỔ ĐỘI",
+            "🌐 CHẠY SERVER",
+            "👑 TẠO PHÒNG",
+            "🚪 THAM GIA",
+            "⚡ KẾT NỐI"
         };
 
         Action[] cardActions = new Action[]
@@ -1140,16 +1304,23 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         for (int i = 0; i < 6; i++)
         {
+            bool isHeroCard = (i == 0);
             bool isRoyalHostCard = (i == 3);
+            Vector2 cardSize = isHeroCard
+                ? new Vector2(268f, 475f)
+                : (isRoyalHostCard ? new Vector2(260f, 455f) : new Vector2(248f, 435f));
+
             BuildSingleGothicCard(
                 cardsContainer.transform,
                 i,
                 cardX[i],
-                isRoyalHostCard ? new Vector2(266f, 460f) : new Vector2(248f, 425f),
+                cardSize,
                 cardThemeColors[i],
                 sprCardIcons[i],
                 cardTitles[i],
-                isRoyalHostCard,
+                cardBadges[i],
+                cardBtnLabels[i],
+                isHeroCard || isRoyalHostCard,
                 font,
                 cardActions[i]
             );
@@ -1164,6 +1335,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Color themeColor,
         Sprite iconSprite,
         string titleText,
+        string badgeText,
+        string btnLabel,
         bool isRoyalCenterCard,
         Font font,
         Action onClickAction)
@@ -1182,7 +1355,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         outerFrame.color = new Color(themeColor.r * 0.85f, themeColor.g * 0.85f, themeColor.b * 0.85f, 0.92f);
 
         Outline glowOutline = cardObj.AddComponent<Outline>();
-        glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.45f);
+        glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.65f);
         glowOutline.effectDistance = new Vector2(3.5f, 3.5f);
 
         // 2. Thân thẻ tối màu bên trong
@@ -1197,6 +1370,38 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Image bodyImg = innerBody.AddComponent<Image>();
         bodyImg.sprite = sprCardGradient;
         bodyImg.color = Color.Lerp(new Color(0.05f, 0.08f, 0.16f, 0.98f), themeColor, 0.18f);
+
+        // Badge nổi bật phía trên thẻ
+        GameObject badgeObj = new GameObject("CardBadge");
+        badgeObj.transform.SetParent(innerBody.transform, false);
+        RectTransform bgRect = badgeObj.AddComponent<RectTransform>();
+        bgRect.anchorMin = new Vector2(0.5f, 1f);
+        bgRect.anchorMax = new Vector2(0.5f, 1f);
+        bgRect.pivot = new Vector2(0.5f, 1f);
+        bgRect.anchoredPosition = new Vector2(0f, -12f);
+        bgRect.sizeDelta = new Vector2(cardSize.x - 30f, 26f);
+
+        Image bgImage = badgeObj.AddComponent<Image>();
+        bgImage.color = new Color(themeColor.r * 0.22f, themeColor.g * 0.22f, themeColor.b * 0.22f, 0.90f);
+        Outline bgOut = badgeObj.AddComponent<Outline>();
+        bgOut.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.70f);
+        bgOut.effectDistance = new Vector2(1f, 1f);
+
+        GameObject bgTxtObj = new GameObject("Text");
+        bgTxtObj.transform.SetParent(badgeObj.transform, false);
+        RectTransform bgtRect = bgTxtObj.AddComponent<RectTransform>();
+        bgtRect.anchorMin = Vector2.zero;
+        bgtRect.anchorMax = Vector2.one;
+        bgtRect.offsetMin = Vector2.zero;
+        bgtRect.offsetMax = Vector2.zero;
+
+        Text bgTxt = bgTxtObj.AddComponent<Text>();
+        bgTxt.font = font;
+        bgTxt.fontSize = 13;
+        bgTxt.fontStyle = FontStyle.Bold;
+        bgTxt.alignment = TextAnchor.MiddleCenter;
+        bgTxt.color = Color.Lerp(themeColor, Color.white, 0.45f);
+        bgTxt.text = badgeText;
 
         // 3. Đỉnh chóp Gothic phía trên thẻ (Crest ornament)
         GameObject topCrest = new GameObject("TopGothicCrest");
@@ -1230,11 +1435,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         ihRect.anchorMin = new Vector2(0.5f, 0.5f);
         ihRect.anchorMax = new Vector2(0.5f, 0.5f);
         ihRect.pivot = new Vector2(0.5f, 0.5f);
-        ihRect.anchoredPosition = new Vector2(0f, 62f);
+        ihRect.anchoredPosition = new Vector2(0f, 66f);
         ihRect.sizeDelta = new Vector2(145f, 145f);
         Image ihImg = iconHalo.AddComponent<Image>();
         ihImg.sprite = sprCircleBadge;
-        ihImg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.18f);
+        ihImg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.22f);
 
         // 6. Icon Vector Sắc Nét ở giữa trên của thẻ
         GameObject iconObj = new GameObject("CardIcon");
@@ -1243,7 +1448,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         icRect.anchorMin = new Vector2(0.5f, 0.5f);
         icRect.anchorMax = new Vector2(0.5f, 0.5f);
         icRect.pivot = new Vector2(0.5f, 0.5f);
-        icRect.anchoredPosition = new Vector2(0f, 62f);
+        icRect.anchoredPosition = new Vector2(0f, 66f);
         icRect.sizeDelta = isRoyalCenterCard ? new Vector2(118f, 118f) : new Vector2(106f, 106f);
 
         Image icImg = iconObj.AddComponent<Image>();
@@ -1256,21 +1461,38 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform ttRect = titleObj.AddComponent<RectTransform>();
         ttRect.anchorMin = new Vector2(0f, 0f);
         ttRect.anchorMax = new Vector2(1f, 0.5f);
-        ttRect.offsetMin = new Vector2(14f, 52f);
-        ttRect.offsetMax = new Vector2(-14f, -15f);
+        ttRect.offsetMin = new Vector2(12f, 64f);
+        ttRect.offsetMax = new Vector2(-12f, -10f);
 
         Text ttTxt = titleObj.AddComponent<Text>();
         ttTxt.font = font;
-        ttTxt.fontSize = isRoyalCenterCard ? 22 : 20;
+        ttTxt.fontSize = isRoyalCenterCard ? 21 : 19;
         ttTxt.fontStyle = FontStyle.Bold;
         ttTxt.alignment = TextAnchor.MiddleCenter;
         ttTxt.lineSpacing = 1.12f;
+        ttTxt.supportRichText = true;
         ttTxt.color = isRoyalCenterCard ? new Color(1f, 0.94f, 0.72f, 1f) : new Color(0.92f, 0.96f, 1f, 1f);
         ttTxt.text = titleText;
 
         Outline ttOut = titleObj.AddComponent<Outline>();
         ttOut.effectColor = new Color(0f, 0f, 0f, 0.85f);
         ttOut.effectDistance = new Vector2(1.5f, -1.5f);
+
+        // Nút hành động trực tiếp ở đáy thẻ
+        CreateStyledActionButton(
+            innerBody.transform,
+            "CardActionButton",
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(0f, 14f),
+            new Vector2(cardSize.x - 34f, 42f),
+            new Color(themeColor.r * 0.45f, themeColor.g * 0.45f, themeColor.b * 0.45f, 0.95f),
+            new Color(themeColor.r, themeColor.g, themeColor.b, 1f),
+            btnLabel,
+            font,
+            16,
+            () => onClickAction?.Invoke()
+        );
 
         // 8. Sự kiện Click & Hiệu ứng Hover sáng bừng
         Button btn = cardObj.AddComponent<Button>();
@@ -1294,8 +1516,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             cardRect.localScale = Vector3.one;
             outerFrame.color = new Color(themeColor.r * 0.85f, themeColor.g * 0.85f, themeColor.b * 0.85f, 0.92f);
-            glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.45f);
-            ihImg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.18f);
+            glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.65f);
+            ihImg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.22f);
         });
         trigger.triggers.Add(exit);
     }
@@ -2219,6 +2441,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 connectionStatusBadgeText.color = colConnecting;
                 connectionStatusDotImage.color = colConnecting;
             }
+        }
+
+        if (topRightPlayerNameText != null && photonMgr != null && !string.IsNullOrEmpty(photonMgr.playerName))
+        {
+            topRightPlayerNameText.text = $"👤 <color=#00E5FF>{photonMgr.playerName}</color>";
         }
 
         // 2. Nếu trận đấu ĐÃ BẮT ĐẦU (sau khi đủ 4 người vào phòng hoặc bấm Test):
