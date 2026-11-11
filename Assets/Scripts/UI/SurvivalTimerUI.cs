@@ -86,7 +86,8 @@ public class SurvivalTimerUI : MonoBehaviour
     private float phaseTimer = 0f;
     private float remainingTime = 180f;
     private int lastDisplayedSecond = -1;
-    private bool isRunning = false;
+    public bool isRunning = false;
+    public bool IsRunning => isRunning;
     private bool isFinished = false;
     public bool IsFinished => isFinished;
 

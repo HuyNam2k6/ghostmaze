@@ -4669,7 +4669,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         gameStartBannerObj.SetActive(false);
     }
 
-    private void AddSystemMessage(string msg)
+    public void AddSystemMessage(string msg)
     {
         AppendChatLine($"<color=#FDCB6E>[Hệ Thống] {msg}</color>");
     }
