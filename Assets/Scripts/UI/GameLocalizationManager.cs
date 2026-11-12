@@ -3,9 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Hệ thống quản lý đa ngôn ngữ (Localization Manager) cho Ghost Maze.
+/// Hệ thống quản lý đa ngôn ngữ toàn diện (Global Localization Manager) cho Ghost Maze.
 /// Hỗ trợ 4 ngôn ngữ: Tiếng Việt (VI), Tiếng Anh (EN), Tiếng Tây Ban Nha (ES), Tiếng Trung (ZH).
 /// Lưu trữ lựa chọn của người chơi qua PlayerPrefs.
+/// Phát sự kiện OnLanguageChanged khi đổi ngôn ngữ để toàn bộ màn hình (Lobby, HUD, Settings, In-game) đồng loạt cập nhật.
 /// </summary>
 public static class GameLocalizationManager
 {
@@ -56,7 +57,7 @@ public static class GameLocalizationManager
         PlayerPrefs.SetInt(PREF_KEY, (int)lang);
         PlayerPrefs.Save();
 
-        Debug.Log($"<color=#2ECC71>[Localization] Đã chuyển đổi ngôn ngữ sang: {GetLanguageNativeName(lang)}</color>");
+        Debug.Log($"<color=#2ECC71>[Localization] Đã chuyển đổi ngôn ngữ toàn cầu sang: {GetLanguageNativeName(lang)}</color>");
         OnLanguageChanged?.Invoke(_currentLang);
     }
 
@@ -73,8 +74,8 @@ public static class GameLocalizationManager
         {
             case Language.Vietnamese: return "Tiếng Việt";
             case Language.English: return "English";
-            case Language.Spanish: return "Español";
-            case Language.Chinese: return "中文 (简体)";
+            case Language.Spanish: return "Spanish (Español)";
+            case Language.Chinese: return "Chinese (中文)";
             default: return "Tiếng Việt";
         }
     }
@@ -104,7 +105,7 @@ public static class GameLocalizationManager
     }
 
     // =========================================================================
-    // TỪ ĐIỂN DỊCH THUẬT (LOCALIZATION DICTIONARY)
+    // TỪ ĐIỂN DỊCH THUẬT TOÀN DIỆN (GLOBAL LOCALIZATION DICTIONARY)
     // =========================================================================
 
     private static readonly Dictionary<string, string[]> Dict = new Dictionary<string, string[]>
@@ -178,8 +179,14 @@ public static class GameLocalizationManager
             "👑  Crear Sala",
             "👑  创建房间"
         } },
+        { "PLAYER_ME", new string[] {
+            "👤 Tôi",
+            "👤 Me",
+            "👤 Yo",
+            "👤 我"
+        } },
 
-        // 6 Thẻ chế độ chơi
+        // 6 Thẻ chế độ chơi Sảnh
         { "CARD_1_TITLE", new string[] {
             "ĐẤU ĐƠN / GHÉP TRẬN\n<color=#2EE87A><size=15>(Tự động tìm 4 người)</size></color>",
             "SOLO MATCHMAKING\n<color=#2EE87A><size=15>(Auto-find 4 players)</size></color>",
@@ -393,43 +400,635 @@ public static class GameLocalizationManager
             "🚪 SALIR DE SALA (F4)",
             "🚪 退出房间 (F4)"
         } },
+        { "WAITING_LEAVE_BTN", new string[] {
+            "⬅  Rời Phòng / Quay Lại Sảnh",
+            "⬅  Leave Room / Back to Lobby",
+            "⬅  Salir / Volver a la Sala",
+            "⬅  退出房间 / 返回大厅"
+        } },
+        { "LOBBY_TAB_MULTIPLAYER", new string[] {
+            "👥 Đa Người Chơi",
+            "👥 Multiplayer",
+            "👥 Multijugador",
+            "👥 多人游戏"
+        } },
+        { "LOBBY_TAB_SOLO", new string[] {
+            "👤 Chơi Đơn",
+            "👤 Single Player",
+            "👤 Un Jugador",
+            "👤 单人游戏"
+        } },
+        { "LOBBY_TAB_SETTINGS", new string[] {
+            "⚙️ Cài Đặt",
+            "⚙️ Settings",
+            "⚙️ Ajustes",
+            "⚙️ 设置"
+        } },
+        { "LOBBY_CARD1_TITLE", new string[] {
+            "Đấu đơn",
+            "Solo Match",
+            "Duelo Individual",
+            "单人对决"
+        } },
+        { "LOBBY_CARD1_SUB", new string[] {
+            "Ghép trận\nmột người chơi",
+            "Matchmaking\nfor 1 player",
+            "Emparejamiento\npara 1 jugador",
+            "单人匹配\n快速对决"
+        } },
+        { "LOBBY_CARD1_BTN", new string[] {
+            "Tham gia ngay ❯",
+            "Join Now ❯",
+            "Unirse Ahora ❯",
+            "立即加入 ❯"
+        } },
+        { "LOBBY_CARD2_TITLE", new string[] {
+            "Đấu đội",
+            "Team Match",
+            "Duelo en Equipo",
+            "组队竞技"
+        } },
+        { "LOBBY_CARD2_SUB", new string[] {
+            "Cùng bạn bè\nchơi nhiều người",
+            "Play multiplayer\nwith friends",
+            "Juega en grupo\ncon amigos",
+            "与好友组队\n畅玩多人"
+        } },
+        { "LOBBY_CARD2_BTN", new string[] {
+            "Tạo phòng ➔",
+            "Create Room ➔",
+            "Crear Sala ➔",
+            "创建房间 ➔"
+        } },
+        { "LOBBY_CARD3_TITLE", new string[] {
+            "Máy chủ",
+            "Server",
+            "Servidor",
+            "专属服务器"
+        } },
+        { "LOBBY_CARD3_SUB", new string[] {
+            "Tạo máy chủ\nriêng của bạn",
+            "Host your own\ndedicated server",
+            "Crea tu propio\nservidor dedicado",
+            "开启属于你的\n独立服务器"
+        } },
+        { "LOBBY_CARD3_BTN", new string[] {
+            "Tạo máy chủ ➔",
+            "Host Server ➔",
+            "Crear Servidor ➔",
+            "创建服务器 ➔"
+        } },
+        { "LOBBY_CARD4_TITLE", new string[] {
+            "Làm chủ phòng",
+            "Host Room",
+            "Ser Anfitrión",
+            "主持房间"
+        } },
+        { "LOBBY_CARD4_SUB", new string[] {
+            "Quản lý phòng\ncủa bạn",
+            "Manage and lead\nyour room",
+            "Administra tu\npropia sala",
+            "管理并掌控\n你的房间"
+        } },
+        { "LOBBY_CARD4_BTN", new string[] {
+            "Bắt đầu ❯",
+            "Start ❯",
+            "Comenzar ❯",
+            "开始 ❯"
+        } },
+        { "LOBBY_CARD5_TITLE", new string[] {
+            "Làm khách",
+            "Join Room",
+            "Ser Invitado",
+            "加入房间"
+        } },
+        { "LOBBY_CARD5_SUB", new string[] {
+            "Tham gia phòng\ncủa người khác",
+            "Join another\nplayer's room",
+            "Únete a la sala\nde otro jugador",
+            "进入其他玩家\n的组队房间"
+        } },
+        { "LOBBY_CARD5_BTN", new string[] {
+            "Tham gia ❯",
+            "Join ❯",
+            "Unirse ❯",
+            "加入 ❯"
+        } },
+        { "LOBBY_CARD6_TITLE", new string[] {
+            "Tự động",
+            "Auto Match",
+            "Automático",
+            "自动匹配"
+        } },
+        { "LOBBY_CARD6_SUB", new string[] {
+            "Tự động làm chủ\nhoặc làm khách",
+            "Auto host\nor join room",
+            "Ser anfitrión o\ninvitado automático",
+            "自动主持或\n加入可用房间"
+        } },
+        { "LOBBY_CARD6_BTN", new string[] {
+            "Bắt đầu ❯",
+            "Start ❯",
+            "Comenzar ❯",
+            "开始 ❯"
+        } },
+        { "LOBBY_STATUS_GOOD", new string[] {
+            "Trạng thái kết nối: Kết nối tốt",
+            "Connection status: Connected",
+            "Estado de conexión: Conectado",
+            "连接状态: 良好"
+        } },
+        { "LOBBY_STATUS_CONNECTING", new string[] {
+            "Trạng thái kết nối: Đang kết nối...",
+            "Connection status: Connecting...",
+            "Estado de conexión: Conectando...",
+            "连接状态: 正在连接..."
+        } },
+        { "LOBBY_STATUS_DISCONNECTED", new string[] {
+            "Trạng thái kết nối: Mất kết nối",
+            "Connection status: Disconnected",
+            "Estado de conexión: Desconectado",
+            "连接状态: 未连接"
+        } },
+        { "LOBBY_FOOTER_SLOGAN", new string[] {
+            "PLAY TOGETHER • HAVE FUN",
+            "PLAY TOGETHER • HAVE FUN",
+            "JUEGA EN EQUIPO • DIVIÉRTETE",
+            "组队开黑 • 畅享乐趣"
+        } },
+        { "LOBBY_CONN_STATUS_LABEL", new string[] {
+            "Trạng thái kết nối:",
+            "Connection Status:",
+            "Estado de conexión:",
+            "连接状态:"
+        } },
+        { "LOBBY_CONN_CONNECTED", new string[] {
+            "Đã kết nối",
+            "Connected",
+            "Conectado",
+            "已连接"
+        } },
+        { "LOBBY_CONN_CONNECTING", new string[] {
+            "Đang kết nối...",
+            "Connecting...",
+            "Conectando...",
+            "正在连接..."
+        } },
+        { "LOBBY_ROOM_ID_LABEL", new string[] {
+            "ID Phòng:",
+            "Room ID:",
+            "ID de Sala:",
+            "房间号:"
+        } },
+        { "LOBBY_ROOM_INPUT_PH", new string[] {
+            "Nhập ID phòng 5 số...",
+            "Enter 5-digit room ID...",
+            "Introduce ID de 5 dígitos...",
+            "输入5位数房间号..."
+        } },
+        { "LOBBY_ME_PROFILE", new string[] {
+            "👤 Tôi",
+            "👤 Me",
+            "👤 Yo",
+            "👤 我"
+        } },
+        { "WAITING_HEADER_TITLE", new string[] {
+            "🏰 SẢNH PHÒNG CHỜ TRẬN ĐẤU (4 NGƯỜI CHƠI) 🏰",
+            "🏰 MATCH WAITING LOBBY (4 PLAYERS) 🏰",
+            "🏰 SALA DE ESPERA (4 JUGADORES) 🏰",
+            "🏰 四人组队大厅 🏰"
+        } },
+        { "WAITING_MY_NAME_LABEL", new string[] {
+            "👤 Tên của bạn:",
+            "👤 Your Nickname:",
+            "👤 Tu Nombre:",
+            "👤 你的昵称:"
+        } },
+        { "WAITING_SAVE_NAME_BTN", new string[] {
+            "✔ Lưu tên",
+            "✔ Save Name",
+            "✔ Guardar",
+            "✔ 保存"
+        } },
+        { "SPINNER_CANCEL_BTN", new string[] {
+            "🛑 HỦY TÌM TRẬN",
+            "🛑 CANCEL SEARCH",
+            "🛑 CANCELAR",
+            "🛑 取消匹配"
+        } },
+        { "SPINNER_TITLE", new string[] {
+            "🔍 ĐANG TÌM TRẬN ĐẤU...",
+            "🔍 SEARCHING FOR MATCH...",
+            "🔍 BUSCANDO PARTIDA...",
+            "🔍 正在匹配玩家..."
+        } },
+        { "WAITING_ROLE_HOST", new string[] {
+            "👑 Chủ Phòng",
+            "👑 Host",
+            "👑 Anfitrión",
+            "👑 房主"
+        } },
+        { "WAITING_ROLE_MEMBER", new string[] {
+            "🟢 Thành Viên",
+            "🟢 Member",
+            "🟢 Miembro",
+            "🟢 队员"
+        } },
+        { "WAITING_SLOT_HOST", new string[] {
+            "VỊ TRÍ #{0} (CHỦ PHÒNG)",
+            "SLOT #{0} (HOST)",
+            "POSICIÓN #{0} (ANFITRIÓN)",
+            "位置 #{0} (房主)"
+        } },
+        { "WAITING_SLOT_TEAMMATE", new string[] {
+            "VỊ TRÍ #{0} (ĐỒNG ĐỘI)",
+            "SLOT #{0} (TEAMMATE)",
+            "POSICIÓN #{0} (COMPAÑERO)",
+            "位置 #{0} (队友)"
+        } },
+        { "WAITING_SLOT_SEARCHING", new string[] {
+            "🔍 Đang ghép người...",
+            "🔍 Matchmaking...",
+            "🔍 Buscando jugador...",
+            "🔍 正在匹配玩家..."
+        } },
+        { "WAITING_SLOT_WAITING", new string[] {
+            "Đang chờ người chơi...",
+            "Waiting for player...",
+            "Esperando jugador...",
+            "等待玩家加入..."
+        } },
+        { "WAITING_BTN_READY_CANCEL", new string[] {
+            "✔ BẠN ĐÃ SẴN SÀNG (Click để hủy)",
+            "✔ YOU ARE READY (Click to cancel)",
+            "✔ ESTÁS LISTO (Clic para cancelar)",
+            "✔ 你已准备 (点击取消)"
+        } },
+        { "WAITING_BTN_READY_CONFIRM", new string[] {
+            "✔ BẤM ĐỂ XÁC NHẬN SẴN SÀNG",
+            "✔ CLICK TO CONFIRM READY",
+            "✔ CLIC PARA CONFIRMAR LISTO",
+            "✔ 点击确认准备"
+        } },
 
-        // Cài đặt (Settings Tabs)
+        // Cài đặt (Settings Dashboard Tabs & Headers)
+        { "SETTINGS_DASHBOARD_TITLE", new string[] {
+            "⚙️ BẢNG CÀI ĐẶT (DASHBOARD)",
+            "⚙️ SETTINGS DASHBOARD",
+            "⚙️ PANEL DE AJUSTES",
+            "⚙️ 设置面板"
+        } },
+        { "SETTINGS_DASHBOARD_SUB", new string[] {
+            "Ghost Maze • Tùy chỉnh hệ thống (F1 / Tab / Esc)",
+            "Ghost Maze • System Preferences (F1 / Tab / Esc)",
+            "Ghost Maze • Preferencias del Sistema (F1 / Tab / Esc)",
+            "Ghost Maze • 系统偏好设置 (F1 / Tab / Esc)"
+        } },
         { "SETTINGS_TAB_GRAPHICS", new string[] {
-            "HÌNH ẢNH",
-            "GRAPHICS",
-            "GRÁFICOS",
-            "画面"
+            "🎨 Hình Ảnh",
+            "🎨 Graphics",
+            "🎨 Gráficos",
+            "🎨 画面"
         } },
         { "SETTINGS_TAB_AUDIO", new string[] {
-            "ÂM THANH",
-            "AUDIO",
-            "SONIDO",
-            "声音"
+            "🔊 Âm Thanh",
+            "🔊 Audio",
+            "🔊 Sonido",
+            "🔊 声音"
         } },
         { "SETTINGS_TAB_CONTROLS", new string[] {
-            "ĐIỀU KHIỂN",
-            "CONTROLS",
-            "CONTROLES",
-            "控制"
+            "🎮 Điều Khiển",
+            "🎮 Controls",
+            "🎮 Controles",
+            "🎮 控制"
         } },
         { "SETTINGS_TAB_LANGUAGE", new string[] {
-            "NGÔN NGỮ",
-            "LANGUAGE",
-            "IDIOMA",
-            "语言"
+            "🌐 Ngôn Ngữ",
+            "🌐 Language",
+            "🌐 Idioma",
+            "🌐 语言"
         } },
         { "SETTINGS_LANG_HEADER", new string[] {
-            "CHỌN NGÔN NGỮ HIỂN THỊ",
-            "SELECT DISPLAY LANGUAGE",
-            "SELECCIONAR IDIOMA",
-            "选择界面语言"
+            "CHỌN NGÔN NGỮ HIỂN THỊ TOÀN BỘ GAME",
+            "SELECT GLOBAL DISPLAY LANGUAGE",
+            "SELECCIONAR IDIOMA GLOBAL DEL JUEGO",
+            "选择全游戏显示语言"
         } },
         { "SETTINGS_LANG_HINT", new string[] {
-            "Thay đổi ngôn ngữ cho giao diện, phụ đề và thông báo trong toàn bộ trò chơi.",
-            "Changes display language for UI, subtitles, and system notices across the game.",
-            "Cambia el idioma para la interfaz, subtítulos y avisos del juego.",
-            "更改游戏界面、字幕以及系统提示信息的语言。"
+            "Thay đổi ngôn ngữ tức thì cho giao diện, phụ đề, đếm giờ và thông báo trong toàn bộ trò chơi.",
+            "Instantly changes display language for UI, subtitles, timers, and notices across the entire game.",
+            "Cambia instantáneamente el idioma para la interfaz, subtítulos, temporizadores y avisos de todo el juego.",
+            "即时更改全游戏界面、字幕、计时器以及系统提示语言。"
+        } },
+        { "BTN_LOBBY_SETTINGS", new string[] {
+            "⚙️ CÀI ĐẶT",
+            "⚙️ SETTINGS",
+            "⚙️ AJUSTES",
+            "⚙️ 设置"
+        } },
+        { "STATUS_ACTIVE", new string[] {
+            "✔ ĐANG DÙNG",
+            "✔ ACTIVE",
+            "✔ ACTIVO",
+            "✔ 当前使用"
+        } },
+        { "STATUS_CHOOSE", new string[] {
+            "CHỌN",
+            "SELECT",
+            "ELEGIR",
+            "选择"
+        } },
+        { "SETTINGS_INMATCH_NOTICE", new string[] {
+            "⚠️ Đang trong trận: Chỉ hỗ trợ điều chỉnh Đồ họa & Độ nhạy",
+            "⚠️ In-Match: Only Graphics & Sensitivity are adjustable",
+            "⚠️ En Partida: Solo Gráficos y Sensibilidad ajustables",
+            "⚠️ 对局中: 仅可调节画面与灵敏度"
+        } },
+        { "SETTINGS_SAVED_NOTICE", new string[] {
+            "✔ Đã lưu cài đặt tự động",
+            "✔ Settings saved automatically",
+            "✔ Ajustes guardados automáticamente",
+            "✔ 设置已自动保存"
+        } },
+        { "SETTINGS_GRAPHICS_HEADER", new string[] {
+            "🎨 1. CHẤT LƯỢNG ĐỒ HỌA (GRAPHICS)",
+            "🎨 1. GRAPHICS QUALITY",
+            "🎨 1. CALIDAD GRÁFICA",
+            "🎨 1. 画面质量"
+        } },
+        { "SETTINGS_GRAPHICS_BOOST_BTN", new string[] {
+            "🌟 TĂNG ĐỒ HỌA CỰC ĐẠI (SIÊU NÉT 130%)",
+            "🌟 ULTRA GRAPHICS (CRISP 130%)",
+            "🌟 GRÁFICOS ULTRA (NÍTIDO 130%)",
+            "🌟 极限画质 (130%高精锐化)"
+        } },
+        { "SETTINGS_GRAPHICS_ULTRA", new string[] {
+            "🌟 Siêu Đẹp (130%)",
+            "🌟 Ultra (130%)",
+            "🌟 Ultra (130%)",
+            "🌟 极限 (130%)"
+        } },
+        { "SETTINGS_GRAPHICS_MED", new string[] {
+            "⚖️ Cân Bằng (100%)",
+            "⚖️ Balanced (100%)",
+            "⚖️ Equilibrado (100%)",
+            "⚖️ 平衡 (100%)"
+        } },
+        { "SETTINGS_GRAPHICS_LOW", new string[] {
+            "⚡ Tiết Kiệm (85%)",
+            "⚡ Power Save (85%)",
+            "⚡ Ahorro (85%)",
+            "⚡ 流畅省电 (85%)"
+        } },
+        { "SETTINGS_FPS_HEADER", new string[] {
+            "⚡ 2. TỐC ĐỘ KHUNG HÌNH (FPS)",
+            "⚡ 2. TARGET FRAME RATE (FPS)",
+            "⚡ 2. TASA DE FOTOGRAMAS (FPS)",
+            "⚡ 2. 目标帧率 (FPS)"
+        } },
+        { "SETTINGS_FPS_UNLIMITED", new string[] {
+            "🚀 Mở Khóa FPS (Max)",
+            "🚀 Unlimited FPS (Max)",
+            "🚀 FPS Ilimitado (Max)",
+            "🚀 解锁帧率上限"
+        } },
+        { "SETTINGS_FPS_120", new string[] {
+            "⚡ 120 FPS Siêu Mượt",
+            "⚡ 120 FPS Smooth",
+            "⚡ 120 FPS Fluido",
+            "⚡ 120 FPS 极速流畅"
+        } },
+        { "SETTINGS_FPS_60", new string[] {
+            "🔋 60 FPS Chuẩn Mát Máy",
+            "🔋 60 FPS Standard",
+            "🔋 60 FPS Estándar",
+            "🔋 60 FPS 标准"
+        } },
+        { "SETTINGS_VSYNC_HEADER", new string[] {
+            "🔄 3. ĐỒNG BỘ DỌC (V-SYNC)",
+            "🔄 3. VERTICAL SYNC (V-SYNC)",
+            "🔄 3. SINCRONIZACIÓN VERTICAL",
+            "🔄 3. 垂直同步 (V-SYNC)"
+        } },
+        { "SETTINGS_AUDIO_HEADER", new string[] {
+            "🔊 ĐIỀU CHỈNH ÂM LƯỢNG HỆ THỐNG",
+            "🔊 AUDIO VOLUME SETTINGS",
+            "🔊 AJUSTES DE VOLUMEN",
+            "🔊 系统音量调节"
+        } },
+        { "SETTINGS_AUDIO_MASTER_LABEL", new string[] {
+            "Âm lượng tổng (Master)",
+            "Master Volume",
+            "Volumen General",
+            "主音量"
+        } },
+        { "SETTINGS_AUDIO_MUSIC_LABEL", new string[] {
+            "Nhạc nền rùng rợn (Music)",
+            "Atmospheric Music",
+            "Música de Fondo",
+            "背景音乐"
+        } },
+        { "SETTINGS_AUDIO_SFX_LABEL", new string[] {
+            "Hiệu ứng âm thanh & Ma (SFX)",
+            "Sound Effects & Ghost (SFX)",
+            "Efectos de Sonido (SFX)",
+            "音效与鬼怪声效"
+        } },
+        { "SETTINGS_AUDIO_MUTE", new string[] {
+            "🔇 Tắt Toàn Bộ Âm Thanh",
+            "🔇 Mute All Audio",
+            "🔇 Silenciar Todo",
+            "🔇 静音所有音效"
+        } },
+        { "SETTINGS_AUDIO_UNMUTE", new string[] {
+            "🔊 Bật Âm Thanh",
+            "🔊 Unmute Audio",
+            "🔊 Activar Sonido",
+            "🔊 开启声音"
+        } },
+        { "SETTINGS_CONTROLS_HEADER", new string[] {
+            "🎮 ĐIỀU CHỈNH ĐIỀU KHIỂN & GÓC NHÌN",
+            "🎮 CONTROLS & CAMERA SENSITIVITY",
+            "🎮 CONTROLES Y SENSIBILIDAD",
+            "🎮 操作控制与视角灵敏度"
+        } },
+        { "SETTINGS_CONTROLS_SENS_LABEL", new string[] {
+            "Độ nhạy góc nhìn 360°",
+            "Camera Sensitivity (360°)",
+            "Sensibilidad de Cámara (360°)",
+            "视角灵敏度 (360°)"
+        } },
+        { "SETTINGS_CONTROLS_KEYBINDINGS_HEADER", new string[] {
+            "⌨️ HƯỚNG DẪN BÀN PHÍM (KEYBINDINGS)",
+            "⌨️ KEYBOARD CONTROLS GUIDE",
+            "⌨️ GUÍA DE CONTROLES TECLADO",
+            "⌨️ 键盘键位指南"
+        } },
+        { "SETTINGS_CONTROLS_KEYBINDINGS_BODY", new string[] {
+            "• [W] [A] [S] [D] / Mũi tên : Di chuyển nhân vật\n• [Left Shift] : Chạy nước rút (Sprint)\n• [Space] : Nhảy cao tiếp đất\n• [Di Chuột] : Xoay góc nhìn thứ ba 360°\n• [Con Lăn Chuột] : Thu phóng Camera gần/xa\n• [F1] / [Tab] / [Esc] : Bật / Tắt nhanh Dashboard",
+            "• [W] [A] [S] [D] / Arrows : Character Movement\n• [Left Shift] : Sprint\n• [Space] : Jump\n• [Mouse Move] : Orbit Camera 360°\n• [Scroll Wheel] : Camera Zoom In/Out\n• [F1] / [Tab] / [Esc] : Toggle Settings Dashboard",
+            "• [W] [A] [S] [D] / Flechas : Mover personaje\n• [Left Shift] : Correr (Sprint)\n• [Espacio] : Saltar\n• [Mover Ratón] : Rotar cámara 360°\n• [Rueda Ratón] : Acercar / Alejar cámara\n• [F1] / [Tab] / [Esc] : Abrir / Cerrar Ajustes",
+            "• [W] [A] [S] [D] / 方向键 : 角色移动\n• [Left Shift] : 疾跑冲刺\n• [空格键] : 跳跃\n• [滑动鼠标] : 360° 旋转第三人称视角\n• [滚轮] : 镜头远近缩放\n• [F1] / [Tab] / [Esc] : 快速开启/关闭设置"
+        } },
+        { "SETTINGS_BTN_CLOSE", new string[] {
+            "ĐÓNG CÀI ĐẶT",
+            "CLOSE SETTINGS",
+            "CERRAR AJUSTES",
+            "关闭设置"
+        } },
+
+        // IN-MATCH HUD & SURVIVAL TIMERS (SurvivalTimerUI)
+        { "HUD_WAITING_FOR_ROOM", new string[] {
+            "⚔️ ĐANG CHỜ PHÒNG XÁC NHẬN BẮT ĐẦU",
+            "⚔️ WAITING FOR ROOM CONFIRMATION",
+            "⚔️ ESPERANDO CONFIRMACIÓN DE SALA",
+            "⚔️ 等待房间确认开始"
+        } },
+        { "HUD_GHOST_RANDOM_NOTICE", new string[] {
+            "🎃 BẠN ĐƯỢC RANDOM LÀM MA BÍ NGÔ! CHỜ TRONG VÒNG TRÒN:",
+            "🎃 YOU ARE CHOSEN AS PUMPKIN GHOST! WAIT IN CIRCLE:",
+            "🎃 ¡ERES EL FANTASMA CALABAZA! ESPERA EN EL CÍRCULO:",
+            "🎃 你被随机选为南瓜鬼！请在圈内等待:"
+        } },
+        { "HUD_HUMAN_RUN_PREPARE", new string[] {
+            "⏳ CHUẨN BỊ XUẤT PHÁT CHẠY TRỐN (TRONG VÒNG TRÒN)",
+            "⏳ PREPARE TO RUN & HIDE (IN CIRCLE)",
+            "⏳ PREPÁRATE PARA CORRER (EN EL CÍRCULO)",
+            "⏳ 准备出发躲藏 (在圈内)"
+        } },
+        { "HUD_GHOST_COUNTDOWN_HINT", new string[] {
+            "🎃 BẠN SẼ HÓA THÂN THÀNH MA BÍ NGÔ SAU:",
+            "🎃 YOU WILL TRANSFORM INTO GHOST IN:",
+            "🎃 TE TRANSFORMARÁS EN FANTASMA EN:",
+            "🎃 你将在倒计时后化身南瓜鬼:"
+        } },
+        { "HUD_HUMAN_COUNTDOWN_HINT", new string[] {
+            "🏃 HÃY CHẠY TRỐN! 2 MA BÍ NGÔ XUẤT HIỆN SAU:",
+            "🏃 RUN AND HIDE! 2 GHOSTS SPAWN IN:",
+            "🏃 ¡CORRE! 2 FANTASMAS APARECEN EN:",
+            "🏃 快逃！两只南瓜鬼将在倒计时后出现:"
+        } },
+        { "HUD_CIRCLE_OPENED_HUMAN", new string[] {
+            "🏃 VÒNG TRÒN ĐÃ MỞ! HÃY TỎA RA MÊ CUNG CHẠY & TRỐN HÚ!\n(2 Người chơi Ma Bí Ngô sẽ hóa thân đi săn sau 20s)",
+            "🏃 CIRCLE OPENED! SPREAD OUT AND HIDE IN THE MAZE!\n(2 Pumpkin Ghosts will awaken in 20s)",
+            "🏃 ¡CÍRCULO ABIERTO! ¡ESCÓNDETE EN EL LABERINTO!\n(Los 2 Fantasmas despertarán en 20s)",
+            "🏃 结界已解开！快分散到迷宫中躲藏！\n(两只南瓜鬼将在20秒后苏醒追猎)"
+        } },
+        { "HUD_CIRCLE_OPENED_GHOST", new string[] {
+            "🎃 BẠN ĐƯỢC CHỌN LÀM MA BÍ NGÔ!\nHãy đợi trong vòng tròn 20s để người khác chạy trốn trước khi đi săn!",
+            "🎃 YOU ARE THE PUMPKIN GHOST!\nWait in circle 20s before hunting!",
+            "🎃 ¡ERES EL FANTASMA CALABAZA!\n¡Espera 20s en el círculo antes de cazar!",
+            "🎃 你被选为南瓜鬼！\n请在圈内等待20秒让幸存者躲藏！"
+        } },
+        { "HUD_HUNTING_STARTED", new string[] {
+            "🔥 MA BÍ NGÔ ĐÃ XUẤT HIỆN ĐI SĂN!\nHÃY SINH TỒN TRONG 3 PHÚT!",
+            "🔥 PUMPKIN GHOSTS ARE AWAKE! SURVIVE FOR 3 MINUTES!",
+            "🔥 ¡LOS FANTASMAS HAN DESPERTADO! ¡SOBREVIVE 3 MINUTOS!",
+            "🔥 南瓜鬼已苏醒！在迷宫中生存3分钟！"
+        } },
+        { "HUD_SURVIVAL_TIME_TITLE", new string[] {
+            "⏱️ THỜI GIAN SINH TỒN",
+            "⏱️ SURVIVAL TIME",
+            "⏱️ TIEMPO DE SUPERVIVENCIA",
+            "⏱️ 剩余生存时间"
+        } },
+        { "HUD_HUMAN_VICTORY", new string[] {
+            "🏆 CON NGƯỜI CHIẾN THẮNG!",
+            "🏆 SURVIVORS WIN!",
+            "🏆 ¡LOS HUMANOS GANAN!",
+            "🏆 幸存者获胜！"
+        } },
+        { "HUD_GHOST_VICTORY", new string[] {
+            "💀 2 MA BÍ NGÔ CHIẾN THẮNG!",
+            "💀 PUMPKIN GHOSTS WIN!",
+            "💀 ¡LOS FANTASMAS GANAN!",
+            "💀 南瓜鬼获胜！"
+        } },
+        { "HUD_ALL_HUMANS_DOWN", new string[] {
+            "TẤT CẢ CON NGƯỜI ĐÃ BỊ HẠ GỤC!",
+            "ALL SURVIVORS HAVE BEEN ELIMINATED!",
+            "¡TODOS LOS HUMANOS HAN SIDO DERROTADOS!",
+            "所有幸存者已被击败！"
+        } },
+        { "HUD_HUMANS_SURVIVED", new string[] {
+            "HẾT 3 PHÚT! CON NGƯỜI ĐÃ SINH TỒN THÀNH CÔNG!",
+            "3 MINUTES UP! SURVIVORS SUCCESSFULLY SURVIVED!",
+            "¡3 MINUTOS CUMPLIDOS! ¡LOS HUMANOS SOBREVIVIERON!",
+            "3分钟结束！幸存者成功生还！"
+        } },
+        { "HUD_REPLAY_AGREE_BTN", new string[] {
+            "👍 ĐỒNG Ý CHƠI LẠI [ P ]",
+            "👍 AGREE TO REPLAY [ P ]",
+            "👍 ACEPTAR REVANCHA [ P ]",
+            "👍 同意再来一局 [ P ]"
+        } },
+        { "HUD_REPLAY_CONFIRMED", new string[] {
+            "✅ ĐÃ XÁC NHẬN CHƠI LẠI — Nhấn [P] để hủy",
+            "✅ REPLAY CONFIRMED — Press [P] to cancel",
+            "✅ REVANCHA CONFIRMADA — Pulsa [P] para cancelar",
+            "✅ 已确认再来一局 — 按 [P] 取消"
+        } },
+        { "HUD_REPLAY_SOLO_BTN", new string[] {
+            "🔄 CHƠI LẠI NGAY [ P ]",
+            "🔄 PLAY AGAIN NOW [ P ]",
+            "🔄 JUGAR DE NUEVO [ P ]",
+            "🔄 立即重开 [ P ]"
+        } },
+        { "HUD_LEAVE_LOBBY_BTN", new string[] {
+            "🚪 RỜI VỀ SẢNH [ ESC ]",
+            "🚪 LEAVE TO LOBBY [ ESC ]",
+            "🚪 SALIR AL LOBBY [ ESC ]",
+            "🚪 返回大厅 [ ESC ]"
+        } },
+        { "HUD_WAITING_REPLAY_PLAYERS", new string[] {
+            "⏳ ĐỢI CẢ PHÒNG XÁC NHẬN CHƠI LẠI: <color=#00FF9D>{0} / {1}</color>",
+            "⏳ WAITING FOR ALL PLAYERS: <color=#00FF9D>{0} / {1}</color>",
+            "⏳ ESPERANDO A TODOS LOS JUGADORES: <color=#00FF9D>{0} / {1}</color>",
+            "⏳ 等待所有玩家确认: <color=#00FF9D>{0} / {1}</color>"
+        } },
+        { "HUD_REPLAY_STARTING", new string[] {
+            "<color=#00FF9D>🚀 ĐÃ ĐỦ NGƯỜI ĐỒNG Ý! ĐANG TẠO LẠI TRÒ CHƠI...</color>",
+            "<color=#00FF9D>🚀 ALL PLAYERS AGREED! RESTARTING GAME...</color>",
+            "<color=#00FF9D>🚀 ¡TODOS DE ACUERDO! REINICIANDO PARTIDA...</color>",
+            "<color=#00FF9D>🚀 全员同意！正在重新创建对局...</color>"
+        } },
+        { "HUD_TOP_ROOM_ID", new string[] {
+            "🏠 PHÒNG: {0}",
+            "🏠 ROOM: {0}",
+            "🏠 SALA: {0}",
+            "🏠 房间: {0}"
+        } },
+
+        // PLAYER HEALTH & SPECTATE (PlayerHealth)
+        { "HUD_PLAYER_HP_TITLE", new string[] {
+            "❤️ MÁU PLAYER",
+            "❤️ PLAYER HP",
+            "❤️ SALUD",
+            "❤️ 生命值"
+        } },
+        { "HUD_PLAYER_DEAD", new string[] {
+            "💀 ĐÃ TỬ TRẬN",
+            "💀 DEFEATED",
+            "💀 ELIMINADO",
+            "💀 已阵亡"
+        } },
+        { "HUD_GHOST_IMMORTAL", new string[] {
+            "👻 MA BÍ NGÔ (BẤT TỬ)",
+            "👻 PUMPKIN GHOST (IMMORTAL)",
+            "👻 FANTASMA (INMORTAL)",
+            "👻 南瓜鬼 (无敌)"
+        } },
+        { "HUD_SPECTATE_TITLE", new string[] {
+            "👁 ĐANG XEM ĐỒNG ĐỘI: {0} ({1}/{2})",
+            "👁 SPECTATING: {0} ({1}/{2})",
+            "👁 ESPECTANDO: {0} ({1}/{2})",
+            "👁 正在观战队友: {0} ({1}/{2})"
+        } },
+        { "HUD_SPECTATE_NO_TEAMMATES", new string[] {
+            "💀 ĐÃ TỬ TRẬN — KHÔNG CÒN ĐỒNG ĐỘI CÙNG PHE",
+            "💀 ELIMINATED — NO REMAINING TEAMMATES",
+            "💀 ELIMINADO — NO HAY COMPAÑEROS VIVOS",
+            "💀 已阵亡 — 无剩余队友"
         } }
     };
 

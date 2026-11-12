@@ -61,12 +61,30 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     // Quản lý Đa Ngôn Ngữ & Tag 18+ (Localization & 18+ Age Rating)
     private Text headerLanguageBtnText;
+    private Text lobbySettingsBtnText;
     private Text headerAgeRatingText;
     private Text headerSubtitleText;
     private Text bottomDisclaimerText;
     private readonly Text[] cardTitleTexts = new Text[6];
+    private readonly Text[] cardSubtitleTexts = new Text[6];
     private readonly Text[] cardBadgeTexts = new Text[6];
     private readonly Text[] cardBtnTexts = new Text[6];
+    private Text tabMultiplayerText;
+    private Text tabSoloText;
+    private Text tabSettingsText;
+    private GameObject tabMultiplayerUnderline;
+    private Text bottomConnectionStatusText;
+    private Text bottomSloganText;
+    private Text connectionStatusLabelText;
+    private Text roomIdLabelText;
+    private Text roomIdInputPlaceholderText;
+    private Text joinRoomBtnText;
+    private Text createRoomBtnText;
+    private Text waitingHeaderTitleText;
+    private Text waitingMyNameLabelText;
+    private Text waitingSaveNameBtnText;
+    private Text waitingLeaveBtnText;
+    private Text matchmakingSpinnerCancelBtnText;
 
     private struct PlayerSlotUI
     {
@@ -164,6 +182,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         // Đăng ký nhận thông báo thay đổi ngôn ngữ
         GameLocalizationManager.OnLanguageChanged += HandleLobbyLanguageChanged;
+    }
+
+    /// <summary>
+    /// Kiểm tra giao diện Sảnh Chờ có đang hiển thị hay không (dùng để phân biệt chế độ cài đặt Trong Trận vs Ở Sảnh).
+    /// </summary>
+    public bool IsLobbyShowing()
+    {
+        if (lobbyCanvas == null) return false;
+        if (!lobbyCanvas.gameObject.activeInHierarchy) return false;
+        if (lobbyRootObj != null && !lobbyRootObj.activeInHierarchy) return false;
+        return true;
     }
 
     private void OnDestroy()
@@ -289,55 +318,83 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         tex.filterMode = FilterMode.Bilinear;
 
         // Mặt trăng ở góc trên bên phải
-        Vector2 moonCenter = new Vector2(w * 0.75f, h * 0.80f);
-        float moonRadius = h * 0.16f;
+        Vector2 moonCenter = new Vector2(w * 0.73f, h * 0.77f);
+        float moonRadius = h * 0.17f;
 
-        Color topSky = new Color(0.03f, 0.05f, 0.12f, 0.98f);
-        Color midSky = new Color(0.07f, 0.08f, 0.20f, 0.96f);
-        Color botMist = new Color(0.04f, 0.07f, 0.15f, 0.98f);
+        // Vị trí đèn lồng đỏ cổ kính góc bên trái
+        Vector2 lanternCenter = new Vector2(w * 0.08f, h * 0.68f);
+        float lanternRadius = h * 0.20f;
+
+        Color topSky = new Color(0.02f, 0.04f, 0.10f, 0.98f);
+        Color midSky = new Color(0.06f, 0.08f, 0.18f, 0.96f);
+        Color botMist = new Color(0.03f, 0.05f, 0.12f, 0.98f);
 
         for (int y = 0; y < h; y++)
         {
             float ty = y / (float)(h - 1);
-            Color baseRow = ty > 0.45f
-                ? Color.Lerp(midSky, topSky, (ty - 0.45f) / 0.55f)
-                : Color.Lerp(botMist, midSky, ty / 0.45f);
+            Color baseRow = ty > 0.42f
+                ? Color.Lerp(midSky, topSky, (ty - 0.42f) / 0.58f)
+                : Color.Lerp(botMist, midSky, ty / 0.42f);
 
             for (int x = 0; x < w; x++)
             {
                 float tx = x / (float)(w - 1);
                 Color c = baseRow;
 
-                // Hào quang mặt trăng với SmoothStep
+                // 1. Hào quang mặt trăng với SmoothStep
                 float distMoon = Vector2.Distance(new Vector2(x, y), moonCenter);
                 if (distMoon < moonRadius)
                 {
                     float edge = Mathf.SmoothStep(0f, 1f, (moonRadius - distMoon) / 2.5f);
                     float crater = Mathf.PerlinNoise(x * 0.04f, y * 0.04f) * 0.10f;
-                    Color moonCol = new Color(0.90f - crater, 0.93f - crater, 1.0f, 0.98f);
+                    Color moonCol = new Color(0.92f - crater, 0.94f - crater, 1.0f, 0.98f);
                     c = Color.Lerp(c, moonCol, edge * 0.88f);
                 }
                 else if (distMoon < moonRadius * 3.5f)
                 {
                     float glow = Mathf.Pow(1f - (distMoon - moonRadius) / (moonRadius * 2.5f), 2.2f);
-                    c += new Color(0.20f, 0.30f, 0.65f, 0f) * (glow * 0.50f);
+                    c += new Color(0.18f, 0.32f, 0.68f, 0f) * (glow * 0.52f);
                 }
 
-                // Sương mù ma mị ở nửa dưới
-                if (ty < 0.35f)
+                // 2. Ánh đèn lồng ma mị ấm áp bên trái
+                float distLantern = Vector2.Distance(new Vector2(x, y), lanternCenter);
+                if (distLantern < lanternRadius)
                 {
-                    float mistNoise = Mathf.PerlinNoise(tx * 5f + 1.2f, ty * 8f + 2.4f);
-                    float mistStrength = (1f - ty / 0.35f) * mistNoise * 0.20f;
-                    c += new Color(0.14f, 0.18f, 0.38f, 0f) * mistStrength;
+                    float lglow = Mathf.Pow(1f - distLantern / lanternRadius, 2.0f);
+                    c += new Color(0.95f, 0.22f, 0.08f, 0f) * (lglow * 0.55f);
                 }
 
-                // Vignette 4 góc tối sâu
+                // 3. Bóng đen mái chùa cổ kính cong vút ở phía bên phải
+                if (tx > 0.65f)
+                {
+                    float relX = (tx - 0.65f) / 0.35f;
+                    // Đường cong mái chùa uốn vút
+                    float roofY1 = 0.52f + Mathf.Sin(relX * Mathf.PI * 3.2f) * 0.06f + relX * 0.22f;
+                    float roofY2 = 0.34f + Mathf.Sin(relX * Mathf.PI * 2.8f) * 0.05f + relX * 0.16f;
+                    if (ty < roofY1 || ty < roofY2)
+                    {
+                        Color pagodaDark = new Color(0.015f, 0.022f, 0.05f, 1f);
+                        c = Color.Lerp(c, pagodaDark, 0.82f);
+                    }
+                }
+
+                // 4. Sương mù và nền sân gạch đá cổ ở nửa dưới
+                if (ty < 0.30f)
+                {
+                    float groundFactor = (0.30f - ty) / 0.30f;
+                    Color groundCol = new Color(0.025f, 0.038f, 0.08f, 1f);
+                    float stoneNoise = Mathf.PerlinNoise(tx * 25f, ty * 18f) * 0.05f;
+                    groundCol += new Color(stoneNoise * 0.4f, stoneNoise * 0.7f, stoneNoise * 1.1f, 0f);
+                    c = Color.Lerp(c, groundCol, groundFactor * 0.92f);
+                }
+
+                // 5. Vignette 4 góc tối sâu
                 float vx = (tx - 0.5f) * 2f;
                 float vy = (ty - 0.5f) * 2f;
-                float vig = Mathf.Clamp01((vx * vx + vy * vy) * 0.32f);
-                c.r *= (1f - vig * 0.45f);
-                c.g *= (1f - vig * 0.45f);
-                c.b *= (1f - vig * 0.35f);
+                float vig = Mathf.Clamp01((vx * vx + vy * vy) * 0.30f);
+                c.r *= (1f - vig * 0.40f);
+                c.g *= (1f - vig * 0.40f);
+                c.b *= (1f - vig * 0.30f);
 
                 tex.SetPixel(x, y, c);
             }
@@ -736,7 +793,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         lobbyCanvas.sortingOrder = 42;
 
         CanvasScaler scaler = cGo.AddComponent<CanvasScaler>();
-        UIFontHelper.ConfigureCrispCanvasScaler(scaler);
+        UIFontHelper.ConfigureCrispCanvas(lobbyCanvas, scaler);
         cGo.AddComponent<GraphicRaycaster>();
 
         EnsureEventSystemExists();
@@ -764,13 +821,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         bgImg.sprite = sprBackdropSky;
         bgImg.color = Color.white;
 
-        // 2. Badge Trạng Thái Kết Nối (Góc trên bên trái)
-        BuildTopLeftConnectionBadge(lobbyRootObj.transform, font);
+        // 2. Logo Game: GHOST MAZE (Góc trên bên trái)
+        BuildTopLeftGameLogo(lobbyRootObj.transform, font);
 
-        // 2.1. Badge Hồ Sơ Người Chơi (Góc trên bên phải)
+        // 2.1. Thanh Tab Điều Hướng (Chính giữa phía trên: Đa Người Chơi / Chơi Đơn / Cài Đặt)
+        BuildTopCenterNavTabs(lobbyRootObj.transform, font);
+
+        // 2.2. Hồ Sơ Người Chơi & Nút Cài Đặt, Nút Nguồn Thoát Game (Góc trên bên phải)
         BuildTopRightPlayerBadge(lobbyRootObj.transform, font);
 
-        // 3. MÀN HÌNH 1: SẢNH CHÍNH (Thanh ID Phòng + Nút Tham Gia/Tạo Phòng + 6 Thẻ Bài)
+        // 3. MÀN HÌNH 1: SẢNH CHÍNH (Thanh ID Phòng + 6 Thẻ Chế Độ Chơi Gothic)
         mainCardsViewObj = new GameObject("MainCardsView");
         mainCardsViewObj.transform.SetParent(lobbyRootObj.transform, false);
         RectTransform mvRect = mainCardsViewObj.AddComponent<RectTransform>();
@@ -779,13 +839,10 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         mvRect.offsetMin = Vector2.zero;
         mvRect.offsetMax = Vector2.zero;
 
-        // Tiêu đề Game: Logo GHOST MAZE chính giữa phía trên
-        BuildTopCenterGameLogo(mainCardsViewObj.transform, font);
-
-        // Thanh ID Phòng & Nút Tham Gia / Tạo Phòng
+        // Thanh ID Phòng & Nút [ ➔ Tham gia ] cam rực rỡ
         BuildTopCenterRoomBar(mainCardsViewObj.transform, font);
 
-        // 6 Thẻ Chế Độ Chơi Gothic
+        // 6 Thẻ Chế Độ Chơi Gothic (Chuẩn màu, icon, subtitle, nút pill, và Vương Miện Vàng 👑 trên thẻ Làm chủ phòng)
         BuildSixGothicModeCards(mainCardsViewObj.transform, font);
 
         // 4. MÀN HÌNH 2: BÊN TRONG PHÒNG CHỜ (Waiting Room View - Hiển thị ID Phòng + 4 Người Chơi & Tôi Ở Đây)
@@ -797,11 +854,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         // 5. Thanh HUD ID Phòng Nhỏ Gọn Góc Trên Phải Khi Đã Bắt Đầu Trận Đấu
         BuildInGameRoomHUD(lobbyCanvas.transform, font);
 
-        // 6. Dải Banner Cảnh Báo Bản Quyền & Phân Loại 18+ (Bảo Hộ Pháp Lý Dưới Đáy Màn Hình)
-        BuildBottomLegalDisclaimer(lobbyRootObj.transform, font);
+        // 6. Thanh Trạng Thái Dưới Cùng (Trái: ● Trạng thái kết nối: Kết nối tốt | Phải: PLAY TOGETHER • HAVE FUN)
+        BuildBottomStatusBar(lobbyRootObj.transform, font);
 
         // Khởi tạo text ngôn ngữ đồng bộ
         UpdateAllLobbyLocalizedTexts();
+
+        // Tối ưu độ nét vector toàn diện cho UI sảnh
+        UIFontHelper.ApplyCrispnessRecursively(lobbyRootObj, 15);
 
         // Khởi đầu ở Sảnh Chính
         SwitchToMainCardsView();
@@ -840,303 +900,308 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     }
 
     // =========================================================================
-    // 3. BADGE TRẠNG THÁI KẾT NỐI GÓC TRÊN BÊN TRÁI & HỒ SƠ GÓC TRÊN BÊN PHẢI
+    // 3. TOP BAR: LOGO (TRÁI), TAB ĐIỀU HƯỚNG (GIỮA), HỒ SƠ & TIỆN ÍCH (PHẢI)
     // =========================================================================
-    private void BuildTopLeftConnectionBadge(Transform parent, Font font)
+    private void BuildTopLeftGameLogo(Transform parent, Font font)
     {
-        GameObject badgeObj = new GameObject("ConnectionStatusBadge");
-        badgeObj.transform.SetParent(parent, false);
-        RectTransform bRect = badgeObj.AddComponent<RectTransform>();
-        bRect.anchorMin = new Vector2(0f, 1f);
-        bRect.anchorMax = new Vector2(0f, 1f);
-        bRect.pivot = new Vector2(0f, 1f);
-        bRect.anchoredPosition = new Vector2(40f, -28f);
-        bRect.sizeDelta = new Vector2(360f, 52f);
-
-        Image bBg = badgeObj.AddComponent<Image>();
-        bBg.color = new Color(0.06f, 0.09f, 0.18f, 0.94f);
-        Outline bOut1 = badgeObj.AddComponent<Outline>();
-        bOut1.effectColor = new Color(0.32f, 0.44f, 0.78f, 0.85f);
-        bOut1.effectDistance = new Vector2(2f, 2f);
-
-        // Vòng tròn biểu tượng mắt xích bên trái
-        GameObject iconCircle = new GameObject("LinkIconCircle");
-        iconCircle.transform.SetParent(badgeObj.transform, false);
-        RectTransform icRect = iconCircle.AddComponent<RectTransform>();
-        icRect.anchorMin = new Vector2(0f, 0.5f);
-        icRect.anchorMax = new Vector2(0f, 0.5f);
-        icRect.pivot = new Vector2(0.5f, 0.5f);
-        icRect.anchoredPosition = new Vector2(26f, 0f);
-        icRect.sizeDelta = new Vector2(38f, 38f);
-
-        Image icBg = iconCircle.AddComponent<Image>();
-        icBg.sprite = sprCircleBadge;
-        icBg.color = new Color(0.14f, 0.26f, 0.58f, 0.95f);
-
-        GameObject linkIcon = new GameObject("LinkIcon");
-        linkIcon.transform.SetParent(iconCircle.transform, false);
-        RectTransform liRect = linkIcon.AddComponent<RectTransform>();
-        liRect.anchorMin = Vector2.zero;
-        liRect.anchorMax = Vector2.one;
-        liRect.offsetMin = new Vector2(6f, 6f);
-        liRect.offsetMax = new Vector2(-6f, -6f);
-        Image liImg = linkIcon.AddComponent<Image>();
-        liImg.sprite = sprLinkIcon;
-        liImg.color = new Color(0.55f, 0.82f, 1.0f, 1f);
-
-        // Chấm tròn đèn trạng thái
-        GameObject dotObj = new GameObject("StatusDot");
-        dotObj.transform.SetParent(badgeObj.transform, false);
-        RectTransform dRect = dotObj.AddComponent<RectTransform>();
-        dRect.anchorMin = new Vector2(0f, 0.5f);
-        dRect.anchorMax = new Vector2(0f, 0.5f);
-        dRect.pivot = new Vector2(0.5f, 0.5f);
-        dRect.anchoredPosition = new Vector2(195f, 0f);
-        dRect.sizeDelta = new Vector2(14f, 14f);
-
-        connectionStatusDotImage = dotObj.AddComponent<Image>();
-        connectionStatusDotImage.sprite = sprCircleBadge;
-        connectionStatusDotImage.color = colConnected;
-
-        // Nhãn "Trạng thái:"
-        GameObject lblObj = new GameObject("Label");
-        lblObj.transform.SetParent(badgeObj.transform, false);
-        RectTransform lRect = lblObj.AddComponent<RectTransform>();
-        lRect.anchorMin = new Vector2(0f, 0f);
-        lRect.anchorMax = new Vector2(0f, 1f);
-        lRect.pivot = new Vector2(0f, 0.5f);
-        lRect.anchoredPosition = new Vector2(56f, 0f);
-        lRect.sizeDelta = new Vector2(135f, 0f);
-
-        Text lblTxt = lblObj.AddComponent<Text>();
-        lblTxt.font = font;
-        lblTxt.fontSize = 15;
-        lblTxt.fontStyle = FontStyle.Bold;
-        lblTxt.alignment = TextAnchor.MiddleLeft;
-        lblTxt.color = new Color(0.78f, 0.85f, 0.96f, 1f);
-        lblTxt.text = "Trạng thái kết nối:";
-
-        // Text trạng thái ("Đã kết nối" / "Đang kết nối...")
-        GameObject valObj = new GameObject("StatusValueText");
-        valObj.transform.SetParent(badgeObj.transform, false);
-        RectTransform vRect = valObj.AddComponent<RectTransform>();
-        vRect.anchorMin = new Vector2(0f, 0f);
-        vRect.anchorMax = new Vector2(1f, 1f);
-        vRect.offsetMin = new Vector2(215f, 0f);
-        vRect.offsetMax = new Vector2(-10f, 0f);
-
-        connectionStatusBadgeText = valObj.AddComponent<Text>();
-        connectionStatusBadgeText.font = font;
-        connectionStatusBadgeText.fontSize = 15;
-        connectionStatusBadgeText.fontStyle = FontStyle.Bold;
-        connectionStatusBadgeText.alignment = TextAnchor.MiddleLeft;
-        connectionStatusBadgeText.color = colConnected;
-        connectionStatusBadgeText.text = "Đã kết nối";
-    }
-
-    private void BuildTopRightPlayerBadge(Transform parent, Font font)
-    {
-        // 1. Nút chuyển đổi nhanh Ngôn Ngữ (Quick Language Switcher Button)
-        GameObject langBtnObj = new GameObject("QuickLanguageSwitcherBtn");
-        langBtnObj.transform.SetParent(parent, false);
-        RectTransform lrt = langBtnObj.AddComponent<RectTransform>();
-        lrt.anchorMin = new Vector2(1f, 1f);
-        lrt.anchorMax = new Vector2(1f, 1f);
-        lrt.pivot = new Vector2(1f, 1f);
-        lrt.anchoredPosition = new Vector2(-330f, -28f);
-        lrt.sizeDelta = new Vector2(180f, 52f);
-
-        Image lbg = langBtnObj.AddComponent<Image>();
-        lbg.color = new Color(0.06f, 0.12f, 0.24f, 0.95f);
-
-        Outline lol = langBtnObj.AddComponent<Outline>();
-        lol.effectColor = new Color(0.35f, 0.65f, 0.95f, 0.85f);
-        lol.effectDistance = new Vector2(2f, 2f);
-
-        Button lbtn = langBtnObj.AddComponent<Button>();
-        lbtn.onClick.AddListener(() =>
-        {
-            GameLocalizationManager.CycleNextLanguage();
-        });
-
-        GameObject ltxtObj = new GameObject("Text");
-        ltxtObj.transform.SetParent(langBtnObj.transform, false);
-        RectTransform ltrt = ltxtObj.AddComponent<RectTransform>();
-        ltrt.anchorMin = Vector2.zero;
-        ltrt.anchorMax = Vector2.one;
-        ltrt.offsetMin = Vector2.zero;
-        ltrt.offsetMax = Vector2.zero;
-
-        headerLanguageBtnText = ltxtObj.AddComponent<Text>();
-        headerLanguageBtnText.font = font;
-        headerLanguageBtnText.fontSize = 15;
-        headerLanguageBtnText.fontStyle = FontStyle.Bold;
-        headerLanguageBtnText.alignment = TextAnchor.MiddleCenter;
-        headerLanguageBtnText.color = new Color(0.92f, 0.96f, 1f);
-        headerLanguageBtnText.supportRichText = true;
-        UpdateLanguageButtonLabel();
-
-        // 2. Badge Hồ sơ người chơi
-        GameObject badgeObj = new GameObject("PlayerProfileBadge");
-        badgeObj.transform.SetParent(parent, false);
-        RectTransform bRect = badgeObj.AddComponent<RectTransform>();
-        bRect.anchorMin = new Vector2(1f, 1f);
-        bRect.anchorMax = new Vector2(1f, 1f);
-        bRect.pivot = new Vector2(1f, 1f);
-        bRect.anchoredPosition = new Vector2(-40f, -28f);
-        bRect.sizeDelta = new Vector2(280f, 52f);
-
-        Image bBg = badgeObj.AddComponent<Image>();
-        bBg.color = new Color(0.06f, 0.09f, 0.18f, 0.94f);
-        Outline bOut1 = badgeObj.AddComponent<Outline>();
-        bOut1.effectColor = new Color(0.32f, 0.44f, 0.78f, 0.85f);
-        bOut1.effectDistance = new Vector2(2f, 2f);
-
-        // Icon Avatar
-        GameObject iconCircle = new GameObject("AvatarCircle");
-        iconCircle.transform.SetParent(badgeObj.transform, false);
-        RectTransform icRect = iconCircle.AddComponent<RectTransform>();
-        icRect.anchorMin = new Vector2(0f, 0.5f);
-        icRect.anchorMax = new Vector2(0f, 0.5f);
-        icRect.pivot = new Vector2(0.5f, 0.5f);
-        icRect.anchoredPosition = new Vector2(26f, 0f);
-        icRect.sizeDelta = new Vector2(36f, 36f);
-
-        Image icBg = iconCircle.AddComponent<Image>();
-        icBg.sprite = sprCircleBadge;
-        icBg.color = new Color(0.14f, 0.45f, 0.85f, 0.95f);
-
-        GameObject avIcon = new GameObject("Icon");
-        avIcon.transform.SetParent(iconCircle.transform, false);
-        RectTransform aiRect = avIcon.AddComponent<RectTransform>();
-        aiRect.anchorMin = Vector2.zero;
-        aiRect.anchorMax = Vector2.one;
-        aiRect.offsetMin = new Vector2(5f, 5f);
-        aiRect.offsetMax = new Vector2(-5f, -5f);
-        Image aiImg = avIcon.AddComponent<Image>();
-        aiImg.sprite = sprCardIcons[0];
-        aiImg.color = Color.white;
-
-        // Text Tên người chơi
-        GameObject nameObj = new GameObject("PlayerNameText");
-        nameObj.transform.SetParent(badgeObj.transform, false);
-        RectTransform nRect = nameObj.AddComponent<RectTransform>();
-        nRect.anchorMin = new Vector2(0f, 0f);
-        nRect.anchorMax = new Vector2(1f, 1f);
-        nRect.offsetMin = new Vector2(54f, 0f);
-        nRect.offsetMax = new Vector2(-10f, 0f);
-
-        topRightPlayerNameText = nameObj.AddComponent<Text>();
-        topRightPlayerNameText.font = font;
-        topRightPlayerNameText.fontSize = 16;
-        topRightPlayerNameText.fontStyle = FontStyle.Bold;
-        topRightPlayerNameText.alignment = TextAnchor.MiddleLeft;
-        topRightPlayerNameText.color = new Color(0.92f, 0.96f, 1f, 1f);
-        topRightPlayerNameText.supportRichText = true;
-        topRightPlayerNameText.text = "👤 Tôi";
-    }
-
-    private void BuildTopCenterGameLogo(Transform parent, Font font)
-    {
-        GameObject logoObj = new GameObject("GameLogoHeader");
+        GameObject logoObj = new GameObject("TopLeftGameLogo");
         logoObj.transform.SetParent(parent, false);
         RectTransform rt = logoObj.AddComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 1f);
-        rt.anchorMax = new Vector2(0.5f, 1f);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.anchoredPosition = new Vector2(0f, -22f);
-        rt.sizeDelta = new Vector2(920f, 108f);
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(0f, 1f);
+        rt.pivot = new Vector2(0f, 1f);
+        rt.anchoredPosition = new Vector2(50f, -24f);
+        rt.sizeDelta = new Vector2(260f, 72f);
 
-        // 1. Text Tiêu đề Game: GHOST MAZE
-        GameObject titleObj = new GameObject("TitleText");
+        GameObject titleObj = new GameObject("LogoText");
         titleObj.transform.SetParent(logoObj.transform, false);
         RectTransform trt = titleObj.AddComponent<RectTransform>();
-        trt.anchorMin = new Vector2(0f, 0.34f);
-        trt.anchorMax = new Vector2(1f, 1f);
+        trt.anchorMin = Vector2.zero;
+        trt.anchorMax = Vector2.one;
         trt.offsetMin = Vector2.zero;
         trt.offsetMax = Vector2.zero;
 
         Text titleTxt = titleObj.AddComponent<Text>();
         titleTxt.font = font;
-        titleTxt.fontSize = 54;
+        titleTxt.fontSize = 28;
         titleTxt.fontStyle = FontStyle.Bold;
-        titleTxt.alignment = TextAnchor.MiddleCenter;
+        titleTxt.alignment = TextAnchor.MiddleLeft;
+        titleTxt.lineSpacing = 0.88f;
         titleTxt.supportRichText = true;
-        titleTxt.color = new Color(1f, 0.88f, 0.35f, 1f);
-        titleTxt.text = "<color=#00E5FF>GHOST</color>  <color=#FFD700>MAZE</color>";
+        titleTxt.text = "<size=24><color=#E6F0FF>GHOST</color></size>\n<size=34><color=#FF2A3A>MAZE</color></size>";
 
         Outline outline = titleObj.AddComponent<Outline>();
-        outline.effectColor = new Color(0.01f, 0.03f, 0.10f, 0.98f);
-        outline.effectDistance = new Vector2(3f, -3f);
+        outline.effectColor = new Color(0.02f, 0.04f, 0.09f, 0.95f);
+        outline.effectDistance = new Vector2(2f, -2f);
 
         Shadow shadow = titleObj.AddComponent<Shadow>();
-        shadow.effectColor = new Color(0f, 0.85f, 1f, 0.45f);
-        shadow.effectDistance = new Vector2(0f, -3f);
+        shadow.effectColor = new Color(0.85f, 0.12f, 0.18f, 0.45f);
+        shadow.effectDistance = new Vector2(1f, -1f);
+    }
 
-        // 2. Subtitle: MÊ CUNG HUYỀN BÍ ● SINH TỒN TỔ ĐỘI 4 NGƯỜI
-        GameObject subObj = new GameObject("SubtitleText");
-        subObj.transform.SetParent(logoObj.transform, false);
-        RectTransform srt = subObj.AddComponent<RectTransform>();
-        srt.anchorMin = new Vector2(0f, 0f);
-        srt.anchorMax = new Vector2(1f, 0.36f);
-        srt.offsetMin = Vector2.zero;
-        srt.offsetMax = Vector2.zero;
+    private void BuildTopCenterNavTabs(Transform parent, Font font)
+    {
+        GameObject tabsObj = new GameObject("TopCenterNavTabs");
+        tabsObj.transform.SetParent(parent, false);
+        RectTransform rt = tabsObj.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, -24f);
+        rt.sizeDelta = new Vector2(490f, 48f);
 
-        Text subTxt = subObj.AddComponent<Text>();
-        subTxt.font = font;
-        subTxt.fontSize = 17;
-        subTxt.fontStyle = FontStyle.Bold;
-        subTxt.alignment = TextAnchor.MiddleCenter;
-        subTxt.supportRichText = true;
-        subTxt.color = new Color(0.65f, 0.88f, 1f, 0.95f);
-        subTxt.text = "⚡  MÊ CUNG HUYỀN BÍ  ●  SINH TỒN TỔ ĐỘI 4 NGƯỜI  ⚡";
+        // Tab 1: Đa Người Chơi (Active - Có vạch phát sáng gầm)
+        GameObject tab1 = new GameObject("Tab_Multiplayer");
+        tab1.transform.SetParent(tabsObj.transform, false);
+        RectTransform rt1 = tab1.AddComponent<RectTransform>();
+        rt1.anchorMin = new Vector2(0f, 0f);
+        rt1.anchorMax = new Vector2(0.33f, 1f);
+        rt1.offsetMin = new Vector2(4f, 2f);
+        rt1.offsetMax = new Vector2(-4f, -2f);
 
-        Outline subOut = subObj.AddComponent<Outline>();
-        subOut.effectColor = new Color(0.04f, 0.08f, 0.20f, 0.95f);
-        subOut.effectDistance = new Vector2(1.5f, -1.5f);
-        headerSubtitleText = subTxt;
+        Image bg1 = tab1.AddComponent<Image>();
+        bg1.color = new Color(0.05f, 0.18f, 0.32f, 0.92f);
+        Outline ol1 = tab1.AddComponent<Outline>();
+        ol1.effectColor = new Color(0.00f, 0.82f, 1.00f, 0.85f);
+        ol1.effectDistance = new Vector2(1.5f, 1.5f);
 
-        // 3. Tag 18+ Bảo Hộ Pháp Lý (Official Age Rating 18+ Pill Badge)
-        GameObject ageObj = new GameObject("AgeRatingBadge18Plus");
-        ageObj.transform.SetParent(logoObj.transform, false);
-        RectTransform art = ageObj.AddComponent<RectTransform>();
-        art.anchorMin = new Vector2(1f, 1f);
-        art.anchorMax = new Vector2(1f, 1f);
-        art.pivot = new Vector2(1f, 1f);
-        art.anchoredPosition = new Vector2(-15f, -6f);
-        art.sizeDelta = new Vector2(145f, 32f);
+        Button btn1 = tab1.AddComponent<Button>();
+        btn1.onClick.AddListener(() => SwitchToMainCardsView());
 
-        Image ageBg = ageObj.AddComponent<Image>();
-        ageBg.color = new Color(0.85f, 0.12f, 0.15f, 0.95f); // Đỏ tươi cảnh báo 18+
+        GameObject uline = new GameObject("UnderlineGlow");
+        uline.transform.SetParent(tab1.transform, false);
+        RectTransform urt = uline.AddComponent<RectTransform>();
+        urt.anchorMin = new Vector2(0.05f, 0f);
+        urt.anchorMax = new Vector2(0.95f, 0f);
+        urt.pivot = new Vector2(0.5f, 0f);
+        urt.anchoredPosition = new Vector2(0f, -1f);
+        urt.sizeDelta = new Vector2(0f, 3.5f);
+        Image uimg = uline.AddComponent<Image>();
+        uimg.color = new Color(0.00f, 0.90f, 1.00f, 1.0f);
+        tabMultiplayerUnderline = uline;
 
-        Outline ageOut = ageObj.AddComponent<Outline>();
-        ageOut.effectColor = new Color(1f, 0.85f, 0.25f, 0.95f); // Viền vàng neon nổi bật
-        ageOut.effectDistance = new Vector2(1.5f, -1.5f);
+        GameObject t1Obj = new GameObject("Text");
+        t1Obj.transform.SetParent(tab1.transform, false);
+        RectTransform t1rt = t1Obj.AddComponent<RectTransform>();
+        t1rt.anchorMin = Vector2.zero;
+        t1rt.anchorMax = Vector2.one;
+        t1rt.offsetMin = Vector2.zero;
+        t1rt.offsetMax = Vector2.zero;
+        tabMultiplayerText = t1Obj.AddComponent<Text>();
+        tabMultiplayerText.font = font;
+        tabMultiplayerText.fontSize = 15;
+        tabMultiplayerText.fontStyle = FontStyle.Bold;
+        tabMultiplayerText.alignment = TextAnchor.MiddleCenter;
+        tabMultiplayerText.color = new Color(0.92f, 0.98f, 1.00f);
+        tabMultiplayerText.text = GameLocalizationManager.T("LOBBY_TAB_MULTIPLAYER", "👥 Đa Người Chơi");
 
-        GameObject ageTxtObj = new GameObject("Text");
-        ageTxtObj.transform.SetParent(ageObj.transform, false);
-        RectTransform atrt = ageTxtObj.AddComponent<RectTransform>();
-        atrt.anchorMin = Vector2.zero;
-        atrt.anchorMax = Vector2.one;
-        atrt.offsetMin = Vector2.zero;
-        atrt.offsetMax = Vector2.zero;
+        // Tab 2: Chơi Đơn
+        GameObject tab2 = new GameObject("Tab_Solo");
+        tab2.transform.SetParent(tabsObj.transform, false);
+        RectTransform rt2 = tab2.AddComponent<RectTransform>();
+        rt2.anchorMin = new Vector2(0.34f, 0f);
+        rt2.anchorMax = new Vector2(0.67f, 1f);
+        rt2.offsetMin = new Vector2(4f, 2f);
+        rt2.offsetMax = new Vector2(-4f, -2f);
 
-        headerAgeRatingText = ageTxtObj.AddComponent<Text>();
-        headerAgeRatingText.font = font;
-        headerAgeRatingText.fontSize = 13;
-        headerAgeRatingText.fontStyle = FontStyle.Bold;
-        headerAgeRatingText.alignment = TextAnchor.MiddleCenter;
-        headerAgeRatingText.color = Color.white;
-        headerAgeRatingText.supportRichText = true;
-        headerAgeRatingText.text = "🔞 <b>18+</b> | MATURE";
+        Image bg2 = tab2.AddComponent<Image>();
+        bg2.color = new Color(0.05f, 0.08f, 0.16f, 0.80f);
+        Outline ol2 = tab2.AddComponent<Outline>();
+        ol2.effectColor = new Color(0.20f, 0.32f, 0.55f, 0.50f);
+        ol2.effectDistance = new Vector2(1f, 1f);
 
-        Outline subOut = subObj.AddComponent<Outline>();
-        subOut.effectColor = new Color(0.04f, 0.08f, 0.20f, 0.95f);
-        subOut.effectDistance = new Vector2(1.5f, -1.5f);
+        Button btn2 = tab2.AddComponent<Button>();
+        btn2.onClick.AddListener(() => OnCard1_StartSinglePlayer());
+
+        GameObject t2Obj = new GameObject("Text");
+        t2Obj.transform.SetParent(tab2.transform, false);
+        RectTransform t2rt = t2Obj.AddComponent<RectTransform>();
+        t2rt.anchorMin = Vector2.zero;
+        t2rt.anchorMax = Vector2.one;
+        t2rt.offsetMin = Vector2.zero;
+        t2rt.offsetMax = Vector2.zero;
+        tabSoloText = t2Obj.AddComponent<Text>();
+        tabSoloText.font = font;
+        tabSoloText.fontSize = 15;
+        tabSoloText.fontStyle = FontStyle.Bold;
+        tabSoloText.alignment = TextAnchor.MiddleCenter;
+        tabSoloText.color = new Color(0.72f, 0.80f, 0.92f);
+        tabSoloText.text = GameLocalizationManager.T("LOBBY_TAB_SOLO", "👤 Chơi Đơn");
+
+        // Tab 3: Cài Đặt
+        GameObject tab3 = new GameObject("Tab_Settings");
+        tab3.transform.SetParent(tabsObj.transform, false);
+        RectTransform rt3 = tab3.AddComponent<RectTransform>();
+        rt3.anchorMin = new Vector2(0.68f, 0f);
+        rt3.anchorMax = new Vector2(1f, 1f);
+        rt3.offsetMin = new Vector2(4f, 2f);
+        rt3.offsetMax = new Vector2(-4f, -2f);
+
+        Image bg3 = tab3.AddComponent<Image>();
+        bg3.color = new Color(0.05f, 0.08f, 0.16f, 0.80f);
+        Outline ol3 = tab3.AddComponent<Outline>();
+        ol3.effectColor = new Color(0.20f, 0.32f, 0.55f, 0.50f);
+        ol3.effectDistance = new Vector2(1f, 1f);
+
+        Button btn3 = tab3.AddComponent<Button>();
+        btn3.onClick.AddListener(() => GameSettingsManager.EnsureInstance().OpenDashboard(GameSettingsManager.SettingsMode.LobbyFull));
+
+        GameObject t3Obj = new GameObject("Text");
+        t3Obj.transform.SetParent(tab3.transform, false);
+        RectTransform t3rt = t3Obj.AddComponent<RectTransform>();
+        t3rt.anchorMin = Vector2.zero;
+        t3rt.anchorMax = Vector2.one;
+        t3rt.offsetMin = Vector2.zero;
+        t3rt.offsetMax = Vector2.zero;
+        tabSettingsText = t3Obj.AddComponent<Text>();
+        tabSettingsText.font = font;
+        tabSettingsText.fontSize = 15;
+        tabSettingsText.fontStyle = FontStyle.Bold;
+        tabSettingsText.alignment = TextAnchor.MiddleCenter;
+        tabSettingsText.color = new Color(0.72f, 0.80f, 0.92f);
+        tabSettingsText.text = GameLocalizationManager.T("LOBBY_TAB_SETTINGS", "⚙️ Cài Đặt");
+    }
+
+    private void BuildTopRightPlayerBadge(Transform parent, Font font)
+    {
+        GameObject rightBar = new GameObject("TopRightHeaderActions");
+        rightBar.transform.SetParent(parent, false);
+        RectTransform rrt = rightBar.AddComponent<RectTransform>();
+        rrt.anchorMin = new Vector2(1f, 1f);
+        rrt.anchorMax = new Vector2(1f, 1f);
+        rrt.pivot = new Vector2(1f, 1f);
+        rrt.anchoredPosition = new Vector2(-45f, -24f);
+        rrt.sizeDelta = new Vector2(370f, 48f);
+
+        // 1. Profile Capsule: 👤 Player_001 ▾
+        GameObject profilePill = new GameObject("PlayerProfilePill");
+        profilePill.transform.SetParent(rightBar.transform, false);
+        RectTransform prt = profilePill.AddComponent<RectTransform>();
+        prt.anchorMin = new Vector2(0f, 0.5f);
+        prt.anchorMax = new Vector2(0f, 0.5f);
+        prt.pivot = new Vector2(0f, 0.5f);
+        prt.anchoredPosition = new Vector2(0f, 0f);
+        prt.sizeDelta = new Vector2(215f, 44f);
+
+        Image pbg = profilePill.AddComponent<Image>();
+        pbg.color = new Color(0.06f, 0.09f, 0.18f, 0.92f);
+        Outline pol = profilePill.AddComponent<Outline>();
+        pol.effectColor = new Color(0.25f, 0.42f, 0.75f, 0.75f);
+        pol.effectDistance = new Vector2(1.5f, 1.5f);
+
+        Button pbtn = profilePill.AddComponent<Button>();
+        pbtn.onClick.AddListener(() =>
+        {
+            if (waitingRoomViewObj != null && !waitingRoomViewObj.activeSelf)
+            {
+                EnterWaitingRoomWithId("SOLO_EDIT", true);
+            }
+        });
+
+        GameObject ptxtObj = new GameObject("Text");
+        ptxtObj.transform.SetParent(profilePill.transform, false);
+        RectTransform ptrt = ptxtObj.AddComponent<RectTransform>();
+        ptrt.anchorMin = Vector2.zero;
+        ptrt.anchorMax = Vector2.one;
+        ptrt.offsetMin = new Vector2(12f, 0f);
+        ptrt.offsetMax = new Vector2(-12f, 0f);
+
+        topRightPlayerNameText = ptxtObj.AddComponent<Text>();
+        topRightPlayerNameText.font = font;
+        topRightPlayerNameText.fontSize = 15;
+        topRightPlayerNameText.fontStyle = FontStyle.Bold;
+        topRightPlayerNameText.alignment = TextAnchor.MiddleCenter;
+        topRightPlayerNameText.color = new Color(0.92f, 0.96f, 1.0f);
+        topRightPlayerNameText.text = "👤 Player_001 ▾";
+
+        // 2. Divider |
+        GameObject divObj = new GameObject("Divider");
+        divObj.transform.SetParent(rightBar.transform, false);
+        RectTransform drt = divObj.AddComponent<RectTransform>();
+        drt.anchorMin = new Vector2(0f, 0.5f);
+        drt.anchorMax = new Vector2(0f, 0.5f);
+        drt.pivot = new Vector2(0.5f, 0.5f);
+        drt.anchoredPosition = new Vector2(230f, 0f);
+        drt.sizeDelta = new Vector2(1.5f, 24f);
+        Image dimg = divObj.AddComponent<Image>();
+        dimg.color = new Color(0.35f, 0.48f, 0.75f, 0.60f);
+
+        // 3. Settings Gear Button ⚙️
+        GameObject setBtn = new GameObject("QuickSettingsIconBtn");
+        setBtn.transform.SetParent(rightBar.transform, false);
+        RectTransform srt = setBtn.AddComponent<RectTransform>();
+        srt.anchorMin = new Vector2(0f, 0.5f);
+        srt.anchorMax = new Vector2(0f, 0.5f);
+        srt.pivot = new Vector2(0.5f, 0.5f);
+        srt.anchoredPosition = new Vector2(262f, 0f);
+        srt.sizeDelta = new Vector2(44f, 44f);
+
+        Image sbg = setBtn.AddComponent<Image>();
+        sbg.color = new Color(0.08f, 0.12f, 0.22f, 0.90f);
+        Outline sol = setBtn.AddComponent<Outline>();
+        sol.effectColor = new Color(0.30f, 0.50f, 0.85f, 0.70f);
+        sol.effectDistance = new Vector2(1.5f, 1.5f);
+
+        Button sButton = setBtn.AddComponent<Button>();
+        sButton.onClick.AddListener(() => GameSettingsManager.EnsureInstance().OpenDashboard(GameSettingsManager.SettingsMode.LobbyFull));
+
+        GameObject stxt = new GameObject("Text");
+        stxt.transform.SetParent(setBtn.transform, false);
+        RectTransform strt = stxt.AddComponent<RectTransform>();
+        strt.anchorMin = Vector2.zero;
+        strt.anchorMax = Vector2.one;
+        strt.offsetMin = Vector2.zero;
+        strt.offsetMax = Vector2.zero;
+        Text stxtC = stxt.AddComponent<Text>();
+        stxtC.font = font;
+        stxtC.fontSize = 20;
+        stxtC.alignment = TextAnchor.MiddleCenter;
+        stxtC.color = new Color(1f, 0.92f, 0.40f);
+        stxtC.text = "⚙️";
+
+        // 4. Power/Quit Button ⏻
+        GameObject quitBtn = new GameObject("QuickQuitIconBtn");
+        quitBtn.transform.SetParent(rightBar.transform, false);
+        RectTransform qrt = quitBtn.AddComponent<RectTransform>();
+        qrt.anchorMin = new Vector2(0f, 0.5f);
+        qrt.anchorMax = new Vector2(0f, 0.5f);
+        qrt.pivot = new Vector2(0.5f, 0.5f);
+        qrt.anchoredPosition = new Vector2(318f, 0f);
+        qrt.sizeDelta = new Vector2(44f, 44f);
+
+        Image qbg = quitBtn.AddComponent<Image>();
+        qbg.color = new Color(0.18f, 0.06f, 0.08f, 0.90f);
+        Outline qol = quitBtn.AddComponent<Outline>();
+        qol.effectColor = new Color(0.85f, 0.25f, 0.30f, 0.80f);
+        qol.effectDistance = new Vector2(1.5f, 1.5f);
+
+        Button qButton = quitBtn.AddComponent<Button>();
+        qButton.onClick.AddListener(() =>
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+        });
+
+        GameObject qtxt = new GameObject("Text");
+        qtxt.transform.SetParent(quitBtn.transform, false);
+        RectTransform qtrt = qtxt.AddComponent<RectTransform>();
+        qtrt.anchorMin = Vector2.zero;
+        qtrt.anchorMax = Vector2.one;
+        qtrt.offsetMin = Vector2.zero;
+        qtrt.offsetMax = Vector2.zero;
+        Text qtxtC = qtxt.AddComponent<Text>();
+        qtxtC.font = font;
+        qtxtC.fontSize = 20;
+        qtxtC.alignment = TextAnchor.MiddleCenter;
+        qtxtC.color = new Color(1f, 0.45f, 0.45f);
+        qtxtC.text = "⏻";
     }
 
     // =========================================================================
-    // 4. THANH ID PHÒNG & NÚT THAM GIA / TẠO PHÒNG (Ở GIỮA PHÍA TRÊN)
+    // 4. THANH ID PHÒNG (SCI-FI CHAMFERED BOX & NÚT CAM RỰC RỠ)
     // =========================================================================
     private void BuildTopCenterRoomBar(Transform parent, Font font)
     {
@@ -1146,25 +1211,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         barRect.anchorMin = new Vector2(0.5f, 1f);
         barRect.anchorMax = new Vector2(0.5f, 1f);
         barRect.pivot = new Vector2(0.5f, 1f);
-        barRect.anchoredPosition = new Vector2(0f, -145f);
-        barRect.sizeDelta = new Vector2(1150f, 76f);
+        barRect.anchoredPosition = new Vector2(0f, -95f);
+        barRect.sizeDelta = new Vector2(1100f, 68f);
 
         Image barBg = barObj.AddComponent<Image>();
-        barBg.color = new Color(0.06f, 0.08f, 0.16f, 0.95f);
+        barBg.color = new Color(0.04f, 0.07f, 0.14f, 0.94f);
         Outline barOut = barObj.AddComponent<Outline>();
-        barOut.effectColor = new Color(0.45f, 0.36f, 0.82f, 0.90f);
+        barOut.effectColor = new Color(0.25f, 0.45f, 0.85f, 0.85f);
         barOut.effectDistance = new Vector2(2f, 2f);
-
-        // Viền phát sáng bên trong
-        GameObject innerBorder = new GameObject("InnerTrim");
-        innerBorder.transform.SetParent(barObj.transform, false);
-        RectTransform ibRect = innerBorder.AddComponent<RectTransform>();
-        ibRect.anchorMin = Vector2.zero;
-        ibRect.anchorMax = Vector2.one;
-        ibRect.offsetMin = new Vector2(4f, 4f);
-        ibRect.offsetMax = new Vector2(-4f, -4f);
-        Image ibImg = innerBorder.AddComponent<Image>();
-        ibImg.color = new Color(0.09f, 0.12f, 0.24f, 0.65f);
 
         // 1. Icon Cánh Cửa + Chữ "ID Phòng:"
         GameObject doorIconObj = new GameObject("DoorIcon");
@@ -1173,11 +1227,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         diRect.anchorMin = new Vector2(0f, 0.5f);
         diRect.anchorMax = new Vector2(0f, 0.5f);
         diRect.pivot = new Vector2(0.5f, 0.5f);
-        diRect.anchoredPosition = new Vector2(42f, 0f);
-        diRect.sizeDelta = new Vector2(40f, 40f);
+        diRect.anchoredPosition = new Vector2(40f, 0f);
+        diRect.sizeDelta = new Vector2(34f, 34f);
         Image diImg = doorIconObj.AddComponent<Image>();
         diImg.sprite = sprDoorIcon;
-        diImg.color = new Color(0.75f, 0.85f, 1f, 0.95f);
+        diImg.color = new Color(0.75f, 0.88f, 1.0f, 0.95f);
 
         GameObject labelObj = new GameObject("RoomIdLabel");
         labelObj.transform.SetParent(barObj.transform, false);
@@ -1185,31 +1239,32 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         lRect.anchorMin = new Vector2(0f, 0.5f);
         lRect.anchorMax = new Vector2(0f, 0.5f);
         lRect.pivot = new Vector2(0f, 0.5f);
-        lRect.anchoredPosition = new Vector2(74f, 0f);
-        lRect.sizeDelta = new Vector2(130f, 50f);
+        lRect.anchoredPosition = new Vector2(72f, 0f);
+        lRect.sizeDelta = new Vector2(140f, 50f);
 
         Text lTxt = labelObj.AddComponent<Text>();
         lTxt.font = font;
         lTxt.fontSize = 20;
         lTxt.fontStyle = FontStyle.Bold;
         lTxt.alignment = TextAnchor.MiddleLeft;
-        lTxt.color = new Color(0.95f, 0.96f, 1f, 1f);
-        lTxt.text = "ID Phòng:";
+        lTxt.color = new Color(0.95f, 0.97f, 1.0f);
+        lTxt.text = GameLocalizationManager.T("LOBBY_ROOM_ID_LABEL", "ID Phòng:");
+        roomIdLabelText = lTxt;
 
-        // 2. Ô Nhập ID Phòng (InputField)
+        // 2. Ô Nhập ID Phòng (InputField) kèm Nút Copy/Paste ❐
         GameObject inputObj = new GameObject("RoomInputField");
         inputObj.transform.SetParent(barObj.transform, false);
         RectTransform inRect = inputObj.AddComponent<RectTransform>();
         inRect.anchorMin = new Vector2(0f, 0.5f);
         inRect.anchorMax = new Vector2(0f, 0.5f);
         inRect.pivot = new Vector2(0f, 0.5f);
-        inRect.anchoredPosition = new Vector2(215f, 0f);
-        inRect.sizeDelta = new Vector2(470f, 52f);
+        inRect.anchoredPosition = new Vector2(220f, 0f);
+        inRect.sizeDelta = new Vector2(580f, 48f);
 
         Image inBg = inputObj.AddComponent<Image>();
-        inBg.color = new Color(0.03f, 0.04f, 0.09f, 0.96f);
+        inBg.color = new Color(0.02f, 0.04f, 0.08f, 0.96f);
         Outline inOut = inputObj.AddComponent<Outline>();
-        inOut.effectColor = new Color(0.28f, 0.36f, 0.65f, 0.85f);
+        inOut.effectColor = new Color(0.22f, 0.35f, 0.65f, 0.85f);
         inOut.effectDistance = new Vector2(1.5f, 1.5f);
 
         GameObject inTextObj = new GameObject("Text");
@@ -1217,15 +1272,15 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform itRect = inTextObj.AddComponent<RectTransform>();
         itRect.anchorMin = Vector2.zero;
         itRect.anchorMax = Vector2.one;
-        itRect.offsetMin = new Vector2(16f, 0f);
-        itRect.offsetMax = new Vector2(-16f, 0f);
+        itRect.offsetMin = new Vector2(18f, 0f);
+        itRect.offsetMax = new Vector2(-54f, 0f);
 
         Text inText = inTextObj.AddComponent<Text>();
         inText.font = font;
-        inText.fontSize = 20;
+        inText.fontSize = 18;
         inText.fontStyle = FontStyle.Bold;
         inText.alignment = TextAnchor.MiddleLeft;
-        inText.color = new Color(1f, 0.90f, 0.35f, 1f);
+        inText.color = new Color(1f, 0.92f, 0.40f);
         inText.supportRichText = false;
 
         GameObject phObj = new GameObject("Placeholder");
@@ -1233,16 +1288,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform phRect = phObj.AddComponent<RectTransform>();
         phRect.anchorMin = Vector2.zero;
         phRect.anchorMax = Vector2.one;
-        phRect.offsetMin = new Vector2(16f, 0f);
-        phRect.offsetMax = new Vector2(-16f, 0f);
+        phRect.offsetMin = new Vector2(18f, 0f);
+        phRect.offsetMax = new Vector2(-54f, 0f);
 
         Text phText = phObj.AddComponent<Text>();
         phText.font = font;
-        phText.fontSize = 18;
+        phText.fontSize = 17;
         phText.fontStyle = FontStyle.Italic;
         phText.alignment = TextAnchor.MiddleLeft;
-        phText.color = new Color(0.45f, 0.52f, 0.72f, 0.75f);
-        phText.text = "Nhập ID phòng 5 số...";
+        phText.color = new Color(0.40f, 0.50f, 0.70f, 0.75f);
+        phText.text = GameLocalizationManager.T("LOBBY_ROOM_INPUT_PH", "Nhập ID phòng...");
+        roomIdInputPlaceholderText = phText;
 
         roomIdInputField = inputObj.AddComponent<InputField>();
         roomIdInputField.textComponent = inText;
@@ -1250,37 +1306,63 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         roomIdInputField.characterLimit = 25;
         roomIdInputField.onValueChanged.AddListener(OnRoomIdInputChanged);
 
-        // 3. Nút "[ ➔ Tham gia ]"
-        CreateStyledActionButton(
+        // Nút Sao Chép / Dán ❐ ở mép phải của InputField
+        GameObject copyBtnObj = new GameObject("CopyPasteBtn");
+        copyBtnObj.transform.SetParent(inputObj.transform, false);
+        RectTransform cprt = copyBtnObj.AddComponent<RectTransform>();
+        cprt.anchorMin = new Vector2(1f, 0.5f);
+        cprt.anchorMax = new Vector2(1f, 0.5f);
+        cprt.pivot = new Vector2(1f, 0.5f);
+        cprt.anchoredPosition = new Vector2(-8f, 0f);
+        cprt.sizeDelta = new Vector2(36f, 36f);
+
+        Button cpBtn = copyBtnObj.AddComponent<Button>();
+        GameObject cpTxtObj = new GameObject("Text");
+        cpTxtObj.transform.SetParent(copyBtnObj.transform, false);
+        RectTransform cptrt = cpTxtObj.AddComponent<RectTransform>();
+        cptrt.anchorMin = Vector2.zero;
+        cptrt.anchorMax = Vector2.one;
+        cptrt.offsetMin = Vector2.zero;
+        cptrt.offsetMax = Vector2.zero;
+        Text cpTxt = cpTxtObj.AddComponent<Text>();
+        cpTxt.font = font;
+        cpTxt.fontSize = 20;
+        cpTxt.alignment = TextAnchor.MiddleCenter;
+        cpTxt.color = new Color(0.65f, 0.78f, 1.0f);
+        cpTxt.text = "❐";
+
+        cpBtn.onClick.AddListener(() =>
+        {
+            if (roomIdInputField != null)
+            {
+                string clip = GUIUtility.systemCopyBuffer;
+                if (!string.IsNullOrEmpty(clip) && string.IsNullOrEmpty(roomIdInputField.text))
+                {
+                    roomIdInputField.text = clip.Trim();
+                }
+                else if (!string.IsNullOrEmpty(roomIdInputField.text))
+                {
+                    GUIUtility.systemCopyBuffer = roomIdInputField.text.Trim();
+                }
+            }
+        });
+
+        // 3. Nút Orange Gradient Glowing: [ ➔ Tham gia ]
+        Button joinBtn = CreateStyledActionButton(
             barObj.transform,
             "JoinRoomButton",
-            new Vector2(0f, 0.5f),
-            new Vector2(0f, 0.5f),
-            new Vector2(705f, 0f),
-            new Vector2(200f, 52f),
-            new Color(0.38f, 0.20f, 0.85f, 0.96f),
-            new Color(0.68f, 0.45f, 1.00f, 1f),
-            "➔  Tham gia",
+            new Vector2(1f, 0.5f),
+            new Vector2(1f, 0.5f),
+            new Vector2(-16f, 0f),
+            new Vector2(250f, 50f),
+            new Color(0.95f, 0.52f, 0.05f, 0.98f),
+            new Color(1.00f, 0.82f, 0.28f, 1.00f),
+            GameLocalizationManager.T("BTN_JOIN_ROOM", "➔  Tham gia"),
             font,
-            19,
+            20,
             OnJoinRoomClicked
         );
-
-        // 4. Nút "[ 👑 Tạo phòng ]"
-        CreateStyledActionButton(
-            barObj.transform,
-            "CreateRoomButton",
-            new Vector2(0f, 0.5f),
-            new Vector2(0f, 0.5f),
-            new Vector2(925f, 0f),
-            new Vector2(200f, 52f),
-            new Color(0.78f, 0.52f, 0.08f, 0.96f),
-            new Color(1.00f, 0.85f, 0.30f, 1f),
-            "👑  Tạo phòng",
-            font,
-            19,
-            OnCreateRoomClicked
-        );
+        joinRoomBtnText = joinBtn != null ? joinBtn.GetComponentInChildren<Text>() : null;
     }
 
     private Button CreateStyledActionButton(
@@ -1336,7 +1418,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     }
 
     // =========================================================================
-    // 5. DỰNG 6 THẺ BÀI GOTHIC PHÁT SÁNG BẰNG UGUI THẬT (KHÔNG DÙNG ẢNH CHỤP)
+    // 5. 6 THẺ BÀI GOTHIC NỔI BẬT THEO ĐÚNG THIẾT KẾ CONCEPT
     // =========================================================================
     private void BuildSixGothicModeCards(Transform parent, Font font)
     {
@@ -1346,55 +1428,55 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         cRect.anchorMin = new Vector2(0.5f, 0.5f);
         cRect.anchorMax = new Vector2(0.5f, 0.5f);
         cRect.pivot = new Vector2(0.5f, 0.5f);
-        cRect.anchoredPosition = new Vector2(0f, -115f);
-        cRect.sizeDelta = new Vector2(1760f, 490f);
+        cRect.anchoredPosition = new Vector2(0f, -55f);
+        cRect.sizeDelta = new Vector2(1740f, 460f);
 
-        float[] cardX = new float[] { -685f, -412f, -140f, 140f, 412f, 685f };
+        float[] cardX = new float[] { -625f, -375f, -125f, 125f, 375f, 625f };
 
         Color[] cardThemeColors = new Color[]
         {
-            new Color(0.20f, 0.65f, 1.00f, 1f), // 1. Xanh dương điện tử (Đấu Đơn)
-            new Color(0.12f, 0.86f, 0.72f, 1f), // 2. Xanh ngọc (Tổ Đội)
-            new Color(0.62f, 0.32f, 0.98f, 1f), // 3. Tím đậm (Máy chủ)
-            new Color(1.00f, 0.78f, 0.18f, 1f), // 4. Vàng hoàng gia (Làm chủ phòng)
-            new Color(0.18f, 0.76f, 0.98f, 1f), // 5. Xanh băng (Làm khách)
-            new Color(0.88f, 0.32f, 0.98f, 1f)  // 6. Tím hồng neon (Tự động)
+            new Color(0.00f, 0.82f, 1.00f, 1f), // 1. Cyan (Đấu đơn)
+            new Color(0.00f, 0.90f, 0.46f, 1f), // 2. Mint Green (Đấu đội)
+            new Color(0.61f, 0.20f, 0.85f, 1f), // 3. Purple (Máy chủ)
+            new Color(1.00f, 0.70f, 0.00f, 1f), // 4. Royal Gold (Làm chủ phòng)
+            new Color(0.01f, 0.53f, 0.82f, 1f), // 5. Azure Blue (Làm khách)
+            new Color(0.88f, 0.25f, 0.98f, 1f)  // 6. Magenta (Tự động)
         };
 
         string[] cardTitles = new string[]
         {
-            "ĐẤU ĐƠN / GHÉP TRẬN\n<color=#2EE87A><size=15>(Tự động tìm 4 người)</size></color>",
-            "ĐẤU TỔ ĐỘI\n<color=#64D2FF><size=15>(Ghép bạn bè & người lẻ)</size></color>",
-            "BẮT ĐẦU\nMÁY CHỦ",
-            "BẮT ĐẦU\nLÀM CHỦ PHÒNG",
-            "BẮT ĐẦU\nLÀM KHÁCH",
-            "TỰ ĐỘNG LÀM CHỦ\nHOẶC LÀM KHÁCH"
+            "Đấu đơn",
+            "Đấu đội",
+            "Máy chủ",
+            "Làm chủ phòng",
+            "Làm khách",
+            "Tự động"
         };
 
-        string[] cardBadges = new string[]
+        string[] cardSubtitles = new string[]
         {
-            "⭐ GHÉP NHANH ⭐",
-            "👥 TỔ ĐỘI",
-            "🌐 DEDICATED",
-            "👑 CHỦ PHÒNG",
-            "🚪 THEO ID",
-            "⚡ TỰ ĐỘNG"
+            "Ghép trận\nmột người chơi",
+            "Cùng bạn bè\nchơi nhiều người",
+            "Tạo máy chủ\nriêng của bạn",
+            "Quản lý phòng\ncủa bạn",
+            "Tham gia phòng\ncủa người khác",
+            "Tự động làm chủ\nhoặc làm khách"
         };
 
         string[] cardBtnLabels = new string[]
         {
-            "⚡ TÌM TRẬN NGAY",
-            "👥 TẠO TỔ ĐỘI",
-            "🌐 CHẠY SERVER",
-            "👑 TẠO PHÒNG",
-            "🚪 THAM GIA",
-            "⚡ KẾT NỐI"
+            "Tham gia ngay ❯",
+            "Tạo phòng ➔",
+            "Tạo máy chủ ➔",
+            "Bắt đầu ❯",
+            "Tham gia ❯",
+            "Bắt đầu ❯"
         };
 
         Action[] cardActions = new Action[]
         {
             OnCard1_StartSinglePlayer,
-            OnCard2_StartSharedClient,
+            OnCreateRoomClicked,
             OnCard3_StartServer,
             OnCard4_StartHost,
             OnCard5_StartClient,
@@ -1403,11 +1485,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         for (int i = 0; i < 6; i++)
         {
-            bool isHeroCard = (i == 0);
             bool isRoyalHostCard = (i == 3);
-            Vector2 cardSize = isHeroCard
-                ? new Vector2(268f, 475f)
-                : (isRoyalHostCard ? new Vector2(260f, 455f) : new Vector2(248f, 435f));
+            Vector2 cardSize = isRoyalHostCard ? new Vector2(246f, 415f) : new Vector2(236f, 395f);
 
             BuildSingleGothicCard(
                 cardsContainer.transform,
@@ -1417,9 +1496,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 cardThemeColors[i],
                 sprCardIcons[i],
                 cardTitles[i],
-                cardBadges[i],
+                cardSubtitles[i],
                 cardBtnLabels[i],
-                isHeroCard || isRoyalHostCard,
+                isRoyalHostCard,
                 font,
                 cardActions[i]
             );
@@ -1434,7 +1513,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Color themeColor,
         Sprite iconSprite,
         string titleText,
-        string badgeText,
+        string subtitleText,
         string btnLabel,
         bool isRoyalCenterCard,
         Font font,
@@ -1446,16 +1525,40 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         cardRect.anchorMin = new Vector2(0.5f, 0.5f);
         cardRect.anchorMax = new Vector2(0.5f, 0.5f);
         cardRect.pivot = new Vector2(0.5f, 0.5f);
-        cardRect.anchoredPosition = new Vector2(posX, isRoyalCenterCard ? 12f : 0f);
+        cardRect.anchoredPosition = new Vector2(posX, isRoyalCenterCard ? 8f : 0f);
         cardRect.sizeDelta = cardSize;
 
-        // 1. Khung viền ngoài phát sáng Neon
+        // 1. Khung viền ngoài phát sáng Neon theo màu chủ đạo của thẻ
         Image outerFrame = cardObj.AddComponent<Image>();
-        outerFrame.color = new Color(themeColor.r * 0.85f, themeColor.g * 0.85f, themeColor.b * 0.85f, 0.92f);
+        outerFrame.color = new Color(themeColor.r * 0.90f, themeColor.g * 0.90f, themeColor.b * 0.90f, 0.95f);
 
         Outline glowOutline = cardObj.AddComponent<Outline>();
-        glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.65f);
-        glowOutline.effectDistance = new Vector2(3.5f, 3.5f);
+        glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.70f);
+        glowOutline.effectDistance = new Vector2(3f, 3f);
+
+        // Vương miện vàng 👑 đậu trên đỉnh viền thẻ Làm chủ phòng
+        if (isRoyalCenterCard)
+        {
+            GameObject crownDecor = new GameObject("PerchedRoyalCrown");
+            crownDecor.transform.SetParent(cardObj.transform, false);
+            RectTransform crt = crownDecor.AddComponent<RectTransform>();
+            crt.anchorMin = new Vector2(0.5f, 1f);
+            crt.anchorMax = new Vector2(0.5f, 1f);
+            crt.pivot = new Vector2(0.5f, 0.5f);
+            crt.anchoredPosition = new Vector2(0f, 14f);
+            crt.sizeDelta = new Vector2(56f, 34f);
+
+            Text ctxt = crownDecor.AddComponent<Text>();
+            ctxt.font = font;
+            ctxt.fontSize = 28;
+            ctxt.alignment = TextAnchor.MiddleCenter;
+            ctxt.color = new Color(1f, 0.84f, 0.05f);
+            ctxt.text = "👑";
+
+            Shadow cshadow = crownDecor.AddComponent<Shadow>();
+            cshadow.effectColor = new Color(1f, 0.65f, 0.00f, 0.90f);
+            cshadow.effectDistance = new Vector2(0f, 0f);
+        }
 
         // 2. Thân thẻ tối màu bên trong
         GameObject innerBody = new GameObject("CardBody");
@@ -1468,57 +1571,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         Image bodyImg = innerBody.AddComponent<Image>();
         bodyImg.sprite = sprCardGradient;
-        bodyImg.color = Color.Lerp(new Color(0.05f, 0.08f, 0.16f, 0.98f), themeColor, 0.18f);
+        bodyImg.color = Color.Lerp(new Color(0.04f, 0.06f, 0.12f, 0.98f), themeColor, 0.16f);
 
-        // Badge nổi bật phía trên thẻ
-        GameObject badgeObj = new GameObject("CardBadge");
-        badgeObj.transform.SetParent(innerBody.transform, false);
-        RectTransform bgRect = badgeObj.AddComponent<RectTransform>();
-        bgRect.anchorMin = new Vector2(0.5f, 1f);
-        bgRect.anchorMax = new Vector2(0.5f, 1f);
-        bgRect.pivot = new Vector2(0.5f, 1f);
-        bgRect.anchoredPosition = new Vector2(0f, -12f);
-        bgRect.sizeDelta = new Vector2(cardSize.x - 30f, 26f);
-
-        Image bgImage = badgeObj.AddComponent<Image>();
-        bgImage.color = new Color(themeColor.r * 0.22f, themeColor.g * 0.22f, themeColor.b * 0.22f, 0.90f);
-        Outline bgOut = badgeObj.AddComponent<Outline>();
-        bgOut.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.70f);
-        bgOut.effectDistance = new Vector2(1f, 1f);
-
-        GameObject bgTxtObj = new GameObject("Text");
-        bgTxtObj.transform.SetParent(badgeObj.transform, false);
-        RectTransform bgtRect = bgTxtObj.AddComponent<RectTransform>();
-        bgtRect.anchorMin = Vector2.zero;
-        bgtRect.anchorMax = Vector2.one;
-        bgtRect.offsetMin = Vector2.zero;
-        bgtRect.offsetMax = Vector2.zero;
-
-        Text bgTxt = bgTxtObj.AddComponent<Text>();
-        bgTxt.font = font;
-        bgTxt.fontSize = 13;
-        bgTxt.fontStyle = FontStyle.Bold;
-        bgTxt.alignment = TextAnchor.MiddleCenter;
-        bgTxt.color = Color.Lerp(themeColor, Color.white, 0.45f);
-        bgTxt.text = badgeText;
-        if (index >= 0 && index < cardBadgeTexts.Length)
-        {
-            cardBadgeTexts[index] = bgTxt;
-        }
-
-        // 3. Đỉnh chóp Gothic phía trên thẻ (Crest ornament)
-        GameObject topCrest = new GameObject("TopGothicCrest");
-        topCrest.transform.SetParent(cardObj.transform, false);
-        RectTransform tcRect = topCrest.AddComponent<RectTransform>();
-        tcRect.anchorMin = new Vector2(0.5f, 1f);
-        tcRect.anchorMax = new Vector2(0.5f, 1f);
-        tcRect.pivot = new Vector2(0.5f, 0.5f);
-        tcRect.anchoredPosition = new Vector2(0f, 4f);
-        tcRect.sizeDelta = isRoyalCenterCard ? new Vector2(110f, 18f) : new Vector2(84f, 12f);
-        Image tcImg = topCrest.AddComponent<Image>();
-        tcImg.color = themeColor;
-
-        // 4. Họa tiết bóng hàng rào & bia mộ dưới đáy thẻ
+        // 3. Họa tiết bóng hàng rào & bia mộ dưới đáy thẻ
         GameObject botSil = new GameObject("GraveyardBottomSilhouette");
         botSil.transform.SetParent(innerBody.transform, false);
         RectTransform bsRect = botSil.AddComponent<RectTransform>();
@@ -1531,50 +1586,49 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         bsImg.sprite = sprGraveyardBottom;
         bsImg.color = Color.white;
 
-        // 5. Hào quang tròn mờ phía sau Icon
+        // 4. Hào quang mờ sau Icon
         GameObject iconHalo = new GameObject("IconHalo");
         iconHalo.transform.SetParent(innerBody.transform, false);
         RectTransform ihRect = iconHalo.AddComponent<RectTransform>();
         ihRect.anchorMin = new Vector2(0.5f, 0.5f);
         ihRect.anchorMax = new Vector2(0.5f, 0.5f);
         ihRect.pivot = new Vector2(0.5f, 0.5f);
-        ihRect.anchoredPosition = new Vector2(0f, 66f);
-        ihRect.sizeDelta = new Vector2(145f, 145f);
+        ihRect.anchoredPosition = new Vector2(0f, 68f);
+        ihRect.sizeDelta = new Vector2(140f, 140f);
         Image ihImg = iconHalo.AddComponent<Image>();
         ihImg.sprite = sprCircleBadge;
         ihImg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.22f);
 
-        // 6. Icon Vector Sắc Nét ở giữa trên của thẻ
+        // 5. Icon Vector Sắc Nét
         GameObject iconObj = new GameObject("CardIcon");
         iconObj.transform.SetParent(innerBody.transform, false);
         RectTransform icRect = iconObj.AddComponent<RectTransform>();
         icRect.anchorMin = new Vector2(0.5f, 0.5f);
         icRect.anchorMax = new Vector2(0.5f, 0.5f);
         icRect.pivot = new Vector2(0.5f, 0.5f);
-        icRect.anchoredPosition = new Vector2(0f, 66f);
-        icRect.sizeDelta = isRoyalCenterCard ? new Vector2(118f, 118f) : new Vector2(106f, 106f);
+        icRect.anchoredPosition = new Vector2(0f, 68f);
+        icRect.sizeDelta = isRoyalCenterCard ? new Vector2(110f, 110f) : new Vector2(98f, 98f);
 
         Image icImg = iconObj.AddComponent<Image>();
         icImg.sprite = iconSprite;
-        icImg.color = Color.Lerp(themeColor, Color.white, 0.38f);
+        icImg.color = Color.Lerp(themeColor, Color.white, 0.40f);
 
-        // 7. Tiêu đề tiếng Việt trên thẻ
+        // 6. Tiêu đề Thẻ (Bold Crisp Title)
         GameObject titleObj = new GameObject("CardTitle");
         titleObj.transform.SetParent(innerBody.transform, false);
         RectTransform ttRect = titleObj.AddComponent<RectTransform>();
-        ttRect.anchorMin = new Vector2(0f, 0f);
+        ttRect.anchorMin = new Vector2(0f, 0.5f);
         ttRect.anchorMax = new Vector2(1f, 0.5f);
-        ttRect.offsetMin = new Vector2(12f, 64f);
-        ttRect.offsetMax = new Vector2(-12f, -10f);
+        ttRect.pivot = new Vector2(0.5f, 0.5f);
+        ttRect.anchoredPosition = new Vector2(0f, -12f);
+        ttRect.sizeDelta = new Vector2(cardSize.x - 20f, 32f);
 
         Text ttTxt = titleObj.AddComponent<Text>();
         ttTxt.font = font;
-        ttTxt.fontSize = isRoyalCenterCard ? 21 : 19;
+        ttTxt.fontSize = isRoyalCenterCard ? 22 : 20;
         ttTxt.fontStyle = FontStyle.Bold;
         ttTxt.alignment = TextAnchor.MiddleCenter;
-        ttTxt.lineSpacing = 1.12f;
-        ttTxt.supportRichText = true;
-        ttTxt.color = isRoyalCenterCard ? new Color(1f, 0.94f, 0.72f, 1f) : new Color(0.92f, 0.96f, 1f, 1f);
+        ttTxt.color = isRoyalCenterCard ? new Color(1f, 0.92f, 0.65f) : Color.white;
         ttTxt.text = titleText;
         if (index >= 0 && index < cardTitleTexts.Length)
         {
@@ -1582,18 +1636,41 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         }
 
         Outline ttOut = titleObj.AddComponent<Outline>();
-        ttOut.effectColor = new Color(0f, 0f, 0f, 0.85f);
+        ttOut.effectColor = new Color(0f, 0f, 0f, 0.90f);
         ttOut.effectDistance = new Vector2(1.5f, -1.5f);
 
-        // Nút hành động trực tiếp ở đáy thẻ
+        // 7. Mô tả phụ của Thẻ (Subtitle 2 dòng)
+        GameObject subObj = new GameObject("CardSubtitle");
+        subObj.transform.SetParent(innerBody.transform, false);
+        RectTransform stRect = subObj.AddComponent<RectTransform>();
+        stRect.anchorMin = new Vector2(0f, 0.5f);
+        stRect.anchorMax = new Vector2(1f, 0.5f);
+        stRect.pivot = new Vector2(0.5f, 0.5f);
+        stRect.anchoredPosition = new Vector2(0f, -54f);
+        stRect.sizeDelta = new Vector2(cardSize.x - 24f, 44f);
+
+        Text stTxt = subObj.AddComponent<Text>();
+        stTxt.font = font;
+        stTxt.fontSize = 14;
+        stTxt.fontStyle = FontStyle.Normal;
+        stTxt.alignment = TextAnchor.MiddleCenter;
+        stTxt.lineSpacing = 1.15f;
+        stTxt.color = Color.Lerp(themeColor, new Color(0.85f, 0.92f, 1f), 0.70f);
+        stTxt.text = subtitleText;
+        if (index >= 0 && index < cardSubtitleTexts.Length)
+        {
+            cardSubtitleTexts[index] = stTxt;
+        }
+
+        // 8. Nút hành động dạng Pill ở đáy thẻ
         Button actBtn = CreateStyledActionButton(
             innerBody.transform,
             "CardActionButton",
             new Vector2(0.5f, 0f),
             new Vector2(0.5f, 0f),
-            new Vector2(0f, 14f),
-            new Vector2(cardSize.x - 34f, 42f),
-            new Color(themeColor.r * 0.45f, themeColor.g * 0.45f, themeColor.b * 0.45f, 0.95f),
+            new Vector2(0f, 18f),
+            new Vector2(cardSize.x - 36f, 44f),
+            new Color(themeColor.r * 0.35f, themeColor.g * 0.35f, themeColor.b * 0.35f, 0.95f),
             new Color(themeColor.r, themeColor.g, themeColor.b, 1f),
             btnLabel,
             font,
@@ -1605,13 +1682,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             cardBtnTexts[index] = actBtn != null ? actBtn.GetComponentInChildren<Text>() : null;
         }
 
-        // 8. Sự kiện Click & Hiệu ứng Hover sáng bừng
+        // 9. Hiệu ứng Hover & Click
         Button btn = cardObj.AddComponent<Button>();
         btn.targetGraphic = bodyImg;
         btn.onClick.AddListener(() => onClickAction?.Invoke());
 
         EventTrigger trigger = cardObj.AddComponent<EventTrigger>();
-
         EventTrigger.Entry enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
         enter.callback.AddListener((_) =>
         {
@@ -1626,11 +1702,61 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         exit.callback.AddListener((_) =>
         {
             cardRect.localScale = Vector3.one;
-            outerFrame.color = new Color(themeColor.r * 0.85f, themeColor.g * 0.85f, themeColor.b * 0.85f, 0.92f);
-            glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.65f);
+            outerFrame.color = new Color(themeColor.r * 0.90f, themeColor.g * 0.90f, themeColor.b * 0.90f, 0.95f);
+            glowOutline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, 0.70f);
             ihImg.color = new Color(themeColor.r, themeColor.g, themeColor.b, 0.22f);
         });
         trigger.triggers.Add(exit);
+    }
+
+    private void BuildBottomStatusBar(Transform parent, Font font)
+    {
+        GameObject bottomBar = new GameObject("BottomStatusBar");
+        bottomBar.transform.SetParent(parent, false);
+        RectTransform brt = bottomBar.AddComponent<RectTransform>();
+        brt.anchorMin = new Vector2(0f, 0f);
+        brt.anchorMax = new Vector2(1f, 0f);
+        brt.pivot = new Vector2(0.5f, 0f);
+        brt.anchoredPosition = new Vector2(0f, 12f);
+        brt.sizeDelta = new Vector2(0f, 38f);
+
+        // Trái: ● Trạng thái kết nối: Kết nối tốt
+        GameObject leftObj = new GameObject("ConnectionStatusLeft");
+        leftObj.transform.SetParent(bottomBar.transform, false);
+        RectTransform lrt = leftObj.AddComponent<RectTransform>();
+        lrt.anchorMin = new Vector2(0f, 0f);
+        lrt.anchorMax = new Vector2(0f, 1f);
+        lrt.pivot = new Vector2(0f, 0.5f);
+        lrt.anchoredPosition = new Vector2(50f, 0f);
+        lrt.sizeDelta = new Vector2(450f, 0f);
+
+        bottomConnectionStatusText = leftObj.AddComponent<Text>();
+        bottomConnectionStatusText.font = font;
+        bottomConnectionStatusText.fontSize = 15;
+        bottomConnectionStatusText.fontStyle = FontStyle.Bold;
+        bottomConnectionStatusText.alignment = TextAnchor.MiddleLeft;
+        bottomConnectionStatusText.supportRichText = true;
+        bottomConnectionStatusText.color = new Color(0.00f, 0.95f, 0.55f);
+        bottomConnectionStatusText.text = $"<color=#00FF9D>●</color> {GameLocalizationManager.T("LOBBY_STATUS_GOOD", "Trạng thái kết nối: Kết nối tốt")}";
+
+        // Phải: PLAY TOGETHER • HAVE FUN
+        GameObject rightObj = new GameObject("SloganRight");
+        rightObj.transform.SetParent(bottomBar.transform, false);
+        RectTransform rrt = rightObj.AddComponent<RectTransform>();
+        rrt.anchorMin = new Vector2(1f, 0f);
+        rrt.anchorMax = new Vector2(1f, 1f);
+        rrt.pivot = new Vector2(1f, 0.5f);
+        rrt.anchoredPosition = new Vector2(-50f, 0f);
+        rrt.sizeDelta = new Vector2(400f, 0f);
+
+        bottomSloganText = rightObj.AddComponent<Text>();
+        bottomSloganText.font = font;
+        bottomSloganText.fontSize = 14;
+        bottomSloganText.fontStyle = FontStyle.Bold;
+        bottomSloganText.alignment = TextAnchor.MiddleRight;
+        bottomSloganText.supportRichText = true;
+        bottomSloganText.color = new Color(0.60f, 0.72f, 0.90f, 0.85f);
+        bottomSloganText.text = GameLocalizationManager.T("LOBBY_FOOTER_SLOGAN", "PLAY TOGETHER • HAVE FUN");
     }
 
     // =========================================================================
@@ -1678,7 +1804,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         hdTxt.fontStyle = FontStyle.Bold;
         hdTxt.alignment = TextAnchor.MiddleCenter;
         hdTxt.color = new Color(1f, 0.88f, 0.32f, 1f);
-        hdTxt.text = "🏰 SẢNH PHÒNG CHỜ TRẬN ĐẤU (4 NGƯỜI CHƠI) 🏰";
+        hdTxt.text = GameLocalizationManager.T("WAITING_HEADER_TITLE", "🏰 SẢNH PHÒNG CHỜ TRẬN ĐẤU (4 NGƯỜI CHƠI) 🏰");
+        waitingHeaderTitleText = hdTxt;
 
         // 2. Hộp Hiển Thị ID Phòng Cực Lớn + Nút Sao Chép ID + Ô Đổi Tên Của Bạn
         GameObject infoRow = new GameObject("RoomIdAndNicknameRow");
@@ -1747,7 +1874,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         mnTxt.fontStyle = FontStyle.Bold;
         mnTxt.alignment = TextAnchor.MiddleLeft;
         mnTxt.color = new Color(0.85f, 0.92f, 1f, 1f);
-        mnTxt.text = "👤 Tên của bạn:";
+        mnTxt.text = GameLocalizationManager.T("WAITING_MY_NAME_LABEL", "👤 Tên của bạn:");
+        waitingMyNameLabelText = mnTxt;
 
         GameObject nameInObj = new GameObject("MyNicknameInput");
         nameInObj.transform.SetParent(infoRow.transform, false);
@@ -1785,7 +1913,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         waitingPlayerNameInput.characterLimit = 20;
         waitingPlayerNameInput.onEndEdit.AddListener(OnWaitingNicknameChanged);
 
-        CreateStyledActionButton(
+        Button applyNameBtn = CreateStyledActionButton(
             infoRow.transform,
             "ApplyNameBtn",
             new Vector2(0f, 0.5f),
@@ -1794,7 +1922,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             new Vector2(155f, 48f),
             new Color(0.15f, 0.62f, 0.45f, 0.95f),
             new Color(0.30f, 0.95f, 0.68f, 1f),
-            "✔ Lưu tên",
+            GameLocalizationManager.T("WAITING_SAVE_NAME_BTN", "✔ Lưu tên"),
             font,
             17,
             () =>
@@ -1805,6 +1933,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 }
             }
         );
+        waitingSaveNameBtnText = applyNameBtn != null ? applyNameBtn.GetComponentInChildren<Text>() : null;
 
         // 3. Tiêu đề Danh sách người chơi trong phòng (X / 4)
         GameObject countRow = new GameObject("PlayerCountHeader");
@@ -1896,7 +2025,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         // 6. Hàng Nút Điều Khiển Phía Dưới Phòng Chờ
         // Nút Rời Phòng / Quay Lại
-        CreateStyledActionButton(
+        Button leaveBtn = CreateStyledActionButton(
             mainBox.transform,
             "LeaveRoomBtn",
             new Vector2(0f, 0f),
@@ -1905,11 +2034,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             new Vector2(340f, 60f),
             new Color(0.65f, 0.18f, 0.22f, 0.95f),
             new Color(1.00f, 0.40f, 0.45f, 1f),
-            "⬅  Rời Phòng / Quay Lại Sảnh",
+            GameLocalizationManager.T("WAITING_LEAVE_BTN", "⬅  Rời Phòng / Quay Lại Sảnh"),
             font,
             20,
             OnLeaveWaitingRoomClicked
         );
+        waitingLeaveBtnText = leaveBtn != null ? leaveBtn.GetComponentInChildren<Text>() : null;
 
         // Nút lớn trung tâm: Bấm để xác nhận sẵn sàng (Toggle Ready)
         Button readyBtn = CreateStyledActionButton(
@@ -2199,12 +2329,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             new Vector2(230f, 44f),
             new Color(0.75f, 0.20f, 0.20f, 0.95f),
             new Color(1f, 0.45f, 0.45f, 1f),
-            "🛑 HỦY TÌM TRẬN",
+            GameLocalizationManager.T("SPINNER_CANCEL_BTN", "🛑 HỦY TÌM TRẬN"),
             font,
             16,
             CancelDirectMatchmaking
         );
         matchmakingSpinnerCancelBtn = cancelBtn;
+        matchmakingSpinnerCancelBtnText = cancelBtn != null ? cancelBtn.GetComponentInChildren<Text>() : null;
 
         matchmakingSpinnerOverlayObj.SetActive(false);
     }
@@ -2727,17 +2858,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                     slot.avatarIcon.sprite = p.isMaster ? sprCardIcons[3] : sprCardIcons[0];
                     slot.avatarIcon.color = new Color(1f, 0.96f, 0.78f, 1f);
 
-                    slot.slotBadgeText.text = "⭐ BẠN ĐANG Ở ĐÂY (TÔI) ⭐";
+                    slot.slotBadgeText.text = GameLocalizationManager.T("WAITING_YOU", "⭐ BẠN ĐANG Ở ĐÂY (TÔI) ⭐");
                     slot.slotBadgeText.color = new Color(1f, 0.90f, 0.28f, 1f);
 
-                    slot.playerNameText.text = $"{p.nickName} (Bạn)";
+                    slot.playerNameText.text = $"{p.nickName} ({GameLocalizationManager.T("LOBBY_ME_PROFILE", "Bạn")})";
                     slot.playerNameText.color = new Color(0.35f, 1.0f, 0.72f, 1f);
 
-                    string rolePrefix = p.isMaster ? "👑 Chủ Phòng" : "🟢 Thành Viên";
-                    string readyTxt = p.isReady ? "✔ Đã sẵn sàng" : "⏳ Chưa sẵn sàng";
+                    string rolePrefix = p.isMaster ? GameLocalizationManager.T("WAITING_ROLE_HOST", "👑 Chủ Phòng") : GameLocalizationManager.T("WAITING_ROLE_MEMBER", "🟢 Thành Viên");
+                    string readyTxt = p.isReady ? GameLocalizationManager.T("WAITING_READY_YES", "✔ Đã sẵn sàng") : GameLocalizationManager.T("WAITING_READY_NO", "⏳ Chưa sẵn sàng");
                     if (!inRoom)
                     {
-                        slot.playerRoleStatusText.text = "⏳ Đang kết nối máy chủ phòng...";
+                        slot.playerRoleStatusText.text = "⏳ " + GameLocalizationManager.T("LOBBY_CONN_CONNECTING", "Đang kết nối...");
                         slot.playerRoleStatusText.color = new Color(1.0f, 0.85f, 0.30f, 1f);
                     }
                     else
@@ -2759,15 +2890,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                     slot.avatarIcon.sprite = p.isMaster ? sprCardIcons[3] : sprCardIcons[0];
                     slot.avatarIcon.color = Color.white;
 
-                    slot.slotBadgeText.text = p.isMaster ? $"VỊ TRÍ #{i + 1} (CHỦ PHÒNG)" : $"VỊ TRÍ #{i + 1} (ĐỒNG ĐỘI)";
+                    slot.slotBadgeText.text = p.isMaster
+                        ? string.Format(GameLocalizationManager.T("WAITING_SLOT_HOST", "VỊ TRÍ #{0} (CHỦ PHÒNG)"), i + 1)
+                        : string.Format(GameLocalizationManager.T("WAITING_SLOT_TEAMMATE", "VỊ TRÍ #{0} (ĐỒNG ĐỘI)"), i + 1);
                     slot.slotBadgeText.color = new Color(0.45f, 0.95f, 0.82f, 1f);
 
                     slot.playerNameText.text = p.nickName;
                     slot.playerNameText.color = Color.white;
 
                     slot.playerRoleStatusText.text = p.isReady
-                        ? "✔ Đã xác nhận sẵn sàng"
-                        : "🟢 Đã vào phòng (Chờ sẵn sàng)";
+                        ? GameLocalizationManager.T("WAITING_READY_YES", "✔ Đã xác nhận sẵn sàng")
+                        : GameLocalizationManager.T("WAITING_READY_NO", "🟢 Đã vào phòng (Chờ sẵn sàng)");
                     slot.playerRoleStatusText.color = p.isReady
                         ? new Color(0.25f, 0.98f, 0.62f, 1f)
                         : new Color(0.75f, 0.88f, 1.0f, 0.95f);
@@ -2782,11 +2915,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 slot.avatarIcon.sprite = sprCardIcons[4];
                 slot.avatarIcon.color = new Color(0.45f, 0.52f, 0.68f, 0.45f);
 
-                slot.slotBadgeText.text = $"VỊ TRÍ #{i + 1} (CÒN TRỐNG)";
+                slot.slotBadgeText.text = string.Format(GameLocalizationManager.T("WAITING_SLOT_EMPTY", "VỊ TRÍ #{0} (CÒN TRỐNG)"), i + 1);
                 slot.slotBadgeText.color = new Color(0.52f, 0.60f, 0.76f, 0.85f);
 
                 bool isSearching = PhotonMultiplayerChatVoice.IsMatchmakingSearching;
-                slot.playerNameText.text = isSearching ? "🔍 Đang ghép người..." : "Đang chờ người chơi...";
+                slot.playerNameText.text = isSearching
+                    ? GameLocalizationManager.T("WAITING_SLOT_SEARCHING", "🔍 Đang ghép người...")
+                    : GameLocalizationManager.T("WAITING_SLOT_WAITING", "Đang chờ người chơi...");
                 slot.playerNameText.color = isSearching ? new Color(0.20f, 0.95f, 0.65f, 0.85f) : new Color(0.48f, 0.56f, 0.72f, 0.75f);
 
                 slot.playerRoleStatusText.text = isSearching
@@ -2893,13 +3028,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             {
                 if (isMeReady)
                 {
-                    waitingReadyBtnText.text = "✔ BẠN ĐÃ SẴN SÀNG (Click để hủy)";
+                    waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_BTN_READY_CANCEL", "✔ BẠN ĐÃ SẴN SÀNG (Click để hủy)");
                     if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.16f, 0.62f, 0.36f, 0.95f);
                     if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.98f, 0.62f, 1f);
                 }
                 else
                 {
-                    waitingReadyBtnText.text = "✔ BẤM ĐỂ XÁC NHẬN SẴN SÀNG (VÀO TRẬN)";
+                    waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_BTN_READY_CONFIRM", "✔ BẤM ĐỂ XÁC NHẬN SẴN SÀNG (VÀO TRẬN)");
                     if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.18f, 0.45f, 0.85f, 0.95f);
                     if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.70f, 1.00f, 1f);
                 }
@@ -2910,7 +3045,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 if (currentCount <= 1)
                 {
                     // Người chơi đơn 1 mình
-                    waitingReadyBtnText.text = "⚔️ BẮT ĐẦU TÌM TRẬN (SẴN SÀNG)";
+                    waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_BTN_START_SEARCH", "⚔️ BẮT ĐẦU TÌM TRẬN (SẴN SÀNG)");
                     if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.95f, 0.52f, 0.10f, 0.95f);
                     if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.00f, 0.75f, 0.25f, 1f);
                 }
@@ -2920,7 +3055,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                     if (photonMgr != null && !photonMgr.IsLocalMaster)
                     {
                         // Thành viên trong đội
-                        waitingReadyBtnText.text = isMeReady ? "✔ ĐÃ SẴN SÀNG (Click để hủy)" : "✔ BẤM ĐỂ SẴN SÀNG";
+                        waitingReadyBtnText.text = isMeReady
+                            ? GameLocalizationManager.T("WAITING_BTN_READY_CANCEL", "✔ ĐÃ SẴN SÀNG (Click để hủy)")
+                            : GameLocalizationManager.T("WAITING_BTN_READY_CONFIRM", "✔ BẤM ĐỂ SẴN SÀNG");
                         if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = isMeReady ? new Color(0.16f, 0.62f, 0.36f, 0.95f) : new Color(0.18f, 0.45f, 0.85f, 0.95f);
                         if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = isMeReady ? new Color(0.35f, 0.98f, 0.62f, 1f) : new Color(0.35f, 0.70f, 1.00f, 1f);
                     }
@@ -2930,13 +3067,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                         bool allOthers = photonMgr != null && photonMgr.AreAllOtherPlayersReady();
                         if (allOthers)
                         {
-                            waitingReadyBtnText.text = $"⚔️ BẮT ĐẦU TÌM TRẬN (GHÉP THÊM {required - currentCount} BẠN)";
+                            waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_BTN_START_SEARCH", "⚔️ BẮT ĐẦU TÌM TRẬN");
                             if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.95f, 0.52f, 0.10f, 0.95f);
                             if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.00f, 0.75f, 0.25f, 1f);
                         }
                         else
                         {
-                            waitingReadyBtnText.text = "⏳ CHỜ TỔ ĐỘI SẴN SÀNG...";
+                            waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_READY_NO", "⏳ CHỜ TỔ ĐỘI SẴN SÀNG...");
                             if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.35f, 0.40f, 0.50f, 0.95f);
                             if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.50f, 0.55f, 0.65f, 1f);
                         }
@@ -3041,6 +3178,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     {
         UpdateLanguageButtonLabel();
 
+        if (lobbySettingsBtnText != null)
+        {
+            lobbySettingsBtnText.text = GameLocalizationManager.T("BTN_LOBBY_SETTINGS", "⚙️ CÀI ĐẶT");
+        }
+
         if (headerSubtitleText != null)
         {
             headerSubtitleText.text = GameLocalizationManager.T("HEADER_SUBTITLE", "⚡  MÊ CUNG HUYỀN BÍ  ●  SINH TỒN TỔ ĐỘI 4 NGƯỜI  ⚡");
@@ -3056,11 +3198,86 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             bottomDisclaimerText.text = GameLocalizationManager.T("AGE_DISCLAIMER_FULL");
         }
 
+        if (connectionStatusLabelText != null)
+        {
+            connectionStatusLabelText.text = GameLocalizationManager.T("LOBBY_CONN_STATUS_LABEL", "Trạng thái kết nối:");
+        }
+
+        if (roomIdLabelText != null)
+        {
+            roomIdLabelText.text = GameLocalizationManager.T("LOBBY_ROOM_ID_LABEL", "ID Phòng:");
+        }
+
+        if (roomIdInputPlaceholderText != null)
+        {
+            roomIdInputPlaceholderText.text = GameLocalizationManager.T("LOBBY_ROOM_INPUT_PH", "Nhập ID phòng 5 số...");
+        }
+
+        if (joinRoomBtnText != null)
+        {
+            joinRoomBtnText.text = GameLocalizationManager.T("BTN_JOIN_ROOM", "➔  Tham gia");
+        }
+
+        if (createRoomBtnText != null)
+        {
+            createRoomBtnText.text = GameLocalizationManager.T("BTN_CREATE_ROOM", "👑  Tạo phòng");
+        }
+
+        if (topRightPlayerNameText != null)
+        {
+            topRightPlayerNameText.text = GameLocalizationManager.T("LOBBY_ME_PROFILE", "👤 Tôi");
+        }
+
+        if (waitingHeaderTitleText != null)
+        {
+            waitingHeaderTitleText.text = GameLocalizationManager.T("WAITING_HEADER_TITLE", "🏰 SẢNH PHÒNG CHỜ TRẬN ĐẤU (4 NGƯỜI CHƠI) 🏰");
+        }
+
+        if (waitingCopyBtnText != null)
+        {
+            waitingCopyBtnText.text = GameLocalizationManager.T("WAITING_COPY_BTN", "📋 Sao chép ID");
+        }
+
+        if (waitingMyNameLabelText != null)
+        {
+            waitingMyNameLabelText.text = GameLocalizationManager.T("WAITING_MY_NAME_LABEL", "👤 Tên của bạn:");
+        }
+
+        if (waitingSaveNameBtnText != null)
+        {
+            waitingSaveNameBtnText.text = GameLocalizationManager.T("WAITING_SAVE_NAME_BTN", "✔ Lưu tên");
+        }
+
+        if (waitingLeaveBtnText != null)
+        {
+            waitingLeaveBtnText.text = GameLocalizationManager.T("WAITING_LEAVE_BTN", "⬅  Rời Phòng / Quay Lại Sảnh");
+        }
+
+        if (matchmakingSpinnerCancelBtnText != null)
+        {
+            matchmakingSpinnerCancelBtnText.text = GameLocalizationManager.T("SPINNER_CANCEL_BTN", "🛑 HỦY TÌM TRẬN");
+        }
+
+        if (matchmakingSpinnerTitleText != null)
+        {
+            matchmakingSpinnerTitleText.text = GameLocalizationManager.T("SPINNER_TITLE", "🔍 ĐANG TÌM TRẬN ĐẤU...");
+        }
+
+        if (tabMultiplayerText != null) tabMultiplayerText.text = GameLocalizationManager.T("LOBBY_TAB_MULTIPLAYER", "👥 Đa Người Chơi");
+        if (tabSoloText != null) tabSoloText.text = GameLocalizationManager.T("LOBBY_TAB_SOLO", "👤 Chơi Đơn");
+        if (tabSettingsText != null) tabSettingsText.text = GameLocalizationManager.T("LOBBY_TAB_SETTINGS", "⚙️ Cài Đặt");
+        if (bottomConnectionStatusText != null) bottomConnectionStatusText.text = $"<color=#00FF9D>●</color> {GameLocalizationManager.T("LOBBY_STATUS_GOOD", "Trạng thái kết nối: Kết nối tốt")}";
+        if (bottomSloganText != null) bottomSloganText.text = GameLocalizationManager.T("LOBBY_FOOTER_SLOGAN", "PLAY TOGETHER • HAVE FUN");
+
         for (int i = 0; i < 6; i++)
         {
             if (i < cardTitleTexts.Length && cardTitleTexts[i] != null)
             {
-                cardTitleTexts[i].text = GameLocalizationManager.T($"CARD_{i + 1}_TITLE");
+                cardTitleTexts[i].text = GameLocalizationManager.T($"LOBBY_CARD{i + 1}_TITLE");
+            }
+            if (i < cardSubtitleTexts.Length && cardSubtitleTexts[i] != null)
+            {
+                cardSubtitleTexts[i].text = GameLocalizationManager.T($"LOBBY_CARD{i + 1}_SUB");
             }
             if (i < cardBadgeTexts.Length && cardBadgeTexts[i] != null)
             {
@@ -3068,9 +3285,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             }
             if (i < cardBtnTexts.Length && cardBtnTexts[i] != null)
             {
-                cardBtnTexts[i].text = GameLocalizationManager.T($"CARD_{i + 1}_BTN");
+                cardBtnTexts[i].text = GameLocalizationManager.T($"LOBBY_CARD{i + 1}_BTN");
             }
         }
+
+        UpdateWaitingRoomUI();
     }
 
     private void HandleLobbyLanguageChanged(GameLocalizationManager.Language lang)

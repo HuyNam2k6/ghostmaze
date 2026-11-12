@@ -3,10 +3,10 @@ guid: bee5cefd88a1c6e4d8b32b50640c8547
 TrueTypeFontImporter:
   externalObjects: {}
   serializedVersion: 4
-  fontSize: 16
+  fontSize: 48
   forceTextureCase: -2
   characterSpacing: 0
-  characterPadding: 1
+  characterPadding: 2
   includeFontData: 1
   fontNames:
   - Roboto

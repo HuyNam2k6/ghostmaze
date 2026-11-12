@@ -907,6 +907,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         if (chatPanelRect != null) chatPanelRect.gameObject.SetActive(false);
         if (lobbyPanelObj != null) lobbyPanelObj.SetActive(false);
 
+        // [GhostMaze] Dọn sạch triệt để mọi tàn dư banner/nút in-game khi rời trận về sảnh
+        GameObject endBanner = GameObject.Find("EndGameResultBanner");
+        if (endBanner != null) Destroy(endBanner);
+        GameObject f1Btn = GameObject.Find("Btn_QuickTestF1");
+        if (f1Btn != null) Destroy(f1Btn);
+        if (SurvivalTimerUI.Instance != null) SurvivalTimerUI.Instance.CleanUpAllInGameUI();
+        if (GameSettingsManager.Instance != null) GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+
         if (client != null && client.InRoom)
         {
             LastLobbyStatus = "Đang rời phòng quay về sảnh Photon...";
@@ -3334,6 +3342,15 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             IsLocalReplayAgreed = false;
             ReplayAgreedActorNumbers.Clear();
             ClearRemotePlayers();
+
+            // [GhostMaze] Đảm bảo sạch bóng mọi HUD trận đấu khi ở LobbyScene
+            GameObject endBanner = GameObject.Find("EndGameResultBanner");
+            if (endBanner != null) Destroy(endBanner);
+            GameObject f1Btn = GameObject.Find("Btn_QuickTestF1");
+            if (f1Btn != null) Destroy(f1Btn);
+            if (SurvivalTimerUI.Instance != null) SurvivalTimerUI.Instance.CleanUpAllInGameUI();
+            if (GameSettingsManager.Instance != null) GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+
             FusionVietnameseLobbyUI.EnsureLobbyUIIfInLobbyScene();
         }
     }

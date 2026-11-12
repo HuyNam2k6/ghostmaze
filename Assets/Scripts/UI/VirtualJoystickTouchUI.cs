@@ -1421,6 +1421,20 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         hudEditToolbarObj.SetActive(false);
     }
 
+    /// <summary>
+    /// Alias mở chế độ tùy chỉnh vị trí nút ảo (gọi từ GameSettingsManager)
+    /// </summary>
+    public void EnterEditMode() => EnterHUDCustomizationMode();
+
+    /// <summary>
+    /// Alias khôi phục toàn bộ vị trí nút về mặc định ban đầu
+    /// </summary>
+    public void ResetToDefaultLayout()
+    {
+        ResetSavedHUDLayoutToDefault();
+        ResetAllCustomHUDToDefault();
+    }
+
     public void EnterHUDCustomizationMode()
     {
         if (touchCanvas == null) return;

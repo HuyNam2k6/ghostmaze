@@ -79,6 +79,7 @@ public class PlayerHealth : MonoBehaviour
 
     private void OnDestroy()
     {
+        GameLocalizationManager.OnLanguageChanged -= HandleHealthLanguageChanged;
         if (spectateHudObj != null)
         {
             Destroy(spectateHudObj);
@@ -91,6 +92,27 @@ public class PlayerHealth : MonoBehaviour
     {
         AutoBindHUDIfNeeded();
         RefreshHealthUIImmediate();
+        GameLocalizationManager.OnLanguageChanged += HandleHealthLanguageChanged;
+        HandleHealthLanguageChanged(GameLocalizationManager.CurrentLanguage);
+    }
+
+    private void HandleHealthLanguageChanged(GameLocalizationManager.Language lang)
+    {
+        GameObject hpTitleGo = GameObject.Find("PlayerHP_Title");
+        if (hpTitleGo != null)
+        {
+            Text hpTitleTxt = hpTitleGo.GetComponent<Text>();
+            if (hpTitleTxt != null)
+            {
+                hpTitleTxt.font = UIFontHelper.GetCrispFont(24);
+                hpTitleTxt.text = GameLocalizationManager.T("HUD_PLAYER_HP_TITLE", "❤️ MÁU PLAYER");
+            }
+        }
+        if (isDead)
+        {
+            if (healthValueText != null) healthValueText.text = GameLocalizationManager.T("HUD_PLAYER_DEAD", "💀 ĐÃ TỬ TRẬN");
+            RefreshSpectateTargetListAndUI();
+        }
     }
 
     private void Update()
@@ -346,7 +368,7 @@ public class PlayerHealth : MonoBehaviour
 
         if (healthValueText != null)
         {
-            healthValueText.text = "💀 ĐÃ TỬ TRẬN";
+            healthValueText.text = GameLocalizationManager.T("HUD_PLAYER_DEAD", "💀 ĐÃ TỬ TRẬN");
         }
 
         RefreshSpectateTargetListAndUI();
@@ -459,12 +481,12 @@ public class PlayerHealth : MonoBehaviour
             if (count > 0 && spectateIndex >= 0 && spectateIndex < count)
             {
                 var cur = spectateTargets[spectateIndex];
-                spectateTitleText.text = $"👁 ĐANG XEM ĐỒNG ĐỘI: {cur.nickName} ({spectateIndex + 1}/{count})";
+                spectateTitleText.text = string.Format(GameLocalizationManager.T("HUD_SPECTATE_TITLE", "👁 ĐANG XEM ĐỒNG ĐỘI: {0} ({1}/{2})"), cur.nickName, spectateIndex + 1, count);
                 spectateTitleText.color = new Color(0.55f, 0.96f, 1f, 1f);
             }
             else
             {
-                spectateTitleText.text = "💀 ĐÃ TỬ TRẬN — KHÔNG CÒN ĐỒNG ĐỘI CÙNG PHE";
+                spectateTitleText.text = GameLocalizationManager.T("HUD_SPECTATE_NO_TEAMMATES", "💀 ĐÃ TỬ TRẬN — KHÔNG CÒN ĐỒNG ĐỘI CÙNG PHE");
                 spectateTitleText.color = new Color(1f, 0.55f, 0.45f, 1f);
             }
         }
@@ -649,7 +671,7 @@ public class PlayerHealth : MonoBehaviour
     {
         if (healthValueText != null)
         {
-            healthValueText.text = "👻 MA BÍ NGÔ (BẤT TỬ)";
+            healthValueText.text = GameLocalizationManager.T("HUD_GHOST_IMMORTAL", "👻 MA BÍ NGÔ (BẤT TỬ)");
         }
 
         Canvas canvas = FindAnyObjectByType<Canvas>();
@@ -685,8 +707,7 @@ public class PlayerHealth : MonoBehaviour
                 textRt.offsetMax = new Vector2(-10f, -5f);
 
                 Text bannerText = textGo.AddComponent<Text>();
-                bannerText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                if (bannerText.font == null) bannerText.font = Font.CreateDynamicFontFromOSFont("Arial", 16);
+                bannerText.font = UIFontHelper.GetCrispFont(36);
                 bannerText.fontSize = 18;
                 bannerText.alignment = TextAnchor.MiddleCenter;
                 bannerText.fontStyle = FontStyle.Bold;

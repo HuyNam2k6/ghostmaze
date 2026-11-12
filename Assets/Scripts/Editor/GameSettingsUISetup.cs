@@ -11,8 +11,8 @@ public static class GameSettingsUISetup
     [MenuItem("Tools/Setup Settings Dashboard (Sidebar & Gear Button)")]
     public static void SetupSettingsUI()
     {
-        // 1. Lấy Font chữ chuẩn của Unity
-        defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        // 1. Lấy Font chữ chuẩn vector siêu sắc nét
+        defaultFont = UIFontHelper.GetCrispFont(36);
         if (defaultFont == null) defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
         // 2. Thiết lập EventSystem tương thích New Input System
@@ -29,15 +29,11 @@ public static class GameSettingsUISetup
         GameObject canvasGo = new GameObject("Canvas_GameSettings");
         Canvas canvas = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.pixelPerfect = true;
+        canvas.pixelPerfect = false; // Tắt pixelPerfect trên canvas scaled để triệt tiêu hiện tượng mờ nhòe chữ
         canvas.sortingOrder = 100;
 
         CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 0.5f;
-        scaler.dynamicPixelsPerUnit = 2.5f;
-        scaler.referencePixelsPerUnit = 100f;
+        UIFontHelper.ConfigureCrispCanvas(canvas, scaler);
 
         canvasGo.AddComponent<GraphicRaycaster>();
 
@@ -226,14 +222,14 @@ public static class GameSettingsUISetup
         rtDash.anchorMax = new Vector2(1f, 1f);
         rtDash.pivot = new Vector2(1f, 0.5f);
         rtDash.anchoredPosition = Vector2.zero;
-        rtDash.sizeDelta = new Vector2(500f, 0f); // Chiếm trọn chiều cao, rộng 500px bên phải
+        rtDash.sizeDelta = new Vector2(620f, 0f); // Chiếm trọn chiều cao, rộng 620px bên phải cho giao diện thoáng nét
 
         Image dashBg = dashboardGo.AddComponent<Image>();
-        dashBg.color = new Color(0.06f, 0.08f, 0.13f, 0.97f);
+        dashBg.color = new Color(0.04f, 0.06f, 0.10f, 0.98f);
         dashBg.raycastTarget = true; // Chặn bấm xuyên qua panel
 
         Outline dashOutline = dashboardGo.AddComponent<Outline>();
-        dashOutline.effectColor = new Color(0.20f, 0.45f, 0.75f, 0.70f);
+        dashOutline.effectColor = new Color(0.20f, 0.55f, 0.95f, 0.85f);
         dashOutline.effectDistance = new Vector2(-2.5f, 0f); // Viền sáng bên mép trái panel
 
         manager.dashboardPanel = dashboardGo;
@@ -242,24 +238,24 @@ public static class GameSettingsUISetup
         CreateTextObject("DashTitle", dashboardGo.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -32f), new Vector2(-40f, 36f),
-            "⚙️ BẢNG CÀI ĐẶT (DASHBOARD)", 21, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.78f, 0.25f));
+            "⚙️ BẢNG CÀI ĐẶT (DASHBOARD)", 22, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.78f, 0.25f));
 
         CreateTextObject("DashSubtitle", dashboardGo.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -62f), new Vector2(-40f, 22f),
-            "Ghost Maze • Tùy chỉnh hệ thống (F1 / Tab / Esc)", 12, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.65f, 0.72f, 0.82f));
+            new Vector2(0f, -62f), new Vector2(-40f, 24f),
+            "Ghost Maze • Tùy chỉnh hệ thống (F1 / Tab / Esc)", 14, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.70f, 0.78f, 0.88f));
 
         // Nút '✕' đóng Dashboard ở góc trên panel
         GameObject closeBtnGo = CreateButton("CloseDashboardButton", dashboardGo.transform,
             new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(1f, 1f),
-            new Vector2(-18f, -22f), new Vector2(38f, 38f),
-            "✕", 18, FontStyle.Bold,
-            new Color(0.55f, 0.15f, 0.15f, 0.90f), Color.white);
+            new Vector2(-18f, -22f), new Vector2(42f, 42f),
+            "✕", 20, FontStyle.Bold,
+            new Color(0.65f, 0.15f, 0.15f, 0.95f), Color.white);
         manager.closeDashboardButton = closeBtnGo.GetComponent<Button>();
 
-        CreateDivider("DividerHeader", dashboardGo.transform, -85f, 460f);
+        CreateDivider("DividerHeader", dashboardGo.transform, -85f, 560f);
 
-        // 6.2 THANH ĐIỀU HƯỚNG TAB (3 MỤC LỚN: HÌNH ẢNH | ÂM THANH | ĐIỀU KHIỂN)
+        // 6.2 THANH ĐIỀU HƯỚNG TAB (HÌNH ẢNH | ÂM THANH | ĐIỀU KHIỂN)
         GameObject tabGroup = new GameObject("TabNavigationGroup");
         tabGroup.transform.SetParent(dashboardGo.transform, false);
         RectTransform rtTabs = tabGroup.AddComponent<RectTransform>();
@@ -267,27 +263,27 @@ public static class GameSettingsUISetup
         rtTabs.anchorMax = new Vector2(0.5f, 1f);
         rtTabs.pivot = new Vector2(0.5f, 1f);
         rtTabs.anchoredPosition = new Vector2(0f, -98f);
-        rtTabs.sizeDelta = new Vector2(460f, 44f);
+        rtTabs.sizeDelta = new Vector2(560f, 48f);
 
-        float tabW = 150f;
+        float tabW = 180f;
         GameObject btnTabG = CreateButton("Tab_Graphics", tabGroup.transform,
             new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f),
-            new Vector2(0f, 0f), new Vector2(tabW, 42f),
-            "🎨 Hình Ảnh", 14, FontStyle.Bold,
+            new Vector2(0f, 0f), new Vector2(tabW, 46f),
+            "🎨 Hình Ảnh", 15, FontStyle.Bold,
             new Color(0.18f, 0.45f, 0.75f), Color.white);
         manager.tabGraphicsButton = btnTabG.GetComponent<Button>();
 
         GameObject btnTabA = CreateButton("Tab_Audio", tabGroup.transform,
             new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-            new Vector2(0f, 0f), new Vector2(tabW, 42f),
-            "🔊 Âm Thanh", 14, FontStyle.Bold,
+            new Vector2(0f, 0f), new Vector2(tabW, 46f),
+            "🔊 Âm Thanh", 15, FontStyle.Bold,
             new Color(0.12f, 0.16f, 0.24f), Color.white);
         manager.tabAudioButton = btnTabA.GetComponent<Button>();
 
         GameObject btnTabC = CreateButton("Tab_Controls", tabGroup.transform,
             new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f),
-            new Vector2(0f, 0f), new Vector2(tabW, 42f),
-            "🎮 Điều Khiển", 14, FontStyle.Bold,
+            new Vector2(0f, 0f), new Vector2(tabW, 46f),
+            "🎮 Điều Khiển", 15, FontStyle.Bold,
             new Color(0.12f, 0.16f, 0.24f), Color.white);
         manager.tabControlsButton = btnTabC.GetComponent<Button>();
 
@@ -298,8 +294,8 @@ public static class GameSettingsUISetup
         rtContent.anchorMin = new Vector2(0.5f, 1f);
         rtContent.anchorMax = new Vector2(0.5f, 1f);
         rtContent.pivot = new Vector2(0.5f, 1f);
-        rtContent.anchoredPosition = new Vector2(0f, -155f);
-        rtContent.sizeDelta = new Vector2(460f, 780f);
+        rtContent.anchoredPosition = new Vector2(0f, -158f);
+        rtContent.sizeDelta = new Vector2(560f, 780f);
 
         // =====================================================================
         // TAB 1: 🎨 HÌNH ẢNH (GRAPHICS & FPS BOOST)
@@ -315,92 +311,92 @@ public static class GameSettingsUISetup
         CreateTextObject("G_Header1", tabGContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -10f), new Vector2(0f, 26f),
-            "🎨 1. CHẤT LƯỢNG ĐỒ HỌA (GRAPHICS)", 15, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.35f, 0.78f, 1.0f));
+            "🎨 1. CHẤT LƯỢNG ĐỒ HỌA (GRAPHICS)", 16, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.35f, 0.78f, 1.0f));
 
         GameObject gStatusGo = CreateTextObject("G_Status", tabGContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -38f), new Vector2(0f, 22f),
-            "Chất Lượng: Siêu Đẹp (Ultra) | Độ Nét: 130%", 13, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.85f, 0.90f, 1.0f));
+            new Vector2(0f, -38f), new Vector2(0f, 24f),
+            "Chất Lượng: Siêu Đẹp (Ultra) | Độ Nét: 130%", 14, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.85f, 0.90f, 1.0f));
         manager.graphicsStatusText = gStatusGo.GetComponent<Text>();
 
         // Nút lớn Tăng Đồ Họa Cực Đại
         GameObject btnBoostG = CreateButton("Btn_BoostGraphics", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -78f), new Vector2(460f, 44f),
-            "🌟 TĂNG ĐỒ HỌA CỰC ĐẠI (SIÊU NÉT 130%)", 14, FontStyle.Bold,
+            new Vector2(0f, -78f), new Vector2(560f, 46f),
+            "🌟 TĂNG ĐỒ HỌA CỰC ĐẠI (SIÊU NÉT 130%)", 15, FontStyle.Bold,
             new Color(0.14f, 0.44f, 0.74f), Color.white);
         btnBoostG.GetComponent<Button>().onClick.AddListener(manager.ApplyGraphicsUltra);
 
         // 3 nút lựa chọn chi tiết
-        float w3 = 148f;
+        float w3 = 182f;
         GameObject btnG_U = CreateButton("Btn_G_Ultra", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(-154f, -132f), new Vector2(w3, 38f),
-            "🌟 Siêu Đẹp (130%)", 12, FontStyle.Bold,
+            new Vector2(-188f, -132f), new Vector2(w3, 40f),
+            "🌟 Siêu Đẹp (130%)", 14, FontStyle.Bold,
             new Color(0.16f, 0.30f, 0.48f), Color.white);
         btnG_U.GetComponent<Button>().onClick.AddListener(manager.ApplyGraphicsUltra);
 
         GameObject btnG_M = CreateButton("Btn_G_Med", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -132f), new Vector2(w3, 38f),
-            "⚖️ Cân Bằng (100%)", 12, FontStyle.Bold,
+            new Vector2(0f, -132f), new Vector2(w3, 40f),
+            "⚖️ Cân Bằng (100%)", 14, FontStyle.Bold,
             new Color(0.18f, 0.24f, 0.35f), new Color(0.9f, 0.9f, 0.9f));
         btnG_M.GetComponent<Button>().onClick.AddListener(manager.ApplyGraphicsMedium);
 
         GameObject btnG_L = CreateButton("Btn_G_Low", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(154f, -132f), new Vector2(w3, 38f),
-            "⚡ Tiết Kiệm (85%)", 12, FontStyle.Bold,
+            new Vector2(188f, -132f), new Vector2(w3, 40f),
+            "⚡ Tiết Kiệm (85%)", 14, FontStyle.Bold,
             new Color(0.18f, 0.24f, 0.35f), new Color(0.9f, 0.9f, 0.9f));
         btnG_L.GetComponent<Button>().onClick.AddListener(manager.ApplyGraphicsLow);
 
-        CreateDivider("DividerG", tabGContent.transform, -165f, 460f);
+        CreateDivider("DividerG", tabGContent.transform, -165f, 560f);
 
         // Khu vực FPS Boost
         CreateTextObject("FPS_Header", tabGContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -188f), new Vector2(0f, 26f),
-            "🚀 2. TỐC ĐỘ KHUNG HÌNH (FPS BOOST)", 15, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.35f, 0.92f, 0.55f));
+            "🚀 2. TỐC ĐỘ KHUNG HÌNH (FPS BOOST)", 16, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.35f, 0.92f, 0.55f));
 
         GameObject fpsStatusGo = CreateTextObject("FPS_Status", tabGContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -216f), new Vector2(0f, 22f),
-            "Mục Tiêu FPS: Không Giới Hạn (Max FPS)", 13, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.85f, 1.0f, 0.90f));
+            new Vector2(0f, -216f), new Vector2(0f, 24f),
+            "Mục Tiêu FPS: Không Giới Hạn (Max FPS)", 14, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.85f, 1.0f, 0.90f));
         manager.fpsStatusText = fpsStatusGo.GetComponent<Text>();
 
         GameObject btnBoostFPS = CreateButton("Btn_BoostFPS", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -256f), new Vector2(460f, 44f),
-            "🔥 TĂNG TỐI ĐA FPS (MỞ KHÓA KHUNG HÌNH)", 14, FontStyle.Bold,
+            new Vector2(0f, -256f), new Vector2(560f, 46f),
+            "🔥 TĂNG TỐI ĐA FPS (MỞ KHÓA KHUNG HÌNH)", 15, FontStyle.Bold,
             new Color(0.12f, 0.56f, 0.32f), Color.white);
         btnBoostFPS.GetComponent<Button>().onClick.AddListener(manager.ApplyMaxFPS);
 
-        float w4 = 110f;
+        float w4 = 136f;
         GameObject btnF_Max = CreateButton("Btn_F_Max", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(-172f, -310f), new Vector2(w4, 38f),
-            "🔥 Max FPS", 12, FontStyle.Bold,
+            new Vector2(-208f, -310f), new Vector2(w4, 40f),
+            "🔥 Max FPS", 13, FontStyle.Bold,
             new Color(0.14f, 0.40f, 0.26f), Color.white);
         btnF_Max.GetComponent<Button>().onClick.AddListener(manager.ApplyMaxFPS);
 
         GameObject btnF_120 = CreateButton("Btn_F_120", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(-58f, -310f), new Vector2(w4, 38f),
-            "⚡ 120 FPS", 12, FontStyle.Bold,
+            new Vector2(-70f, -310f), new Vector2(w4, 40f),
+            "⚡ 120 FPS", 13, FontStyle.Bold,
             new Color(0.18f, 0.28f, 0.35f), Color.white);
         btnF_120.GetComponent<Button>().onClick.AddListener(manager.Apply120FPS);
 
         GameObject btnF_60 = CreateButton("Btn_F_60", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(58f, -310f), new Vector2(w4, 38f),
-            "🔒 60 FPS", 12, FontStyle.Bold,
+            new Vector2(70f, -310f), new Vector2(w4, 40f),
+            "🔒 60 FPS", 13, FontStyle.Bold,
             new Color(0.18f, 0.28f, 0.35f), Color.white);
         btnF_60.GetComponent<Button>().onClick.AddListener(manager.Apply60FPS);
 
         GameObject btnF_VSync = CreateButton("Btn_F_VSync", tabGContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(172f, -310f), new Vector2(w4, 38f),
-            "🖥️ V-Sync", 12, FontStyle.Bold,
+            new Vector2(208f, -310f), new Vector2(w4, 40f),
+            "🖥️ V-Sync", 13, FontStyle.Bold,
             new Color(0.20f, 0.26f, 0.35f), Color.white);
         btnF_VSync.GetComponent<Button>().onClick.AddListener(manager.ToggleVSync);
 
@@ -419,48 +415,48 @@ public static class GameSettingsUISetup
         CreateTextObject("A_Header", tabAContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -10f), new Vector2(0f, 26f),
-            "🔊 ĐIỀU CHỈNH ÂM LƯỢNG HỆ THỐNG", 15, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.78f, 0.35f));
+            "🔊 ĐIỀU CHỈNH ÂM LƯỢNG HỆ THỐNG", 16, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.78f, 0.35f));
 
         // Slider 1: Master Volume
         GameObject lblMaster = CreateTextObject("Lbl_Master", tabAContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -45f), new Vector2(0f, 22f),
-            "Âm Lượng Tổng: 100%", 13, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
+            new Vector2(0f, -45f), new Vector2(0f, 24f),
+            "Âm Lượng Tổng: 100%", 15, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
         manager.masterVolumeLabel = lblMaster.GetComponent<Text>();
 
         GameObject sldMaster = CreateSimpleSlider("Slider_Master", tabAContent.transform,
-            new Vector2(0f, -80f), new Vector2(460f, 24f), 0f, 1f, 1.0f);
+            new Vector2(0f, -80f), new Vector2(560f, 26f), 0f, 1f, 1.0f);
         manager.masterVolumeSlider = sldMaster.GetComponent<Slider>();
 
         // Slider 2: Music Volume
         GameObject lblMusic = CreateTextObject("Lbl_Music", tabAContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -120f), new Vector2(0f, 22f),
-            "Nhạc Nền Ma Mị: 80%", 13, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
+            new Vector2(0f, -120f), new Vector2(0f, 24f),
+            "Nhạc Nền Ma Mị: 80%", 15, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
         manager.musicVolumeLabel = lblMusic.GetComponent<Text>();
 
         GameObject sldMusic = CreateSimpleSlider("Slider_Music", tabAContent.transform,
-            new Vector2(0f, -155f), new Vector2(460f, 24f), 0f, 1f, 0.8f);
+            new Vector2(0f, -155f), new Vector2(560f, 26f), 0f, 1f, 0.8f);
         manager.musicVolumeSlider = sldMusic.GetComponent<Slider>();
 
         // Slider 3: SFX Volume
         GameObject lblSFX = CreateTextObject("Lbl_SFX", tabAContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -195f), new Vector2(0f, 22f),
-            "Hiệu Ứng & Tiếng Bước Chân: 90%", 13, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
+            new Vector2(0f, -195f), new Vector2(0f, 24f),
+            "Hiệu Ứng & Tiếng Bước Chân: 90%", 15, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
         manager.sfxVolumeLabel = lblSFX.GetComponent<Text>();
 
         GameObject sldSFX = CreateSimpleSlider("Slider_SFX", tabAContent.transform,
-            new Vector2(0f, -230f), new Vector2(460f, 24f), 0f, 1f, 0.9f);
+            new Vector2(0f, -230f), new Vector2(560f, 26f), 0f, 1f, 0.9f);
         manager.sfxVolumeSlider = sldSFX.GetComponent<Slider>();
 
-        CreateDivider("DividerA", tabAContent.transform, -275f, 460f);
+        CreateDivider("DividerA", tabAContent.transform, -275f, 560f);
 
         // Nút Tắt / Bật Toàn Bộ Tiếng
         GameObject btnMute = CreateButton("Btn_Mute", tabAContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -310f), new Vector2(460f, 44f),
-            "🔊 ĐANG BẬT TIẾNG (BẤM ĐỂ TẮT)", 14, FontStyle.Bold,
+            new Vector2(0f, -310f), new Vector2(560f, 46f),
+            "🔊 ĐANG BẬT TIẾNG (BẤM ĐỂ TẮT)", 15, FontStyle.Bold,
             new Color(0.25f, 0.35f, 0.50f), Color.white);
         manager.muteButton = btnMute.GetComponent<Button>();
         manager.muteButtonLabel = btnMute.transform.Find("Text").GetComponent<Text>();
@@ -480,32 +476,32 @@ public static class GameSettingsUISetup
         CreateTextObject("C_Header", tabCContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -10f), new Vector2(0f, 26f),
-            "🎮 ĐỘ NHẠY & THAO TÁC CHUỘT", 15, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.35f, 0.90f, 0.65f));
+            "🎮 ĐỘ NHẠY & THAO TÁC CHUỘT", 16, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.35f, 0.90f, 0.65f));
 
         GameObject lblSens = CreateTextObject("Lbl_Sens", tabCContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -45f), new Vector2(0f, 22f),
-            "Độ Nhạy Chuột: 1.0x", 13, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
+            new Vector2(0f, -45f), new Vector2(0f, 24f),
+            "Độ Nhạy Chuột: 1.0x", 15, FontStyle.Bold, TextAnchor.MiddleLeft, Color.white);
         manager.mouseSensitivityLabel = lblSens.GetComponent<Text>();
 
         GameObject sldSens = CreateSimpleSlider("Slider_Sens", tabCContent.transform,
-            new Vector2(0f, -80f), new Vector2(460f, 24f), 0.2f, 3.5f, 1.0f);
+            new Vector2(0f, -80f), new Vector2(560f, 26f), 0.2f, 3.5f, 1.0f);
         manager.mouseSensitivitySlider = sldSens.GetComponent<Slider>();
 
         GameObject btnInvertY = CreateButton("Btn_InvertY", tabCContent.transform,
             new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-            new Vector2(0f, -125f), new Vector2(460f, 40f),
-            "🔄 Đảo Trục Y: ĐANG TẮT", 13, FontStyle.Bold,
+            new Vector2(0f, -125f), new Vector2(560f, 44f),
+            "🔄 Đảo Trục Y: ĐANG TẮT", 14, FontStyle.Bold,
             new Color(0.18f, 0.26f, 0.38f), Color.white);
         manager.invertYButton = btnInvertY.GetComponent<Button>();
         manager.invertYButtonLabel = btnInvertY.transform.Find("Text").GetComponent<Text>();
 
-        CreateDivider("DividerC", tabCContent.transform, -160f, 460f);
+        CreateDivider("DividerC", tabCContent.transform, -160f, 560f);
 
         CreateTextObject("C_KeysHeader", tabCContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -180f), new Vector2(0f, 26f),
-            "⌨️ HƯỚNG DẪN BÀN PHÍM (KEYBINDINGS)", 15, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.85f, 0.35f));
+            "⌨️ HƯỚNG DẪN BÀN PHÍM (KEYBINDINGS)", 16, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.85f, 0.35f));
 
         string keysInfo = "• [W] [A] [S] [D] / Mũi tên : Di chuyển nhân vật\n" +
                           "• [Left Shift] : Chạy nước rút (Sprint)\n" +
@@ -517,15 +513,15 @@ public static class GameSettingsUISetup
         CreateTextObject("C_KeysBody", tabCContent.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -220f), new Vector2(0f, 150f),
-            keysInfo, 13, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.85f, 0.90f, 0.95f));
+            keysInfo, 14, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.85f, 0.90f, 0.95f));
 
         // =====================================================================
         // FOOTER: NÚT ĐÓNG DASHBOARD Ở ĐÁY PANEL
         // =====================================================================
         GameObject btnCloseBottom = CreateButton("Btn_CloseBottom", dashboardGo.transform,
             new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
-            new Vector2(0f, 35f), new Vector2(460f, 48f),
-            "✕ ĐÓNG CÀI ĐẶT (TIẾP TỤC CHƠI)", 15, FontStyle.Bold,
+            new Vector2(0f, 35f), new Vector2(560f, 50f),
+            "✕ ĐÓNG CÀI ĐẶT (TIẾP TỤC CHƠI)", 16, FontStyle.Bold,
             new Color(0.68f, 0.18f, 0.18f), Color.white);
         btnCloseBottom.GetComponent<Button>().onClick.AddListener(manager.CloseDashboard);
 
@@ -613,6 +609,10 @@ public static class GameSettingsUISetup
         outline.effectDistance = new Vector2(1.5f, -1.5f);
 
         Button btn = btnGo.AddComponent<Button>();
+        btn.targetGraphic = img;
+        Navigation nav = btn.navigation;
+        nav.mode = Navigation.Mode.None;
+        btn.navigation = nav;
         ColorBlock cb = btn.colors;
         cb.normalColor = normalColor;
         cb.highlightedColor = new Color(normalColor.r * 1.35f, normalColor.g * 1.35f, normalColor.b * 1.35f, 1f);

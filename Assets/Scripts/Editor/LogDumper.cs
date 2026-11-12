@@ -64,30 +64,6 @@ public static class LogDumper
                     return;
                 }
 
-                bool hasPackageManagerSingletonNoise = false;
-                bool hasRealCompileError = false;
-
-                for (int i = 0; i < count; i++)
-                {
-                    getEntryInternalMethod.Invoke(null, new object[] { i, logEntry });
-                    string message = messageField?.GetValue(logEntry) as string ?? "";
-                    if (message.Contains("ScriptableSingleton already exists"))
-                    {
-                        hasPackageManagerSingletonNoise = true;
-                    }
-                    else if (message.Contains("error CS"))
-                    {
-                        hasRealCompileError = true;
-                    }
-                }
-
-                // Tự động dọn sạch thông báo rác ScriptableSingleton của cửa sổ PackageManager nội bộ Unity 6
-                if (hasPackageManagerSingletonNoise && !hasRealCompileError && clearMethod != null)
-                {
-                    clearMethod.Invoke(null, null);
-                    count = (int)getCountMethod.Invoke(null, null);
-                }
-
                 if (!Directory.Exists("Logs")) Directory.CreateDirectory("Logs");
                 using (var sw = new StreamWriter("Logs/console_dump.txt", false))
                 {
@@ -99,6 +75,30 @@ public static class LogDumper
                         int mode = modeField != null ? (int)modeField.GetValue(logEntry) : 0;
                         sw.WriteLine($"[{mode}] {message.Replace("\n", " | ")}");
                     }
+                }
+
+                bool hasPackageManagerSingletonNoise = false;
+                bool hasRealWarningsOrErrors = false;
+
+                for (int i = 0; i < count; i++)
+                {
+                    getEntryInternalMethod.Invoke(null, new object[] { i, logEntry });
+                    string message = messageField?.GetValue(logEntry) as string ?? "";
+                    int mode = modeField != null ? (int)modeField.GetValue(logEntry) : 0;
+                    if (message.Contains("ScriptableSingleton already exists"))
+                    {
+                        hasPackageManagerSingletonNoise = true;
+                    }
+                    else if ((mode & (1 | 2 | 4)) != 0 || message.Contains("error CS") || message.Contains("warning CS"))
+                    {
+                        hasRealWarningsOrErrors = true;
+                    }
+                }
+
+                // Chỉ tự động dọn rác ScriptableSingleton nếu không có cảnh báo hay lỗi thật
+                if (hasPackageManagerSingletonNoise && !hasRealWarningsOrErrors && clearMethod != null)
+                {
+                    clearMethod.Invoke(null, null);
                 }
             }
         }

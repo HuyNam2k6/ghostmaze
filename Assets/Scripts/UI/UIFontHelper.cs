@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Helper cung cấp Font chữ sắc nét (Crisp Vector Fonts) và cấu hình CanvasScaler chống mờ trên bản build
+/// Helper cung cấp Font chữ siêu sắc nét (Crisp Vector Fonts) và cấu hình Canvas / CanvasScaler chống mờ trên bản build
 /// Thay thế hoàn toàn font bitmap mờ nhạt LegacyRuntime.ttf
 /// </summary>
 public static class UIFontHelper
@@ -12,10 +12,10 @@ public static class UIFontHelper
     /// <summary>
     /// Lấy font chữ sắc nét nhất có thể:
     /// 1. TrueType vector font trong Assets/Resources/Fonts/GameFont.ttf
-    /// 2. Font vector hệ thống Windows/Android (Segoe UI, Tahoma, Roboto, Arial)
+    /// 2. Font vector hệ thống Windows/Android/iOS (Segoe UI, Roboto, PingFang SC, Helvetica, Arial)
     /// 3. Fallback font nếu không có bất kỳ font nào
     /// </summary>
-    public static Font GetCrispFont(int targetSize = 24)
+    public static Font GetCrispFont(int targetSize = 36)
     {
         if (_cachedFont != null) return _cachedFont;
 
@@ -23,11 +23,14 @@ public static class UIFontHelper
         _cachedFont = Resources.Load<Font>("Fonts/GameFont");
         if (_cachedFont != null) return _cachedFont;
 
-        // 2. Thử nạp font hệ thống chất lượng cao hỗ trợ đầy đủ tiếng Việt có dấu
-        string[] osFontNames = new string[] { "Segoe UI", "Tahoma", "Roboto", "Arial", "Calibri", "Helvetica" };
+        // 2. Thử nạp font hệ thống chất lượng cao hỗ trợ đầy đủ tiếng Việt, tiếng Trung, tiếng Tây Ban Nha
+        string[] osFontNames = new string[] {
+            "Segoe UI", "Roboto", "Helvetica Neue", "PingFang SC", "Microsoft YaHei",
+            "Noto Sans", "Arial", "Calibri", "Tahoma"
+        };
         try
         {
-            _cachedFont = Font.CreateDynamicFontFromOSFont(osFontNames, targetSize > 0 ? targetSize : 24);
+            _cachedFont = Font.CreateDynamicFontFromOSFont(osFontNames, targetSize > 0 ? targetSize : 36);
         }
         catch
         {
@@ -37,7 +40,11 @@ public static class UIFontHelper
         if (_cachedFont != null) return _cachedFont;
 
         // 3. Fallback cuối cùng
-        _cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _cachedFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        if (_cachedFont == null)
+        {
+            _cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
         return _cachedFont;
     }
 
@@ -55,16 +62,55 @@ public static class UIFontHelper
     }
 
     /// <summary>
+    /// Cấu hình Canvas và CanvasScaler chuẩn Full HD 1080p, tắt pixelPerfect để tránh răng cưa subpixel và tăng dynamicPixelsPerUnit
+    /// </summary>
+    public static void ConfigureCrispCanvas(Canvas canvas, CanvasScaler scaler)
+    {
+        if (canvas != null)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            // TẮT pixelPerfect trên canvas scaled: Unity làm mờ chữ khi cố ép điểm ảnh float vào màn hình không nguyên
+            canvas.pixelPerfect = false;
+        }
+
+        if (scaler != null)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+            scaler.referencePixelsPerUnit = 100f;
+            scaler.dynamicPixelsPerUnit = 2.5f; // Tăng độ phân giải raster của font chữ lên 2.5 lần chống mờ
+        }
+    }
+
+    /// <summary>
     /// Cấu hình CanvasScaler chuẩn Full HD 1080p, bật dynamicPixelsPerUnit cao để font và icon luôn sắc nét 100%
     /// </summary>
     public static void ConfigureCrispCanvasScaler(CanvasScaler scaler)
     {
-        if (scaler == null) return;
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-        scaler.referencePixelsPerUnit = 100f;
-        scaler.dynamicPixelsPerUnit = 2.5f; // Tăng độ phân giải raster của font chữ lên 2.5 lần chống mờ
+        ConfigureCrispCanvas(null, scaler);
+    }
+
+    /// <summary>
+    /// Quét đệ quy toàn bộ Text trong GameObject và áp dụng Font sắc nét, tăng kích cỡ tối thiểu
+    /// </summary>
+    public static void ApplyCrispnessRecursively(GameObject root, int minFontSize = 14)
+    {
+        if (root == null) return;
+        Font crisp = GetCrispFont(36);
+        Text[] allTexts = root.GetComponentsInChildren<Text>(true);
+        for (int i = 0; i < allTexts.Length; i++)
+        {
+            Text t = allTexts[i];
+            if (t == null) continue;
+            t.font = crisp;
+            if (t.fontSize < minFontSize)
+            {
+                t.fontSize = minFontSize;
+            }
+            t.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+        }
     }
 }
