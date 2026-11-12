@@ -210,6 +210,8 @@ public class GameSettingsManager : MonoBehaviour
         {
             dashboardPanel.SetActive(false);
         }
+
+        BindAllDashboardButtons();
     }
 
     private void EnsureCameraRenderSafety()
@@ -264,6 +266,9 @@ public class GameSettingsManager : MonoBehaviour
 
         BindDashboardTexts();
 
+        // Gắn sự kiện cho toàn bộ các nút bấm trong Bảng Cài Đặt (Graphics, FPS, Close, Tabs)
+        BindAllDashboardButtons();
+
         GameLocalizationManager.OnLanguageChanged += HandleLanguageChanged;
         HandleLanguageChanged(GameLocalizationManager.CurrentLanguage);
 
@@ -305,6 +310,7 @@ public class GameSettingsManager : MonoBehaviour
 
         if (!visible)
         {
+            CloseDashboard();
             GameObject endBanner = GameObject.Find("EndGameResultBanner");
             if (endBanner != null) Destroy(endBanner);
 
@@ -321,6 +327,7 @@ public class GameSettingsManager : MonoBehaviour
         if (isLobby)
         {
             if (gearCornerButton != null) gearCornerButton.gameObject.SetActive(false);
+            CloseDashboard();
         }
         else
         {
@@ -486,9 +493,9 @@ public class GameSettingsManager : MonoBehaviour
 
     public bool IsInMatch()
     {
-        if (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.isRunning) return true;
-        if (FusionVietnameseLobbyUI.Instance != null && !FusionVietnameseLobbyUI.Instance.IsLobbyShowing()) return true;
-        return false;
+        string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (sceneName == "LobbyScene") return false;
+        return true;
     }
 
     public void ToggleDashboard()
@@ -516,6 +523,7 @@ public class GameSettingsManager : MonoBehaviour
 
         ApplyCrispnessToSettingsUI();
         BindDashboardTexts();
+        BindAllDashboardButtons(); // Đảm bảo mọi nút luôn được gán sự kiện click chính xác mỗi lần mở Dashboard
 
         if (dashboardPanel != null) dashboardPanel.SetActive(true);
         ThirdPersonCamera.isUIPanelOpen = true;
@@ -534,11 +542,17 @@ public class GameSettingsManager : MonoBehaviour
 
     private void ApplySettingsModeVisibility()
     {
-        bool isMatch = (currentMode == SettingsMode.InMatch);
+        bool isMatch = IsInMatch();
 
         // Trong trận: Ẩn Tab Âm thanh và Tab Ngôn ngữ, chỉ giữ Đồ họa & Điều khiển
         if (tabAudioButton != null) tabAudioButton.gameObject.SetActive(!isMatch);
         if (tabLanguageButton != null) tabLanguageButton.gameObject.SetActive(!isMatch);
+        if (tabAudioContent != null && isMatch) tabAudioContent.SetActive(false);
+        if (tabLanguageContent != null && isMatch) tabLanguageContent.SetActive(false);
+
+        // Luôn hiển thị Tab Đồ họa và Tab Điều khiển
+        if (tabGraphicsButton != null) tabGraphicsButton.gameObject.SetActive(true);
+        if (tabControlsButton != null) tabControlsButton.gameObject.SetActive(true);
 
         // Nếu đang ở Tab bị ẩn thì lập tức chuyển về Tab 0 (Đồ họa)
         if (isMatch && (currentActiveTab == 1 || currentActiveTab == 3))
@@ -552,19 +566,22 @@ public class GameSettingsManager : MonoBehaviour
             inMatchNoticeBanner.gameObject.SetActive(isMatch);
             if (isMatch)
             {
-                inMatchNoticeBanner.text = GameLocalizationManager.T("SETTINGS_INMATCH_NOTICE");
+                inMatchNoticeBanner.text = GameLocalizationManager.T("SETTINGS_INMATCH_NOTICE", "⚡ TRONG TRẬN: CHỈ ĐIỀU CHỈNH ĐỒ HỌA & ĐỘ NHẠY (VỀ SẢNH ĐỂ CÀI ĐẶT ĐẦY ĐỦ)");
             }
         }
     }
 
     private void EnsureInMatchNoticeBanner()
     {
-        if (dashboardPanel == null || inMatchNoticeBanner != null) return;
+        if (dashboardPanel == null) return;
 
         Transform existing = dashboardPanel.transform.Find("InMatchNoticeBanner");
         if (existing != null)
         {
-            inMatchNoticeBanner = existing.GetComponent<Text>();
+            inMatchNoticeBanner = existing.GetComponentInChildren<Text>();
+            var existingImg = existing.GetComponent<Image>();
+            if (existingImg != null) existingImg.raycastTarget = false;
+            if (inMatchNoticeBanner != null) inMatchNoticeBanner.raycastTarget = false;
             return;
         }
 
@@ -576,10 +593,11 @@ public class GameSettingsManager : MonoBehaviour
         rt.anchorMax = new Vector2(0.5f, 1f);
         rt.pivot = new Vector2(0.5f, 1f);
         rt.anchoredPosition = new Vector2(0f, -145f);
-        rt.sizeDelta = new Vector2(560f, 32f);
+        rt.sizeDelta = new Vector2(560f, 30f);
 
         Image bg = bannerGo.AddComponent<Image>();
         bg.color = new Color(0.85f, 0.45f, 0.08f, 0.25f);
+        bg.raycastTarget = false;
 
         Outline ol = bannerGo.AddComponent<Outline>();
         ol.effectColor = new Color(1.0f, 0.65f, 0.15f, 0.85f);
@@ -594,13 +612,13 @@ public class GameSettingsManager : MonoBehaviour
         trt.offsetMax = Vector2.zero;
 
         inMatchNoticeBanner = txtGo.AddComponent<Text>();
-        inMatchNoticeBanner.font = UIFontHelper.GetCrispFont(14);
-        inMatchNoticeBanner.fontSize = 14;
+        inMatchNoticeBanner.font = UIFontHelper.GetCrispFont(13);
+        inMatchNoticeBanner.fontSize = 13;
         inMatchNoticeBanner.fontStyle = FontStyle.Bold;
         inMatchNoticeBanner.alignment = TextAnchor.MiddleCenter;
         inMatchNoticeBanner.color = new Color(1.0f, 0.90f, 0.45f);
         inMatchNoticeBanner.raycastTarget = false;
-        inMatchNoticeBanner.text = GameLocalizationManager.T("SETTINGS_INMATCH_NOTICE");
+        inMatchNoticeBanner.text = GameLocalizationManager.T("SETTINGS_INMATCH_NOTICE", "⚡ TRONG TRẬN: CHỈ ĐIỀU CHỈNH ĐỒ HỌA & ĐỘ NHẠY (VỀ SẢNH ĐỂ CÀI ĐẶT ĐẦY ĐỦ)");
     }
 
     public void CloseDashboard()
@@ -614,6 +632,11 @@ public class GameSettingsManager : MonoBehaviour
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
+        else
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
     }
 
     public void SwitchTab(int tabIndex)
@@ -623,6 +646,11 @@ public class GameSettingsManager : MonoBehaviour
         if (tabAudioContent != null) tabAudioContent.SetActive(tabIndex == 1);
         if (tabControlsContent != null) tabControlsContent.SetActive(tabIndex == 2);
         if (tabLanguageContent != null) tabLanguageContent.SetActive(tabIndex == 3);
+
+        if (tabIndex == 3)
+        {
+            RefreshLanguageTabVisuals();
+        }
 
         // Highlight tab đang chọn
         SetTabButtonStyle(tabGraphicsButton, tabIndex == 0, new Color(0.18f, 0.45f, 0.75f));
@@ -762,6 +790,8 @@ public class GameSettingsManager : MonoBehaviour
                            (currentTargetFPS <= 0 ? "<color=#2ECC71>" + GameLocalizationManager.T("SETTINGS_FPS_UNLIMITED") + "</color>" : $"<color=#2ECC71>{currentTargetFPS} FPS</color>");
             fpsStatusText.text = $"Mục Tiêu FPS: {fpsStr}";
         }
+
+        UpdateGraphicsAndFPSButtonHighlights();
     }
 
     // =========================================================================
@@ -989,98 +1019,100 @@ public class GameSettingsManager : MonoBehaviour
 
         if (tabGraphicsButton != null)
         {
+            tabGraphicsButton.onClick.RemoveAllListeners();
+            tabGraphicsButton.onClick.AddListener(() => SwitchTab(0));
             tabGraphicsBtnText = tabGraphicsButton.GetComponentInChildren<Text>();
             if (tabGraphicsBtnText != null) tabGraphicsBtnText.raycastTarget = false;
         }
         if (tabAudioButton != null)
         {
+            tabAudioButton.onClick.RemoveAllListeners();
+            tabAudioButton.onClick.AddListener(() => SwitchTab(1));
             tabAudioBtnText = tabAudioButton.GetComponentInChildren<Text>();
             if (tabAudioBtnText != null) tabAudioBtnText.raycastTarget = false;
         }
         if (tabControlsButton != null)
         {
+            tabControlsButton.onClick.RemoveAllListeners();
+            tabControlsButton.onClick.AddListener(() => SwitchTab(2));
             tabControlsBtnText = tabControlsButton.GetComponentInChildren<Text>();
             if (tabControlsBtnText != null) tabControlsBtnText.raycastTarget = false;
         }
 
-        if (tabLanguageButton == null)
+        Transform existingBtn = tabParent.Find("Tab_Language");
+        if (existingBtn != null)
         {
-            Transform existingBtn = tabParent.Find("Tab_Language");
-            if (existingBtn != null)
-            {
-                tabLanguageButton = existingBtn.GetComponent<Button>();
-                tabLanguageBtnText = existingBtn.GetComponentInChildren<Text>();
-                if (tabLanguageBtnText != null) tabLanguageBtnText.raycastTarget = false;
-            }
-            else
-            {
-                GameObject tabLangGo = new GameObject("Tab_Language");
-                tabLangGo.transform.SetParent(tabParent, false);
+            tabLanguageButton = existingBtn.GetComponent<Button>();
+            tabLanguageBtnText = existingBtn.GetComponentInChildren<Text>();
+            if (tabLanguageBtnText != null) tabLanguageBtnText.raycastTarget = false;
+        }
+        else
+        {
+            GameObject tabLangGo = new GameObject("Tab_Language");
+            tabLangGo.transform.SetParent(tabParent, false);
 
-                RectTransform rt = tabLangGo.AddComponent<RectTransform>();
-                rt.sizeDelta = new Vector2(135f, 46f);
+            RectTransform rt = tabLangGo.AddComponent<RectTransform>();
+            rt.sizeDelta = new Vector2(135f, 46f);
 
-                Image bg = tabLangGo.AddComponent<Image>();
-                bg.color = new Color(0.12f, 0.16f, 0.24f, 0.90f);
-                bg.raycastTarget = true;
+            Image bg = tabLangGo.AddComponent<Image>();
+            bg.color = new Color(0.12f, 0.16f, 0.24f, 0.90f);
+            bg.raycastTarget = true;
 
-                Outline ol = tabLangGo.AddComponent<Outline>();
-                ol.effectColor = new Color(1f, 1f, 1f, 0.4f);
-                ol.effectDistance = new Vector2(1.5f, -1.5f);
+            Outline ol = tabLangGo.AddComponent<Outline>();
+            ol.effectColor = new Color(1f, 1f, 1f, 0.4f);
+            ol.effectDistance = new Vector2(1.5f, -1.5f);
 
-                tabLanguageButton = tabLangGo.AddComponent<Button>();
-                tabLanguageButton.targetGraphic = bg;
-                Navigation nav = tabLanguageButton.navigation;
-                nav.mode = Navigation.Mode.None;
-                tabLanguageButton.navigation = nav;
+            tabLanguageButton = tabLangGo.AddComponent<Button>();
+            tabLanguageButton.targetGraphic = bg;
+            Navigation nav = tabLanguageButton.navigation;
+            nav.mode = Navigation.Mode.None;
+            tabLanguageButton.navigation = nav;
 
-                GameObject txtGo = new GameObject("Text");
-                txtGo.transform.SetParent(tabLangGo.transform, false);
-                RectTransform trt = txtGo.AddComponent<RectTransform>();
-                trt.anchorMin = Vector2.zero;
-                trt.anchorMax = Vector2.one;
-                trt.offsetMin = Vector2.zero;
-                trt.offsetMax = Vector2.zero;
+            GameObject txtGo = new GameObject("Text");
+            txtGo.transform.SetParent(tabLangGo.transform, false);
+            RectTransform trt = txtGo.AddComponent<RectTransform>();
+            trt.anchorMin = Vector2.zero;
+            trt.anchorMax = Vector2.one;
+            trt.offsetMin = Vector2.zero;
+            trt.offsetMax = Vector2.zero;
 
-                tabLanguageBtnText = txtGo.AddComponent<Text>();
-                tabLanguageBtnText.font = UIFontHelper.GetCrispFont(15);
-                tabLanguageBtnText.text = GameLocalizationManager.T("SETTINGS_TAB_LANGUAGE", "🌐 Ngôn Ngữ");
-                tabLanguageBtnText.fontSize = 15;
-                tabLanguageBtnText.fontStyle = FontStyle.Bold;
-                tabLanguageBtnText.alignment = TextAnchor.MiddleCenter;
-                tabLanguageBtnText.color = Color.white;
-                tabLanguageBtnText.raycastTarget = false;
-            }
-            if (tabLanguageButton != null)
-            {
-                tabLanguageButton.onClick.RemoveAllListeners();
-                tabLanguageButton.onClick.AddListener(() => SwitchTab(3));
-            }
+            tabLanguageBtnText = txtGo.AddComponent<Text>();
+            tabLanguageBtnText.font = UIFontHelper.GetCrispFont(15);
+            tabLanguageBtnText.text = GameLocalizationManager.T("SETTINGS_TAB_LANGUAGE", "🌐 Ngôn Ngữ");
+            tabLanguageBtnText.fontSize = 15;
+            tabLanguageBtnText.fontStyle = FontStyle.Bold;
+            tabLanguageBtnText.alignment = TextAnchor.MiddleCenter;
+            tabLanguageBtnText.color = Color.white;
+            tabLanguageBtnText.raycastTarget = false;
+        }
+
+        if (tabLanguageButton != null)
+        {
+            tabLanguageButton.onClick.RemoveAllListeners();
+            tabLanguageButton.onClick.AddListener(() => SwitchTab(3));
         }
 
         Transform contentParent = tabGraphicsContent.transform.parent;
-        if (contentParent != null && tabLanguageContent == null)
+        if (contentParent != null)
         {
             Transform existingContent = contentParent.Find("TabContent_Language");
             if (existingContent != null)
             {
-                tabLanguageContent = existingContent.gameObject;
+                DestroyImmediate(existingContent.gameObject);
             }
-            else
-            {
-                tabLanguageContent = new GameObject("TabContent_Language");
-                tabLanguageContent.transform.SetParent(contentParent, false);
 
-                RectTransform cRt = tabLanguageContent.AddComponent<RectTransform>();
-                cRt.anchorMin = Vector2.zero;
-                cRt.anchorMax = Vector2.one;
-                cRt.offsetMin = Vector2.zero;
-                cRt.offsetMax = Vector2.zero;
-                cRt.pivot = new Vector2(0.5f, 0.5f);
+            tabLanguageContent = new GameObject("TabContent_Language");
+            tabLanguageContent.transform.SetParent(contentParent, false);
 
-                BuildLanguageTabElements(tabLanguageContent.transform);
-                tabLanguageContent.SetActive(false);
-            }
+            RectTransform cRt = tabLanguageContent.AddComponent<RectTransform>();
+            cRt.anchorMin = Vector2.zero;
+            cRt.anchorMax = Vector2.one;
+            cRt.offsetMin = Vector2.zero;
+            cRt.offsetMax = Vector2.zero;
+            cRt.pivot = new Vector2(0.5f, 0.5f);
+
+            BuildLanguageTabElements(tabLanguageContent.transform);
+            tabLanguageContent.SetActive(false);
         }
     }
 
@@ -1136,10 +1168,12 @@ public class GameSettingsManager : MonoBehaviour
             Navigation cnav = cbtn.navigation;
             cnav.mode = Navigation.Mode.None;
             cbtn.navigation = cnav;
+            cbtn.onClick.RemoveAllListeners();
             cbtn.onClick.AddListener(() =>
             {
-                Debug.Log($"[GameSettingsManager] Người chơi chọn ngôn ngữ: {(GameLocalizationManager.Language)langIndex}");
+                Debug.Log($"[GameSettingsManager] Select language: {(GameLocalizationManager.Language)langIndex}");
                 GameLocalizationManager.SetLanguage((GameLocalizationManager.Language)langIndex);
+                RefreshLanguageTabVisuals();
             });
             langOptionButtons[i] = cbtn;
 
@@ -1349,9 +1383,188 @@ public class GameSettingsManager : MonoBehaviour
             {
                 rt.sizeDelta = new Vector2(620f, 0f);
             }
+
+            UIFontHelper.ApplyCrispnessRecursively(dashboardPanel, 15);
+            UpgradeDashboardVisualClarity();
+        }
+    }
+
+    /// <summary>
+    /// Gắn sự kiện OnClick cho toàn bộ các nút trong Bảng Cài Đặt (Graphics, FPS, Tabs, Close, Mute, InvertY)
+    /// Đảm bảo dù Panel được load từ Scene hay tạo ở runtime đều 100% phản hồi click mượt mà
+    /// </summary>
+    public void BindAllDashboardButtons()
+    {
+        if (dashboardPanel == null) return;
+        Transform d = dashboardPanel.transform;
+
+        // 1. Nút Đóng Dashboard ('✕' góc trên và thanh to 'ĐÓNG CÀI ĐẶT' dưới đáy)
+        BindButton(FindButton(d, "CloseDashboardButton") ?? closeDashboardButton, CloseDashboard);
+        BindButton(FindButton(d, "Btn_CloseBottom"), CloseDashboard);
+
+        // 2. Chuyển Tab
+        BindButton(FindButton(d, "TabGroup/Tab_Graphics") ?? FindButton(d, "Tab_Graphics") ?? tabGraphicsButton, () => SwitchTab(0));
+        BindButton(FindButton(d, "TabGroup/Tab_Audio") ?? FindButton(d, "Tab_Audio") ?? tabAudioButton, () => SwitchTab(1));
+        BindButton(FindButton(d, "TabGroup/Tab_Controls") ?? FindButton(d, "Tab_Controls") ?? tabControlsButton, () => SwitchTab(2));
+        BindButton(FindButton(d, "TabGroup/Tab_Language") ?? FindButton(d, "Tab_Language") ?? tabLanguageButton, () => SwitchTab(3));
+
+        // 3. Tab Đồ Họa (Graphics)
+        BindButton(FindButton(d, "Btn_BoostGraphics"), () => ApplyGraphicsUltra(true));
+        BindButton(FindButton(d, "Btn_G_Ultra"), () => ApplyGraphicsUltra(true));
+        BindButton(FindButton(d, "Btn_G_Med"), () => ApplyGraphicsMedium(true));
+        BindButton(FindButton(d, "Btn_G_Low"), () => ApplyGraphicsLow(true));
+
+        // 4. Tab FPS Boost
+        BindButton(FindButton(d, "Btn_BoostFPS"), ApplyMaxFPS);
+        BindButton(FindButton(d, "Btn_F_Max"), ApplyMaxFPS);
+        BindButton(FindButton(d, "Btn_F_120"), Apply120FPS);
+        BindButton(FindButton(d, "Btn_F_60"), Apply60FPS);
+        BindButton(FindButton(d, "Btn_F_VSync"), ToggleVSync);
+
+        // 5. Tab Âm Thanh
+        BindButton(FindButton(d, "Btn_Mute") ?? muteButton, ToggleMute);
+
+        // 6. Tab Điều Khiển
+        BindButton(FindButton(d, "Btn_InvertY") ?? invertYButton, ToggleInvertY);
+
+        // 7. Nút Bánh Răng ở góc (nếu có)
+        if (gearCornerButton != null)
+        {
+            BindButton(gearCornerButton, ToggleDashboard);
         }
 
-        UIFontHelper.ApplyCrispnessRecursively(gameObject, 15);
+        UpdateGraphicsAndFPSButtonHighlights();
+    }
+
+    private Button FindButton(Transform root, string nameOrPath)
+    {
+        if (root == null || string.IsNullOrEmpty(nameOrPath)) return null;
+
+        // Thử tìm theo đường dẫn trực tiếp
+        Transform t = root.Find(nameOrPath);
+        if (t != null)
+        {
+            var btn = t.GetComponent<Button>();
+            if (btn != null) return btn;
+        }
+
+        // Tách tên thuần (không có path)
+        string pureName = nameOrPath;
+        int slashIdx = pureName.LastIndexOf('/');
+        if (slashIdx >= 0) pureName = pureName.Substring(slashIdx + 1);
+
+        // Tìm đệ quy trong toàn bộ cây con
+        Button[] allButtons = root.GetComponentsInChildren<Button>(true);
+        for (int i = 0; i < allButtons.Length; i++)
+        {
+            if (allButtons[i] != null && allButtons[i].gameObject.name == pureName)
+            {
+                return allButtons[i];
+            }
+        }
+        return null;
+    }
+
+    private void BindButton(Button btn, UnityEngine.Events.UnityAction action)
+    {
+        if (btn == null || action == null) return;
+        btn.onClick.RemoveAllListeners();
+        btn.onClick.AddListener(action);
+
+        // Đảm bảo Graphic của Button có raycastTarget = true để bắt trúng click
+        var img = btn.GetComponent<Image>();
+        if (img != null)
+        {
+            img.raycastTarget = true;
+        }
+        btn.interactable = true;
+
+        // Đảm bảo mọi Text con KHÔNG chặn chuột
+        Text[] childTexts = btn.GetComponentsInChildren<Text>(true);
+        for (int i = 0; i < childTexts.Length; i++)
+        {
+            if (childTexts[i] != null) childTexts[i].raycastTarget = false;
+        }
+    }
+
+    private void UpdateGraphicsAndFPSButtonHighlights()
+    {
+        if (dashboardPanel == null) return;
+        Transform d = dashboardPanel.transform;
+
+        // Đồ họa: Ultra, Med, Low
+        SetButtonHighlight(FindButton(d, "Btn_G_Ultra"), currentGraphics == GraphicsLevel.Ultra, new Color(0.18f, 0.52f, 0.88f), new Color(0.14f, 0.22f, 0.32f));
+        SetButtonHighlight(FindButton(d, "Btn_G_Med"), currentGraphics == GraphicsLevel.Medium, new Color(0.18f, 0.52f, 0.88f), new Color(0.14f, 0.22f, 0.32f));
+        SetButtonHighlight(FindButton(d, "Btn_G_Low"), currentGraphics == GraphicsLevel.Low, new Color(0.18f, 0.52f, 0.88f), new Color(0.14f, 0.22f, 0.32f));
+
+        // FPS: Max, 120, 60, VSync
+        SetButtonHighlight(FindButton(d, "Btn_F_Max"), !isVSyncEnabled && currentTargetFPS <= 0, new Color(0.15f, 0.65f, 0.38f), new Color(0.14f, 0.22f, 0.32f));
+        SetButtonHighlight(FindButton(d, "Btn_F_120"), !isVSyncEnabled && currentTargetFPS == highFPS, new Color(0.15f, 0.65f, 0.38f), new Color(0.14f, 0.22f, 0.32f));
+        SetButtonHighlight(FindButton(d, "Btn_F_60"), !isVSyncEnabled && currentTargetFPS == standardFPS, new Color(0.15f, 0.65f, 0.38f), new Color(0.14f, 0.22f, 0.32f));
+        SetButtonHighlight(FindButton(d, "Btn_F_VSync"), isVSyncEnabled, new Color(0.18f, 0.52f, 0.88f), new Color(0.14f, 0.22f, 0.32f));
+    }
+
+    private void SetButtonHighlight(Button btn, bool isActive, Color activeColor, Color normalColor)
+    {
+        if (btn == null) return;
+        var img = btn.GetComponent<Image>();
+        if (img != null)
+        {
+            img.color = isActive ? activeColor : normalColor;
+        }
+        var colors = btn.colors;
+        colors.normalColor = isActive ? activeColor : normalColor;
+        colors.highlightedColor = isActive ? (activeColor * 1.15f) : (normalColor * 1.25f);
+        colors.pressedColor = isActive ? (activeColor * 0.85f) : (normalColor * 0.85f);
+        colors.selectedColor = colors.normalColor;
+        btn.colors = colors;
+    }
+
+    private void UpgradeDashboardVisualClarity()
+    {
+        if (dashboardPanel == null) return;
+        Transform d = dashboardPanel.transform;
+
+        Text title = FindText(d, "DashTitle");
+        if (title != null)
+        {
+            title.fontSize = 22;
+            title.fontStyle = FontStyle.Bold;
+            title.color = new Color(1f, 0.88f, 0.40f, 1f);
+        }
+
+        Text subtitle = FindText(d, "DashSubtitle");
+        if (subtitle != null)
+        {
+            subtitle.fontSize = 14;
+            subtitle.color = new Color(0.70f, 0.88f, 1f, 0.85f);
+        }
+
+        UpgradeButtonText(FindButton(d, "Btn_BoostGraphics"), 16, FontStyle.Bold);
+        UpgradeButtonText(FindButton(d, "Btn_G_Ultra"), 15, FontStyle.Bold);
+        UpgradeButtonText(FindButton(d, "Btn_G_Med"), 15, FontStyle.Bold);
+        UpgradeButtonText(FindButton(d, "Btn_G_Low"), 15, FontStyle.Bold);
+
+        UpgradeButtonText(FindButton(d, "Btn_BoostFPS"), 16, FontStyle.Bold);
+        UpgradeButtonText(FindButton(d, "Btn_F_Max"), 15, FontStyle.Bold);
+        UpgradeButtonText(FindButton(d, "Btn_F_120"), 15, FontStyle.Bold);
+        UpgradeButtonText(FindButton(d, "Btn_F_60"), 15, FontStyle.Bold);
+        UpgradeButtonText(FindButton(d, "Btn_F_VSync"), 15, FontStyle.Bold);
+
+        UpgradeButtonText(FindButton(d, "Btn_CloseBottom"), 16, FontStyle.Bold);
+    }
+
+    private void UpgradeButtonText(Button btn, int fontSize, FontStyle style)
+    {
+        if (btn == null) return;
+        Text t = btn.GetComponentInChildren<Text>(true);
+        if (t != null)
+        {
+            t.fontSize = fontSize;
+            t.fontStyle = style;
+            t.color = Color.white;
+            t.raycastTarget = false;
+        }
     }
 
     // =========================================================================

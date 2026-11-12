@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -24,6 +25,7 @@ public class PumpkinGhostAI : MonoBehaviour
     public bool virtualLeapHeld = false;
     public bool virtualVanishTriggered = false;
     public bool virtualSprintHeld = false;
+    public bool virtualDisguiseTriggered = false;
 
     public void SetVirtualMove(Vector2 dir)
     {
@@ -33,6 +35,11 @@ public class PumpkinGhostAI : MonoBehaviour
     public void SetVirtualSprint(bool held)
     {
         virtualSprintHeld = held;
+    }
+
+    public void TriggerVirtualDisguise()
+    {
+        virtualDisguiseTriggered = true;
     }
 
     public void TriggerVirtualAttack()
@@ -105,6 +112,23 @@ public class PumpkinGhostAI : MonoBehaviour
     public Light freezeLight;
     [Tooltip("Màu ánh sáng khi bị khóa (Mặc định: Xanh lam băng giá)")]
     public Color freezeVFXColor = new Color(0.2f, 0.75f, 1.0f);
+
+    [Header("7. Kỹ Năng: Biến Hình Ngụy Trang (Prop Disguise - Tối Đa 15s)")]
+    [Tooltip("Đang trong trạng thái biến hình thành vật thể")]
+    public bool isDisguised = false;
+    [Tooltip("Thời gian biến hình còn lại (giây)")]
+    public float disguiseTimeRemaining = 0f;
+    [Tooltip("Tên vật thể đang ngụy trang thành")]
+    public string disguisedPropName = "";
+    [Tooltip("Thời gian hồi chiêu biến hình (giây)")]
+    public float disguiseCooldown = 5.0f;
+    private float lastDisguiseEndTime = -10f;
+    public const float DISGUISE_MAX_DURATION = 15.0f;
+    private GameObject disguisePropVisualObj;
+    private MeshFilter disguiseMeshFilter;
+    private MeshRenderer disguiseMeshRenderer;
+    private static Text s_GhostNoticeText;
+    private static float s_GhostNoticeTimer = 0f;
 
     /// <summary>
     /// Trạng thái ma được phép đi săn: Ban đầu ở sảnh và trong 30s đầu (Người đang tản ra trốn) = false.
@@ -204,6 +228,7 @@ public class PumpkinGhostAI : MonoBehaviour
             config = runtimeConfigInstance;
         }
 
+        EnsureDisguiseVisualObj();
         CacheBodyRenderers();
         spawnPosition = transform.position;
         ApplyColliderSettingsFromConfig();
@@ -286,7 +311,8 @@ public class PumpkinGhostAI : MonoBehaviour
             Renderer r = all[i];
             if (r == null) continue;
             if (freezeVFXRoot != null && r.transform.IsChildOf(freezeVFXRoot.transform)) continue;
-            if (r.name.StartsWith("MagicBindingRing")) continue;
+            if (disguisePropVisualObj != null && r.transform.IsChildOf(disguisePropVisualObj.transform)) continue;
+            if (r.name.StartsWith("MagicBindingRing") || r.name.StartsWith("GhostDisguisePropVisual")) continue;
             list.Add(r);
         }
         cachedBodyRenderers = list.ToArray();
@@ -367,6 +393,17 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private void Update()
     {
+        UpdateGhostNoticeTimer();
+
+        if (isDisguised)
+        {
+            disguiseTimeRemaining -= Time.deltaTime;
+            if (disguiseTimeRemaining <= 0f)
+            {
+                CancelDisguise("Hết thời gian 15s");
+            }
+        }
+
         if (!isPlayerControlled)
         {
             if (!enableSoloBotAI) return;
@@ -488,6 +525,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private void EnterSuspiciousState()
     {
+        if (isDisguised) CancelDisguise("Phát hiện con người");
         currentState = GhostState.Suspicious;
         stateTimer = 0f;
         currentMoveSpeed = 0f;
@@ -519,6 +557,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private void EnterChaseState()
     {
+        if (isDisguised) CancelDisguise("Lao vào săn đuổi con người");
         currentState = GhostState.Chase;
         SetEyeColor(config.aggroEyeColor);
         SetEyeIntensity(config.aggroEyeIntensity);
@@ -1804,18 +1843,36 @@ public class PumpkinGhostAI : MonoBehaviour
 
             float baseSpeed = config != null ? config.chaseSpeed : 5.5f;
             float targetSpeed = isSprinting ? baseSpeed * 1.35f : baseSpeed;
+            if (isDisguised) targetSpeed *= 0.85f;
 
             currentMoveSpeed = Mathf.MoveTowards(currentMoveSpeed, targetSpeed, (config != null ? config.acceleration : 14f) * Time.deltaTime);
             SafeMove(moveDirection * (currentMoveSpeed * Time.deltaTime));
 
-            SetAnimatorSpeed(currentMoveSpeed);
-            PlayAnimState("Run", 0.15f);
+            if (!isDisguised)
+            {
+                SetAnimatorSpeed(currentMoveSpeed);
+                PlayAnimState("Run", 0.15f);
+            }
+            else
+            {
+                SetAnimatorSpeed(0f);
+            }
         }
         else
         {
             currentMoveSpeed = Mathf.MoveTowards(currentMoveSpeed, 0f, (config != null ? config.acceleration : 14f) * 1.5f * Time.deltaTime);
             SetAnimatorSpeed(0f);
-            PlayAnimState("Idle", 0.15f);
+            if (!isDisguised)
+            {
+                PlayAnimState("Idle", 0.15f);
+            }
+        }
+
+        // Kỹ năng: Phím R hoặc Virtual Disguise = Biến hình thành vật đứng cạnh / Hủy biến hình
+        if (ReadPlayerDisguiseInputDown())
+        {
+            TriggerDisguiseOrCancel();
+            return;
         }
 
         // Kỹ năng: Chuột trái = Cào xé (Attack) - Cooldown 0.25s theo yêu cầu
@@ -1823,6 +1880,10 @@ public class PumpkinGhostAI : MonoBehaviour
         bool wantsToAttack = ReadPlayerAttackInputDown() || ReadPlayerAttackInputHold();
         if (wantsToAttack)
         {
+            if (isDisguised)
+            {
+                CancelDisguise("Tấn công cào xé");
+            }
             if (VirtualJoystickTouchUI.Instance != null)
             {
                 VirtualJoystickTouchUI.Instance.CancelAutoRun();
@@ -1839,6 +1900,10 @@ public class PumpkinGhostAI : MonoBehaviour
         bool wantsToLeap = ReadPlayerLeapInputDown() || ReadPlayerLeapInputHold() || playerJumpBufferTimer > 0f;
         if (wantsToLeap && isGrounded && !isLeaping && Time.time >= lastLeapTime + 0.1f)
         {
+            if (isDisguised)
+            {
+                CancelDisguise("Nhảy vồ");
+            }
             playerJumpBufferTimer = 0f;
             StartAction(RoutinePlayerControlledLeap(moveDirection));
             return;
@@ -2160,6 +2225,311 @@ public class PumpkinGhostAI : MonoBehaviour
         if ((allowMouse && Input.GetMouseButtonDown(1)) || Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.F)) return true;
 #endif
         return false;
+    }
+
+    private bool ReadPlayerDisguiseInputDown()
+    {
+        if (virtualDisguiseTriggered)
+        {
+            virtualDisguiseTriggered = false;
+            return true;
+        }
+
+        if (ThirdPersonCamera.isUIPanelOpen) return false;
+#if ENABLE_INPUT_SYSTEM
+        var kb = Keyboard.current;
+        if (kb != null && (kb.rKey.wasPressedThisFrame || kb.gKey.wasPressedThisFrame)) return true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.G)) return true;
+#endif
+        return false;
+    }
+
+    // =========================================================================
+    // 8. HỆ THỐNG BIẾN HÌNH THÀNH VẬT THỂ (PROP DISGUISE - 15S)
+    // =========================================================================
+
+    public void EnsureDisguiseVisualObj()
+    {
+        if (disguisePropVisualObj == null)
+        {
+            disguisePropVisualObj = new GameObject("GhostDisguisePropVisual");
+            disguisePropVisualObj.transform.SetParent(transform, false);
+            disguisePropVisualObj.transform.localPosition = Vector3.zero;
+            disguisePropVisualObj.transform.localRotation = Quaternion.identity;
+            disguiseMeshFilter = disguisePropVisualObj.AddComponent<MeshFilter>();
+            disguiseMeshRenderer = disguisePropVisualObj.AddComponent<MeshRenderer>();
+            disguisePropVisualObj.SetActive(false);
+        }
+    }
+
+    public void TriggerDisguiseOrCancel()
+    {
+        if (isDisguised)
+        {
+            CancelDisguise("Người chơi chủ động hủy");
+            return;
+        }
+
+        float timeSinceLast = Time.time - lastDisguiseEndTime;
+        if (timeSinceLast < disguiseCooldown)
+        {
+            float waitSec = Mathf.Ceil(disguiseCooldown - timeSinceLast);
+            ShowGhostHUDNotice($"⚠️ Kỹ năng Biến Hình đang hồi chiêu (còn {waitSec}s)!", new Color(1f, 0.75f, 0.2f, 1f));
+            return;
+        }
+
+        ActivateDisguise();
+    }
+
+    public bool ActivateDisguise()
+    {
+        EnsureDisguiseVisualObj();
+
+        if (!FindNearbyPropForDisguise(5.0f, out Mesh mesh, out Material[] mats, out Vector3 worldScale, out string propName))
+        {
+            ShowGhostHUDNotice("⚠️ Không tìm thấy vật thể nào ở gần (dưới 5m) để biến hình!", new Color(1f, 0.4f, 0.4f, 1f));
+            return false;
+        }
+
+        isDisguised = true;
+        disguiseTimeRemaining = DISGUISE_MAX_DURATION;
+        disguisedPropName = propName;
+
+        disguiseMeshFilter.sharedMesh = mesh;
+        disguiseMeshRenderer.sharedMaterials = mats;
+
+        Vector3 myScale = transform.lossyScale;
+        float sx = Mathf.Approximately(myScale.x, 0f) ? 1f : (worldScale.x / myScale.x);
+        float sy = Mathf.Approximately(myScale.y, 0f) ? 1f : (worldScale.y / myScale.y);
+        float sz = Mathf.Approximately(myScale.z, 0f) ? 1f : (worldScale.z / myScale.z);
+        disguisePropVisualObj.transform.localScale = new Vector3(Mathf.Abs(sx), Mathf.Abs(sy), Mathf.Abs(sz));
+        disguisePropVisualObj.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+
+        SetGhostBodyVisible(false);
+        SetEyeIntensity(0f);
+        disguisePropVisualObj.SetActive(true);
+
+        if (audioSource != null && vanishClip != null)
+        {
+            audioSource.PlayOneShot(vanishClip);
+        }
+
+        ShowGhostHUDNotice($"🎭 ĐÃ BIẾN HÌNH THÀNH: {propName.ToUpper()} (15s)\n[R]: Hủy biến hình  |  [Chuột trái / Space]: Vồ bất ngờ!", new Color(0.35f, 1f, 0.65f, 1f), 3.5f);
+
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.BroadcastGhostDisguise(true, propName, disguisePropVisualObj.transform.localScale);
+        }
+
+        return true;
+    }
+
+    public void CancelDisguise(string reason = "")
+    {
+        if (!isDisguised) return;
+
+        isDisguised = false;
+        disguiseTimeRemaining = 0f;
+        lastDisguiseEndTime = Time.time;
+
+        if (disguisePropVisualObj != null)
+        {
+            disguisePropVisualObj.SetActive(false);
+        }
+
+        SetGhostBodyVisible(true);
+        SetEyeColor(new Color(1f, 0.45f, 0.05f));
+        SetEyeIntensity(config != null ? config.aggroEyeIntensity * 1.25f : 3.5f);
+
+        if (audioSource != null && aggroScreechClip != null)
+        {
+            audioSource.PlayOneShot(aggroScreechClip);
+        }
+
+        string msg = string.IsNullOrEmpty(reason)
+            ? "✕ ĐÃ HỦY BIẾN HÌNH - Trở lại hình dạng Ma Bí Ngô!"
+            : $"✕ HỦY BIẾN HÌNH ({reason}) - Trở lại hình dạng Ma Bí Ngô!";
+        ShowGhostHUDNotice(msg, new Color(1f, 0.7f, 0.25f, 1f), 2.0f);
+
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.BroadcastGhostDisguise(false, "", Vector3.one);
+        }
+    }
+
+    public bool FindNearbyPropForDisguise(float maxDistance, out Mesh propMesh, out Material[] propMaterials, out Vector3 worldScale, out string propName)
+    {
+        propMesh = null;
+        propMaterials = null;
+        worldScale = Vector3.one;
+        propName = "";
+
+        Vector3 myPos = transform.position;
+        Collider[] hits = Physics.OverlapSphere(myPos, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+
+        Transform bestTransform = null;
+        float bestDist = float.MaxValue;
+        Mesh bestMesh = null;
+        Material[] bestMats = null;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider col = hits[i];
+            if (col == null) continue;
+            Transform t = col.transform;
+            if (t == transform || t.IsChildOf(transform)) continue;
+            if (targetPlayer != null && (t == targetPlayer || t.IsChildOf(targetPlayer))) continue;
+            if (col.CompareTag("Player") || col.GetComponentInParent<CharacterController>() != null) continue;
+
+            MeshFilter mf = t.GetComponent<MeshFilter>() ?? t.GetComponentInChildren<MeshFilter>() ?? t.GetComponentInParent<MeshFilter>();
+            MeshRenderer mr = t.GetComponent<MeshRenderer>() ?? t.GetComponentInChildren<MeshRenderer>() ?? t.GetComponentInParent<MeshRenderer>();
+
+            if (mf != null && mr != null && mf.sharedMesh != null && mr.sharedMaterials != null && mr.sharedMaterials.Length > 0)
+            {
+                Bounds b = mf.sharedMesh.bounds;
+                if (b.size.x > 12f || b.size.z > 12f || b.size.y > 8f) continue;
+                string lowerName = t.name.ToLower();
+                if (lowerName.Contains("terrain") || lowerName.Contains("ground") || lowerName.Contains("floor") || lowerName.Contains("boundary")) continue;
+
+                float dist = Vector3.Distance(myPos, t.position);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestTransform = t;
+                    bestMesh = mf.sharedMesh;
+                    bestMats = mr.sharedMaterials;
+                }
+            }
+        }
+
+        if (bestTransform == null)
+        {
+            MeshFilter[] allSceneMf = Object.FindObjectsByType<MeshFilter>();
+            for (int i = 0; i < allSceneMf.Length; i++)
+            {
+                MeshFilter mf = allSceneMf[i];
+                if (mf == null || mf.sharedMesh == null) continue;
+                Transform t = mf.transform;
+                if (t == transform || t.IsChildOf(transform)) continue;
+                if (targetPlayer != null && (t == targetPlayer || t.IsChildOf(targetPlayer))) continue;
+
+                string lower = t.name.ToLower();
+                if (lower.Contains("tombstone") || lower.Contains("grave") || lower.Contains("coffin") || lower.Contains("prop"))
+                {
+                    MeshRenderer mr = t.GetComponent<MeshRenderer>();
+                    if (mr != null && mr.sharedMaterials != null && mr.sharedMaterials.Length > 0)
+                    {
+                        float dist = Vector3.Distance(myPos, t.position);
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            bestTransform = t;
+                            bestMesh = mf.sharedMesh;
+                            bestMats = mr.sharedMaterials;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (bestTransform != null && bestMesh != null && bestMats != null)
+        {
+            propMesh = bestMesh;
+            propMaterials = bestMats;
+            worldScale = bestTransform.lossyScale;
+            propName = FormatFriendlyPropName(bestTransform.name);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string FormatFriendlyPropName(string rawName)
+    {
+        if (string.IsNullOrEmpty(rawName)) return "Bia Mộ Cổ";
+        string lower = rawName.ToLower();
+        if (lower.Contains("tombstone_cross") || lower.Contains("cross")) return "Bia Mộ Thánh Giá";
+        if (lower.Contains("tombstone") || lower.Contains("grave")) return "Bia Mộ Nghĩa Trang";
+        if (lower.Contains("coffin")) return "Quan Tài Cổ";
+        if (lower.Contains("pillar") || lower.Contains("column")) return "Cột Đá Cổ";
+        if (lower.Contains("lantern") || lower.Contains("lamp")) return "Đèn Lồng Cổ";
+        if (lower.Contains("fence")) return "Hàng Rào Sắt";
+        if (lower.Contains("statue")) return "Tượng Đá Bí Ẩn";
+        if (lower.Contains("rock") || lower.Contains("stone")) return "Khối Đá Nghĩa Địa";
+        if (lower.Contains("bush") || lower.Contains("tree")) return "Bụi Cây Héo";
+
+        string clean = System.Text.RegularExpressions.Regex.Replace(rawName, @"[\._\(\)\d]", " ").Trim();
+        return string.IsNullOrEmpty(clean) ? "Vật Thể Nghĩa Trang" : clean;
+    }
+
+    public static void ShowGhostHUDNotice(string msg, Color color, float duration = 2.5f)
+    {
+        EnsureGhostNoticeUI();
+        if (s_GhostNoticeText != null)
+        {
+            s_GhostNoticeText.text = msg;
+            s_GhostNoticeText.color = color;
+            s_GhostNoticeText.gameObject.SetActive(true);
+            s_GhostNoticeTimer = duration;
+        }
+
+        if (ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.gameObject.activeInHierarchy)
+        {
+            ThirdPersonPlayerController.Instance.ShowTargetNotice(msg);
+        }
+
+        Debug.Log($"<color=#00FFB4>[GhostDisguise] {msg}</color>");
+    }
+
+    private static void UpdateGhostNoticeTimer()
+    {
+        if (s_GhostNoticeTimer > 0f)
+        {
+            s_GhostNoticeTimer -= Time.deltaTime;
+            if (s_GhostNoticeTimer <= 0.5f && s_GhostNoticeText != null)
+            {
+                Color c = s_GhostNoticeText.color;
+                c.a = Mathf.Clamp01(s_GhostNoticeTimer / 0.5f);
+                s_GhostNoticeText.color = c;
+            }
+            if (s_GhostNoticeTimer <= 0f && s_GhostNoticeText != null)
+            {
+                s_GhostNoticeText.gameObject.SetActive(false);
+            }
+        }
+    }
+
+    private static void EnsureGhostNoticeUI()
+    {
+        if (s_GhostNoticeText != null) return;
+
+        Canvas targetCanvas = Object.FindAnyObjectByType<Canvas>();
+        if (targetCanvas == null) return;
+
+        GameObject noticeGo = new GameObject("GhostDisguiseNoticeBanner");
+        noticeGo.transform.SetParent(targetCanvas.transform, false);
+
+        RectTransform rt = noticeGo.AddComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.72f);
+        rt.anchorMax = new Vector2(0.5f, 0.72f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = new Vector2(950f, 80f);
+
+        s_GhostNoticeText = noticeGo.AddComponent<Text>();
+        s_GhostNoticeText.font = UIFontHelper.GetCrispFont(22);
+        s_GhostNoticeText.fontSize = 22;
+        s_GhostNoticeText.fontStyle = FontStyle.Bold;
+        s_GhostNoticeText.alignment = TextAnchor.MiddleCenter;
+        s_GhostNoticeText.raycastTarget = false;
+
+        Outline outline = noticeGo.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        outline.effectDistance = new Vector2(1.5f, -1.5f);
+
+        noticeGo.SetActive(false);
     }
 
     // =========================================================================

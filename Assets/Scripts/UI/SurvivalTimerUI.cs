@@ -184,6 +184,7 @@ public class SurvivalTimerUI : MonoBehaviour
         if (timerProgressFill != null) timerProgressFill.gameObject.SetActive(false);
         if (GameSettingsManager.Instance != null)
         {
+            GameSettingsManager.Instance.CloseDashboard();
             GameSettingsManager.Instance.SetInMatchHUDVisible(false);
         }
     }

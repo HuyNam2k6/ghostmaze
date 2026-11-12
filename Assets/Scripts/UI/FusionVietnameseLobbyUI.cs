@@ -168,6 +168,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         }
         Instance = this;
 
+        if (GameSettingsManager.Instance != null)
+        {
+            GameSettingsManager.Instance.CloseDashboard();
+            GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+        }
+
         // Ẩn bảng IMGUI tiếng Anh mặc định của Fusion
         FusionBootstrapDebugGUI.HideDefaultGUI = true;
 
@@ -229,6 +235,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     private void Start()
     {
+        if (GameSettingsManager.Instance != null)
+        {
+            GameSettingsManager.Instance.CloseDashboard();
+            GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+        }
+
         if (bootstrap != null && !string.IsNullOrEmpty(bootstrap.DefaultRoomName) && roomIdInputField != null)
         {
             roomIdInputField.text = bootstrap.DefaultRoomName;
@@ -2669,8 +2681,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             if (isPhotonConnected)
             {
-                string reg = photonMgr != null ? photonMgr.ConnectedRegionName : "";
-                connectionStatusBadgeText.text = string.IsNullOrEmpty(reg) ? "Đã kết nối" : $"Đã kết nối ({reg})";
+                connectionStatusBadgeText.text = "Đã kết nối (Toàn Cầu)";
                 connectionStatusBadgeText.color = colConnected;
                 connectionStatusDotImage.color = colConnected;
             }

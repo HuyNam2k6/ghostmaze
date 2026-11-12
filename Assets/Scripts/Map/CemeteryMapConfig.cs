@@ -67,25 +67,25 @@ public class CemeteryMapConfig : ScriptableObject
         public float fogDensity = 0.0038f;
 
         [Header("Ánh sáng môi trường (Ambient Lighting)")]
-        public Color ambientSkyColor = new Color(0.032f, 0.046f, 0.105f);
-        public Color ambientEquatorColor = new Color(0.018f, 0.025f, 0.058f);
-        public Color ambientGroundColor = new Color(0.005f, 0.007f, 0.018f);
+        public Color ambientSkyColor = new Color(0.0272f, 0.0391f, 0.0892f);
+        public Color ambientEquatorColor = new Color(0.0153f, 0.0212f, 0.0493f);
+        public Color ambientGroundColor = new Color(0.0042f, 0.0059f, 0.0153f);
 
         [Header("Mặt trăng & Ánh trăng (Moonlight)")]
         public Color moonlightColor = new Color(0.68f, 0.82f, 1.0f);
         [Range(0.1f, 3.0f)]
-        public float moonlightIntensity = 0.95f;
+        public float moonlightIntensity = 0.81f;
         public Vector3 moonPosition = new Vector3(-22f, 32.5f, 52f);
         public float moonScale = 12.5f;
 
         [Header("Đèn lồng & Đài tế lễ (Lanterns & Fires)")]
         public Color lanternColor = new Color(1.0f, 0.56f, 0.16f);
         [Range(1f, 20f)]
-        public float lanternIntensity = 5.0f;
+        public float lanternIntensity = 4.25f;
         [Range(2f, 25f)]
         public float lanternRange = 8.0f;
         [Range(5f, 40f)]
-        public float ritualFireIntensity = 14.0f;
+        public float ritualFireIntensity = 11.9f;
     }
 
     [System.Serializable]
@@ -98,19 +98,19 @@ public class CemeteryMapConfig : ScriptableObject
         public float fogDensity = 0.010f;
 
         [Header("Ánh sáng môi trường Người (Tối kịch tính)")]
-        public Color ambientSkyColor = new Color(0.010f, 0.014f, 0.026f);
-        public Color ambientEquatorColor = new Color(0.005f, 0.007f, 0.015f);
-        public Color ambientGroundColor = new Color(0.002f, 0.002f, 0.005f);
+        public Color ambientSkyColor = new Color(0.0085f, 0.0119f, 0.0221f);
+        public Color ambientEquatorColor = new Color(0.0042f, 0.0059f, 0.0127f);
+        public Color ambientGroundColor = new Color(0.0017f, 0.0017f, 0.0042f);
 
         [Header("Ánh trăng mờ le lói (Dim Moonlight)")]
         public Color moonlightColor = new Color(0.32f, 0.44f, 0.65f);
         [Range(0.02f, 1.0f)]
-        public float moonlightIntensity = 0.16f;
+        public float moonlightIntensity = 0.136f;
 
         [Header("Đèn lồng cầm tay của Người (Handheld Lantern)")]
         public Color playerLanternColor = new Color(1.0f, 0.68f, 0.28f);
         [Range(1f, 10f)]
-        public float playerLanternIntensity = 3.2f;
+        public float playerLanternIntensity = 2.72f;
         [Range(3f, 20f)]
         public float playerLanternRange = 8.5f;
     }

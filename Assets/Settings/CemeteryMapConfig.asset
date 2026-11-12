@@ -30,28 +30,28 @@ MonoBehaviour:
     enableFog: 1
     fogColor: {r: 0.012, g: 0.018, b: 0.045, a: 1}
     fogDensity: 0.0038
-    ambientSkyColor: {r: 0.032, g: 0.046, b: 0.105, a: 1}
-    ambientEquatorColor: {r: 0.018, g: 0.025, b: 0.058, a: 1}
-    ambientGroundColor: {r: 0.005, g: 0.007, b: 0.018, a: 1}
+    ambientSkyColor: {r: 0.0272, g: 0.0391, b: 0.0892, a: 1}
+    ambientEquatorColor: {r: 0.0153, g: 0.0212, b: 0.0493, a: 1}
+    ambientGroundColor: {r: 0.0042, g: 0.0059, b: 0.0153, a: 1}
     moonlightColor: {r: 0.68, g: 0.82, b: 1, a: 1}
-    moonlightIntensity: 0.95
+    moonlightIntensity: 0.81
     moonPosition: {x: -22, y: 32.5, z: 52}
     moonScale: 12.5
     lanternColor: {r: 1, g: 0.56, b: 0.16, a: 1}
-    lanternIntensity: 5
+    lanternIntensity: 4.25
     lanternRange: 8
-    ritualFireIntensity: 14
+    ritualFireIntensity: 11.9
   humanAtmosphere:
     enableFog: 1
     fogColor: {r: 0.006, g: 0.010, b: 0.020, a: 1}
     fogDensity: 0.010
-    ambientSkyColor: {r: 0.010, g: 0.014, b: 0.026, a: 1}
-    ambientEquatorColor: {r: 0.005, g: 0.007, b: 0.015, a: 1}
-    ambientGroundColor: {r: 0.002, g: 0.002, b: 0.005, a: 1}
+    ambientSkyColor: {r: 0.0085, g: 0.0119, b: 0.0221, a: 1}
+    ambientEquatorColor: {r: 0.0042, g: 0.0059, b: 0.0127, a: 1}
+    ambientGroundColor: {r: 0.0017, g: 0.0017, b: 0.0042, a: 1}
     moonlightColor: {r: 0.32, g: 0.44, b: 0.65, a: 1}
-    moonlightIntensity: 0.16
+    moonlightIntensity: 0.136
     playerLanternColor: {r: 1, g: 0.68, b: 0.28, a: 1}
-    playerLanternIntensity: 3.2
+    playerLanternIntensity: 2.72
     playerLanternRange: 8.5
   layout:
     centralPlazaDiameter: 32

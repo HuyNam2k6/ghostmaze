@@ -73,6 +73,12 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     private float punchConfiguredScale = 1f;
     private bool isPunchHeld = false;
 
+    // Nút Biến Hình Ma (Ghost Disguise Button)
+    private RectTransform disguiseBtnRect;
+    private Image disguiseBtnImg;
+    private Text disguiseBtnText;
+    private float disguiseConfiguredScale = 1f;
+
     // Tâm ngắm Crosshair
     private GameObject crosshairObj;
 
@@ -345,6 +351,31 @@ public class VirtualJoystickTouchUI : MonoBehaviour
                 ghost.TriggerVirtualAttack();
             }
         }
+
+        // 6. Cập nhật nhãn và trạng thái Nút Biến Hình Ma
+        if (disguiseBtnRect != null)
+        {
+            bool showDisguise = isEditingHUDLayout || (isGhost && !isMatchFinished);
+            if (disguiseBtnRect.gameObject.activeSelf != showDisguise)
+            {
+                disguiseBtnRect.gameObject.SetActive(showDisguise);
+            }
+
+            if (showDisguise && disguiseBtnText != null && !isEditingHUDLayout)
+            {
+                PumpkinGhostAI ghost = GetActivePlayerGhost();
+                if (ghost != null && ghost.isDisguised)
+                {
+                    disguiseBtnText.text = $"✕\nHỦY ({Mathf.CeilToInt(ghost.disguiseTimeRemaining)}s)";
+                    disguiseBtnImg.color = new Color(1f, 0.35f, 0.25f, 0.9f);
+                }
+                else
+                {
+                    disguiseBtnText.text = "🎭\nBIẾN HÌNH";
+                    disguiseBtnImg.color = new Color(0.6f, 0.25f, 0.9f, 0.85f);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -548,6 +579,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         if (autoRunBtnRect != null) autoRunBtnRect.gameObject.SetActive(visible);
         if (jumpBtnRect != null) jumpBtnRect.gameObject.SetActive(visible);
         if (punchBtnRect != null) punchBtnRect.gameObject.SetActive(visible);
+        if (disguiseBtnRect != null) disguiseBtnRect.gameObject.SetActive(visible && (isEditingHUDLayout || IsPlayerControllingGhost()));
         if (fppBtnRect != null) fppBtnRect.gameObject.SetActive(visible);
         if (crosshairObj != null) crosshairObj.SetActive(visible);
     }
@@ -810,6 +842,9 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
         // 6. Nút Đấm / Tấn Công [ 👊 ] (Góc dưới cùng bên phải, vòng lửa vàng cam)
         CreatePunchButtonUI(canvasGo.transform);
+
+        // 6.1. Nút Biến Hình Ma [ 🎭 ] (Dành riêng cho Ma Bí Ngô - 15s)
+        CreateDisguiseButtonUI(canvasGo.transform);
 
         // 7. Proxy kéo thả cho Khung Chat & Voice (hiện khi đang tùy chỉnh nút)
         CreateChatVoiceDragProxy(canvasGo.transform);
@@ -1259,6 +1294,71 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         RegisterCustomHUDTarget(btnGo, "Punch", "Nút Đấm / Tấn Công", punchBtnRect, null, new Vector2(-115f, 115f), 1f);
     }
 
+    private void CreateDisguiseButtonUI(Transform parent)
+    {
+        GameObject btnGo = new GameObject("Btn_GhostDisguise");
+        btnGo.transform.SetParent(parent, false);
+
+        disguiseBtnRect = btnGo.AddComponent<RectTransform>();
+        disguiseBtnRect.anchorMin = new Vector2(1f, 0f);
+        disguiseBtnRect.anchorMax = new Vector2(1f, 0f);
+        disguiseBtnRect.pivot = new Vector2(0.5f, 0.5f);
+        disguiseBtnRect.anchoredPosition = new Vector2(-310f, 215f);
+        disguiseBtnRect.sizeDelta = new Vector2(92f, 92f);
+
+        disguiseBtnImg = btnGo.AddComponent<Image>();
+        disguiseBtnImg.sprite = punchButtonSprite ?? jumpButtonSprite;
+        disguiseBtnImg.color = new Color(0.6f, 0.25f, 0.9f, 0.85f);
+
+        GameObject textGo = new GameObject("DisguiseText");
+        textGo.transform.SetParent(btnGo.transform, false);
+        RectTransform textRt = textGo.AddComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
+        textRt.offsetMin = Vector2.zero;
+        textRt.offsetMax = Vector2.zero;
+
+        disguiseBtnText = textGo.AddComponent<Text>();
+        disguiseBtnText.font = UIFontHelper.GetCrispFont(18);
+        disguiseBtnText.fontSize = 16;
+        disguiseBtnText.fontStyle = FontStyle.Bold;
+        disguiseBtnText.alignment = TextAnchor.MiddleCenter;
+        disguiseBtnText.color = Color.white;
+        disguiseBtnText.text = "🎭\nBIẾN HÌNH";
+        disguiseBtnText.raycastTarget = false;
+
+        Outline outline = textGo.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        outline.effectDistance = new Vector2(1.2f, -1.2f);
+
+        EventTrigger trigger = btnGo.AddComponent<EventTrigger>();
+        EventTrigger.Entry downEntry = new EventTrigger.Entry();
+        downEntry.eventID = EventTriggerType.PointerDown;
+        downEntry.callback.AddListener((data) =>
+        {
+            if (isEditingHUDLayout) return;
+            disguiseBtnRect.localScale = Vector3.one * (disguiseConfiguredScale * 0.92f);
+            PumpkinGhostAI ghost = GetActivePlayerGhost();
+            if (ghost != null)
+            {
+                ghost.TriggerDisguiseOrCancel();
+            }
+        });
+        trigger.triggers.Add(downEntry);
+
+        EventTrigger.Entry upEntry = new EventTrigger.Entry();
+        upEntry.eventID = EventTriggerType.PointerUp;
+        upEntry.callback.AddListener((data) =>
+        {
+            if (isEditingHUDLayout) return;
+            disguiseBtnRect.localScale = Vector3.one * disguiseConfiguredScale;
+        });
+        trigger.triggers.Add(upEntry);
+
+        RegisterCustomHUDTarget(btnGo, "Disguise", "Nút Biến Hình Ma", disguiseBtnRect, null, new Vector2(-310f, 215f), 1f);
+        btnGo.SetActive(false);
+    }
+
     // =========================================================================
     // TRÌNH TÙY CHỈNH VỊ TRÍ & KÍCH THƯỚC NÚT BẤM (CUSTOM HUD KIỂU FREE FIRE)
     // =========================================================================
@@ -1568,7 +1668,9 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         {
             var chatRect = PhotonMultiplayerChatVoice.Instance.ChatPanelRect;
             chatRect.localScale = Vector3.one;
-            chatRect.anchoredPosition = ClampAnchoredPositionInsideParent(chatRect, new Vector2(18f, 335f));
+            var chatTarget = customHUDTargets.Find(t => t != null && t.hudId == "ChatVoice");
+            Vector2 targetPos = (chatTarget != null && chatTarget.defaultAnchoredPos != Vector2.zero) ? chatTarget.defaultAnchoredPos : chatRect.anchoredPosition;
+            chatRect.anchoredPosition = ClampAnchoredPositionInsideParent(chatRect, targetPos);
         }
 
         jumpConfiguredScale = 1f;
@@ -1678,9 +1780,15 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     public static void ApplySavedRectTransform(string hudId, RectTransform rt, Vector2 defaultPos, float defaultScale = 1f)
     {
         if (rt == null) return;
-        float x = PlayerPrefs.GetFloat(HUD_PREFS_PREFIX + hudId + "_X", defaultPos.x);
-        float y = PlayerPrefs.GetFloat(HUD_PREFS_PREFIX + hudId + "_Y", defaultPos.y);
-        float s = Mathf.Clamp(PlayerPrefs.GetFloat(HUD_PREFS_PREFIX + hudId + "_S", defaultScale), 0.55f, 1.60f);
+        // Nếu người dùng chưa từng tùy chỉnh vị trí nút bấm này trong game (chưa lưu PlayerPrefs),
+        // giữ nguyên 100% tọa độ & kích thước đã thiết lập trong Unity Editor, tuyệt đối không ghi đè cố định
+        if (!PlayerPrefs.HasKey(HUD_PREFS_PREFIX + hudId + "_X"))
+        {
+            return;
+        }
+        float x = PlayerPrefs.GetFloat(HUD_PREFS_PREFIX + hudId + "_X", rt.anchoredPosition.x);
+        float y = PlayerPrefs.GetFloat(HUD_PREFS_PREFIX + hudId + "_Y", rt.anchoredPosition.y);
+        float s = Mathf.Clamp(PlayerPrefs.GetFloat(HUD_PREFS_PREFIX + hudId + "_S", rt.localScale.x), 0.55f, 1.60f);
 
         rt.localScale = new Vector3(s, s, 1f);
         rt.anchoredPosition = ClampAnchoredPositionInsideParent(rt, new Vector2(x, y));

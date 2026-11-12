@@ -62,7 +62,7 @@ public static class UIFontHelper
     }
 
     /// <summary>
-    /// Cấu hình Canvas và CanvasScaler chuẩn Full HD 1080p, tắt pixelPerfect để tránh răng cưa subpixel và tăng dynamicPixelsPerUnit
+    /// Cấu hình Canvas và CanvasScaler chuẩn Full HD 1080p, tắt pixelPerfect để tránh răng cưa subpixel và tăng dynamicPixelsPerUnit lên 3.0x cực sắc nét
     /// </summary>
     public static void ConfigureCrispCanvas(Canvas canvas, CanvasScaler scaler)
     {
@@ -80,7 +80,7 @@ public static class UIFontHelper
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
             scaler.referencePixelsPerUnit = 100f;
-            scaler.dynamicPixelsPerUnit = 2.5f; // Tăng độ phân giải raster của font chữ lên 2.5 lần chống mờ
+            scaler.dynamicPixelsPerUnit = 3.0f; // Tăng độ phân giải raster của font chữ lên 3.0 lần siêu sắc nét chống mờ
         }
     }
 
@@ -95,7 +95,7 @@ public static class UIFontHelper
     /// <summary>
     /// Quét đệ quy toàn bộ Text trong GameObject và áp dụng Font sắc nét, tăng kích cỡ tối thiểu
     /// </summary>
-    public static void ApplyCrispnessRecursively(GameObject root, int minFontSize = 14)
+    public static void ApplyCrispnessRecursively(GameObject root, int minFontSize = 15)
     {
         if (root == null) return;
         Font crisp = GetCrispFont(36);

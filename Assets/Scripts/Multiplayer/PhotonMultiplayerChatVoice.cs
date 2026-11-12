@@ -107,6 +107,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private const byte EVENT_ORB_STUN = 109;
     private const byte EVENT_REPLAY_VOTE = 110;
     private const byte EVENT_REPLAY_START = 111;
+    private const byte EVENT_GHOST_DISGUISE = 112;
     public static readonly System.Collections.Generic.Dictionary<int, bool> ReadyPlayerDict = new System.Collections.Generic.Dictionary<int, bool>();
     public static bool IsLocalPlayerReady = false;
     public static readonly System.Collections.Generic.List<int> GhostActorNumbers = new System.Collections.Generic.List<int>();
@@ -137,7 +138,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private bool needReliableInitialPlayerSync = false;
     private float nextRoomRetryTime = 0f;
     public string LastLobbyStatus { get; private set; } = "";
-    public string ConnectedRegionName => (client != null && !string.IsNullOrEmpty(client.CurrentRegion)) ? client.CurrentRegion : fixedRegion;
+    public string ConnectedRegionName => "Toàn Cầu (Global)";
 
     private void ResetMatchLobbyState(bool clearRoles = true)
     {
@@ -913,7 +914,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         GameObject f1Btn = GameObject.Find("Btn_QuickTestF1");
         if (f1Btn != null) Destroy(f1Btn);
         if (SurvivalTimerUI.Instance != null) SurvivalTimerUI.Instance.CleanUpAllInGameUI();
-        if (GameSettingsManager.Instance != null) GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+        if (GameSettingsManager.Instance != null)
+        {
+            GameSettingsManager.Instance.CloseDashboard();
+            GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+        }
 
         if (client != null && client.InRoom)
         {
@@ -1057,6 +1062,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         public bool isGhostForm;
         public Animator animator;
         public float stunEndTime;
+        public GameObject disguisePropObj;
         public bool IsStunned => Time.unscaledTime < stunEndTime;
     }
 
@@ -1442,7 +1448,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             AppIdChat = hasRealtimeId ? photonRealtimeAppId.Trim() : photonAppId,
             AppVersion = "1.0",
             UseNameServer = true,
-            FixedRegion = string.IsNullOrWhiteSpace(fixedRegion) ? null : fixedRegion.Trim(),
+            FixedRegion = string.IsNullOrWhiteSpace(fixedRegion) ? "asia" : fixedRegion.Trim().ToLowerInvariant(),
             Protocol = ConnectionProtocol.Udp,
             AuthMode = AuthModeOption.Auth,
             EnableProtocolFallback = true,
@@ -1451,7 +1457,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         };
 
         isConnectingOrConnected = client.ConnectUsingSettings(settings);
-        LastLobbyStatus = $"Đang kết nối máy chủ Photon ({(string.IsNullOrWhiteSpace(fixedRegion) ? "tự động" : fixedRegion.Trim())})...";
+        LastLobbyStatus = "Đang kết nối máy chủ Toàn Cầu (Global Cloud)...";
         AddSystemMessage(LastLobbyStatus);
     }
 
@@ -1481,7 +1487,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                     MatchingType = MatchmakingMode.FillRoom
                 };
                 isAutoMatchingRandomRoom = true;
-                LastLobbyStatus = $"Đã kết nối ({client.CurrentRegion}) — Đang ghép trận...";
+                LastLobbyStatus = "Đã kết nối máy chủ Toàn Cầu — Đang ghép trận...";
                 client.OpJoinRandomRoom(matchArgs);
                 return;
             }
@@ -1490,15 +1496,15 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
         if (inLobbyScene && !hasUserRequestedRoom && !IsMatchmakingSearching)
         {
-            LastLobbyStatus = $"Đã kết nối Photon ({client.CurrentRegion})";
-            AddSystemMessage($"Đã kết nối máy chủ Photon ({client.CurrentRegion})! Hãy Tạo phòng hoặc Tham gia phòng.");
+            LastLobbyStatus = "Đã kết nối máy chủ Toàn Cầu (Global)";
+            AddSystemMessage("Đã kết nối máy chủ Toàn Cầu (Global)! Hãy Tạo phòng hoặc Tham gia phòng.");
             return;
         }
 
         if (isAutoMatchingRandomRoom)
         {
-            LastLobbyStatus = $"Đã kết nối ({client.CurrentRegion}) — Đang tìm phòng...";
-            AddSystemMessage($"Đã kết nối Photon ({client.CurrentRegion})! Đang tìm phòng đang mở...");
+            LastLobbyStatus = "Đã kết nối máy chủ Toàn Cầu — Đang tìm phòng...";
+            AddSystemMessage("Đã kết nối máy chủ Toàn Cầu! Đang tìm phòng đang mở...");
             JoinRandomRoomArgs matchArgs = new JoinRandomRoomArgs
             {
                 ExpectedCustomRoomProperties = new PhotonHashtable { { ROOM_PROP_MATCH_MODE, MATCH_MODE_4P } },
@@ -1509,8 +1515,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             return;
         }
 
-        LastLobbyStatus = $"Đã kết nối ({client.CurrentRegion}) — Đang vào phòng [{roomName}]...";
-        AddSystemMessage($"Đã kết nối Photon ({client.CurrentRegion})! Đang vào phòng '{roomName}'...");
+        LastLobbyStatus = $"Đã kết nối máy chủ Toàn Cầu — Đang vào phòng [{roomName}]...";
+        AddSystemMessage($"Đã kết nối máy chủ Toàn Cầu! Đang vào phòng '{roomName}'...");
         JoinOrCreateTargetRoom();
     }
 
@@ -1585,7 +1591,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         SyncSoloDropInRoomProperty();
 
         int count = client.CurrentRoom != null ? client.CurrentRoom.PlayerCount : 1;
-        LastLobbyStatus = $"Đã vào phòng [{roomName}] ({client.CurrentRegion}) — {count}/{requiredPlayersToStart} người";
+        LastLobbyStatus = $"Đã vào phòng [{roomName}] (Toàn Cầu) — {count}/{requiredPlayersToStart} người";
         Debug.Log($"<color=#2ECC71>[Photon] {LastLobbyStatus}</color>");
         AddSystemMessage($"Đã vào phòng [{roomName}] ({count}/{requiredPlayersToStart} người). Nhấn [Enter] để Chat, [V] để Mic, [H] để ẩn Chat!");
         BroadcastLocalReadyState();
@@ -2092,12 +2098,19 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         SetChatMinimized(!isChatMinimized);
     }
 
+    private float normalChatHeight = 94f;
+
     public void SetChatMinimized(bool min)
     {
         isChatMinimized = min;
+        if (chatPanelRect != null && !isChatMinimized)
+        {
+            if (chatPanelRect.sizeDelta.y > 50f) normalChatHeight = chatPanelRect.sizeDelta.y;
+        }
+
         if (isChatMinimized)
         {
-            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(420f, 44f);
+            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(chatPanelRect.sizeDelta.x, 44f);
             if (chatHistoryViewportObj != null) chatHistoryViewportObj.SetActive(false);
             else if (chatHistoryText != null) chatHistoryText.gameObject.SetActive(false);
             if (chatInputRow != null) chatInputRow.SetActive(false);
@@ -2106,7 +2119,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         else
         {
-            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(420f, 94f);
+            if (chatPanelRect != null) chatPanelRect.sizeDelta = new Vector2(chatPanelRect.sizeDelta.x, normalChatHeight);
             if (chatHistoryViewportObj != null) chatHistoryViewportObj.SetActive(true);
             else if (chatHistoryText != null) chatHistoryText.gameObject.SetActive(true);
             if (chatInputRow != null) chatInputRow.SetActive(true);
@@ -2902,6 +2915,19 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 ExecuteSyncedReplayLocally(matchGen, ghostInts);
             }
         }
+        else if (photonEvent.Code == EVENT_GHOST_DISGUISE)
+        {
+            if (photonEvent.CustomData is object[] disguiseArr && disguiseArr.Length >= 3)
+            {
+                int actorNr = Convert.ToInt32(disguiseArr[0]);
+                bool isDisguised = Convert.ToBoolean(disguiseArr[1]);
+                string propName = Convert.ToString(disguiseArr[2]);
+                float sx = disguiseArr.Length > 3 ? Convert.ToSingle(disguiseArr[3]) : 1f;
+                float sy = disguiseArr.Length > 4 ? Convert.ToSingle(disguiseArr[4]) : 1f;
+                float sz = disguiseArr.Length > 5 ? Convert.ToSingle(disguiseArr[5]) : 1f;
+                ApplyDisguiseToRemoteGhost(actorNr, isDisguised, propName, new Vector3(sx, sy, sz));
+            }
+        }
     }
 
     public void NotifyLocalHumanDied()
@@ -2988,6 +3014,89 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 object[] payload = new object[] { actorNr, damage, originPos.x, originPos.y, originPos.z };
                 RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
                 client.OpRaiseEvent(EVENT_GHOST_ATTACK, payload, args, SendOptions.SendReliable);
+            }
+        }
+    }
+
+    public void BroadcastGhostDisguise(bool isDisguised, string propName, Vector3 localScale)
+    {
+        if (client == null || !client.InRoom) return;
+
+        int myActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
+        object[] payload = new object[] { myActor, isDisguised, propName ?? "", localScale.x, localScale.y, localScale.z };
+        RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
+        client.OpRaiseEvent(EVENT_GHOST_DISGUISE, payload, args, SendOptions.SendReliable);
+        client.SendOutgoingCommands();
+    }
+
+    public void ApplyDisguiseToRemoteGhost(int actorNr, bool isDisguised, string propName, Vector3 scale)
+    {
+        if (remotePlayers.TryGetValue(actorNr, out var av) && av != null && av.rootObj != null)
+        {
+            if (isDisguised)
+            {
+                if (av.animator != null) av.animator.gameObject.SetActive(false);
+                else
+                {
+                    Renderer[] rends = av.rootObj.GetComponentsInChildren<Renderer>(true);
+                    for (int i = 0; i < rends.Length; i++)
+                    {
+                        if (rends[i] != null && (av.disguisePropObj == null || !rends[i].transform.IsChildOf(av.disguisePropObj.transform)))
+                        {
+                            rends[i].enabled = false;
+                        }
+                    }
+                }
+
+                if (av.disguisePropObj == null)
+                {
+                    av.disguisePropObj = new GameObject("RemoteDisguisePropVisual");
+                    av.disguisePropObj.transform.SetParent(av.rootObj.transform, false);
+                    av.disguisePropObj.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+                    av.disguisePropObj.transform.localRotation = Quaternion.identity;
+                    var mf = av.disguisePropObj.AddComponent<MeshFilter>();
+                    var mr = av.disguisePropObj.AddComponent<MeshRenderer>();
+
+                    MeshFilter[] allMf = UnityEngine.Object.FindObjectsByType<MeshFilter>();
+                    for (int i = 0; i < allMf.Length; i++)
+                    {
+                        if (allMf[i] == null || allMf[i].sharedMesh == null) continue;
+                        if (allMf[i].transform.IsChildOf(av.rootObj.transform)) continue;
+                        var otherMr = allMf[i].GetComponent<MeshRenderer>();
+                        if (otherMr != null && otherMr.sharedMaterials != null && otherMr.sharedMaterials.Length > 0)
+                        {
+                            mf.sharedMesh = allMf[i].sharedMesh;
+                            mr.sharedMaterials = otherMr.sharedMaterials;
+                            break;
+                        }
+                    }
+                }
+
+                if (av.disguisePropObj != null)
+                {
+                    av.disguisePropObj.transform.localScale = scale;
+                    av.disguisePropObj.SetActive(true);
+                }
+            }
+            else
+            {
+                if (av.disguisePropObj != null)
+                {
+                    av.disguisePropObj.SetActive(false);
+                }
+
+                if (av.animator != null) av.animator.gameObject.SetActive(true);
+                else
+                {
+                    Renderer[] rends = av.rootObj.GetComponentsInChildren<Renderer>(true);
+                    for (int i = 0; i < rends.Length; i++)
+                    {
+                        if (rends[i] != null && (av.disguisePropObj == null || !rends[i].transform.IsChildOf(av.disguisePropObj.transform)))
+                        {
+                            rends[i].enabled = true;
+                        }
+                    }
+                }
             }
         }
     }
@@ -3349,7 +3458,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             GameObject f1Btn = GameObject.Find("Btn_QuickTestF1");
             if (f1Btn != null) Destroy(f1Btn);
             if (SurvivalTimerUI.Instance != null) SurvivalTimerUI.Instance.CleanUpAllInGameUI();
-            if (GameSettingsManager.Instance != null) GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+            if (GameSettingsManager.Instance != null)
+        {
+            GameSettingsManager.Instance.CloseDashboard();
+            GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+        }
 
             FusionVietnameseLobbyUI.EnsureLobbyUIIfInLobbyScene();
         }
@@ -3567,7 +3680,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         if (lobbyRoomText != null)
         {
-            lobbyRoomText.text = $"Phòng: <b>{roomName}</b>  ●  Khu vực: <b>{client.CurrentRegion}</b>";
+            lobbyRoomText.text = $"Phòng: <b>{roomName}</b>  ●  Máy chủ: <b>Toàn Cầu (Global)</b>";
         }
 
         if (lobbyCountText != null)
@@ -3622,21 +3735,162 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     // =========================================================================
     // 4. DỰNG GIAO DIỆN UI CHAT & VOICE CHAT TỰ ĐỘNG
     // =========================================================================
+    private bool BindExistingChatVoicePanel(GameObject panel, Font defaultFont)
+    {
+        if (panel == null) return false;
+        chatPanelRect = panel.GetComponent<RectTransform>();
+        if (chatPanelRect == null) return false;
+
+        if (chatPanelRect.sizeDelta.y > 50f)
+        {
+            normalChatHeight = chatPanelRect.sizeDelta.y;
+        }
+
+        Transform tRow = panel.transform.Find("ChatInputRow");
+        if (tRow != null)
+        {
+            chatInputRow = tRow.gameObject;
+            chatInputField = tRow.GetComponentInChildren<InputField>(true);
+            if (chatInputField != null)
+            {
+                chatInputField.onEndEdit.RemoveAllListeners();
+                chatInputField.onEndEdit.AddListener(OnChatInputEndEdit);
+            }
+
+            Transform sendBtnTrans = tRow.Find("SendButton");
+            if (sendBtnTrans != null)
+            {
+                chatSendBtnRect = sendBtnTrans.GetComponent<RectTransform>();
+                var btn = sendBtnTrans.GetComponent<Button>();
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(OnSendChatButtonClicked);
+                }
+            }
+        }
+
+        Transform bottomBarTrans = panel.transform.Find("BottomControlBar");
+        if (bottomBarTrans != null)
+        {
+            Transform bBadge = bottomBarTrans.Find("ChatBadgeButton");
+            if (bBadge != null)
+            {
+                statusBadgeText = bBadge.GetComponentInChildren<Text>(true);
+                var btn = bBadge.GetComponent<Button>();
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(() =>
+                    {
+                        if (lastChatEndFrame == Time.frameCount)
+                        {
+                            SetChatFocus(false, allowCursorLock: true);
+                            return;
+                        }
+                        if (isChatMinimized) SetChatMinimized(false);
+                        SetChatFocus(!isChatInputFocused);
+                    });
+                }
+            }
+
+            Transform bMic = bottomBarTrans.Find("MicToggleButton");
+            if (bMic != null)
+            {
+                micButtonBg = bMic.GetComponent<Image>();
+                micButtonText = bMic.GetComponentInChildren<Text>(true);
+                var btn = bMic.GetComponent<Button>();
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(ToggleMicrophone);
+                }
+            }
+
+            Transform bVoice = bottomBarTrans.Find("VoiceSettingsButton");
+            if (bVoice != null)
+            {
+                var btn = bVoice.GetComponent<Button>();
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(ToggleVoiceSettingsDialog);
+                }
+            }
+
+            Transform bMin = bottomBarTrans.Find("MinimizeChatButton");
+            if (bMin != null)
+            {
+                minimizeButtonText = bMin.GetComponentInChildren<Text>(true);
+                var btn = bMin.GetComponent<Button>();
+                if (btn != null)
+                {
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(ToggleChatMinimized);
+                }
+            }
+        }
+
+        Transform spkTrans = panel.transform.Find("SpeakingIndicator");
+        if (spkTrans != null)
+        {
+            speakingIndicatorText = spkTrans.GetComponent<Text>();
+        }
+
+        Transform vpTrans = panel.transform.Find("ChatHistoryViewport");
+        if (vpTrans != null)
+        {
+            chatHistoryViewportObj = vpTrans.gameObject;
+            chatHistoryText = vpTrans.GetComponentInChildren<Text>(true);
+        }
+
+        UIFontHelper.ApplyCrispnessRecursively(panel, 12);
+        chatPanelRect.gameObject.SetActive(true);
+        return true;
+    }
+
     private void BuildChatAndVoiceUI()
     {
-        GameObject cGo = new GameObject("Canvas_PhotonChatVoice");
-        cGo.transform.SetParent(transform, false);
-        Canvas canvas = cGo.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.pixelPerfect = true;
-        canvas.sortingOrder = 50;
-        CanvasScaler scaler = cGo.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.matchWidthOrHeight = 0.5f;
-        scaler.dynamicPixelsPerUnit = 2.5f;
-        scaler.referencePixelsPerUnit = 100f;
-        cGo.AddComponent<GraphicRaycaster>();
+        Font defaultFont = UIFontHelper.GetCrispFont(14);
+
+        // 1. Kiểm tra xem người dùng đã tạo sẵn PhotonChatVoicePanel trên Scene hay chưa
+        GameObject existingPanel = GameObject.Find("PhotonChatVoicePanel");
+        bool isBoundFromScene = false;
+        Canvas canvas = null;
+
+        if (existingPanel != null)
+        {
+            isBoundFromScene = BindExistingChatVoicePanel(existingPanel, defaultFont);
+            if (isBoundFromScene)
+            {
+                canvas = existingPanel.GetComponentInParent<Canvas>();
+            }
+        }
+
+        if (canvas == null)
+        {
+            GameObject canvasGo = GameObject.Find("Canvas_GameSettings");
+            if (canvasGo != null)
+            {
+                canvas = canvasGo.GetComponent<Canvas>();
+            }
+            else
+            {
+                GameObject cGo = new GameObject("Canvas_PhotonChatVoice");
+                cGo.transform.SetParent(transform, false);
+                canvas = cGo.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.pixelPerfect = false;
+                canvas.sortingOrder = 50;
+                CanvasScaler scaler = cGo.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(1920f, 1080f);
+                scaler.matchWidthOrHeight = 0.5f;
+                scaler.dynamicPixelsPerUnit = 3.0f;
+                scaler.referencePixelsPerUnit = 100f;
+                cGo.AddComponent<GraphicRaycaster>();
+            }
+        }
 
         if (FindAnyObjectByType<EventSystem>() == null)
         {
@@ -3650,24 +3904,22 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             DontDestroyOnLoad(es);
         }
 
-        Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (defaultFont == null) defaultFont = Font.CreateDynamicFontFromOSFont("Arial", 14);
+        if (!isBoundFromScene)
+        {
+            // Khung chứa chính ở góc dưới bên trái (đặt ở vị trí thoáng, không bị fix cứng vị trí)
+            GameObject panel = new GameObject("PhotonChatVoicePanel");
+            panel.transform.SetParent(canvas.transform, false);
+            RectTransform panelRect = panel.AddComponent<RectTransform>();
+            panelRect.anchorMin = new Vector2(0f, 0f);
+            panelRect.anchorMax = new Vector2(0f, 0f);
+            panelRect.pivot = new Vector2(0f, 0f);
+            panelRect.anchoredPosition = new Vector2(20f, 190f);
+            panelRect.sizeDelta = new Vector2(440f, 96f);
+            normalChatHeight = 96f;
+            chatPanelRect = panelRect;
 
-        // Khung chứa chính ở góc dưới bên trái (đặt ở Y: 335 để không bị Virtual Joystick che khuất)
-        // Khung chứa chính ở góc dưới bên trái (đặt ở Y: 335 để không bị Virtual Joystick che khuất)
-        GameObject panel = new GameObject("PhotonChatVoicePanel");
-        panel.transform.SetParent(canvas.transform, false);
-        RectTransform panelRect = panel.AddComponent<RectTransform>();
-        panelRect.anchorMin = new Vector2(0f, 0f);
-        panelRect.anchorMax = new Vector2(0f, 0f);
-        panelRect.pivot = new Vector2(0f, 0f);
-        panelRect.anchoredPosition = new Vector2(18f, 335f);
-        panelRect.sizeDelta = new Vector2(420f, 94f);
-        chatPanelRect = panelRect;
-        VirtualJoystickTouchUI.ApplySavedRectTransform("ChatVoice", panelRect, new Vector2(18f, 335f));
-
-        Image panelBg = panel.AddComponent<Image>();
-        panelBg.color = new Color(0.05f, 0.08f, 0.12f, 0.84f);
+            Image panelBg = panel.AddComponent<Image>();
+            panelBg.color = new Color(0.05f, 0.08f, 0.12f, 0.84f);
 
         // ==========================================
         // HÀNG TRÊN: Ô Nhập Tin Nhắn + Nút Máy Bay Gửi
@@ -3971,15 +4223,16 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         ContentSizeFitter histFitter = historyObj.AddComponent<ContentSizeFitter>();
         histFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
         histFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
 
         // Dựng giao diện Phòng Chờ 4 người (Lobby HUD)
-        BuildLobbyWaitingUI(canvas, defaultFont);
+        if (lobbyPanelObj == null) BuildLobbyWaitingUI(canvas, defaultFont);
 
         // Dựng bảng Cài Đặt Photon Voice Nâng Cao
-        BuildVoiceSettingsDialog(canvas, defaultFont);
+        if (voiceSettingsDialogObj == null) BuildVoiceSettingsDialog(canvas, defaultFont);
 
         // Dựng Badge hiển thị ID Phòng & tiến độ đợi 4/4 Sẵn Sàng khi đang Chơi Đơn trong Map
-        BuildSoloRoomBadgeUI(canvas, defaultFont);
+        if (soloRoomBadgeObj == null) BuildSoloRoomBadgeUI(canvas, defaultFont);
 
         if (startChatMinimized)
         {
