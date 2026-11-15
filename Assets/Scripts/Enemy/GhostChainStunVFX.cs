@@ -10,14 +10,22 @@ using UnityEngine;
 /// </summary>
 public class GhostChainStunVFX : MonoBehaviour
 {
+    [Tooltip("Prefab xích 3D tải từ Asset (để trống sẽ tự tìm Resources/VFX/BindingChainsPrefab)")]
+    public GameObject customBindingChainsPrefab;
+
     private static Material s_SharedChainMaterial;
+    private static Material s_SharedSparkMaterial;
+    private static Texture2D s_SharedSparkTexture;
     private static Mesh s_SharedChainMesh;
 
     private GameObject chainsRoot;
+    private ParticleSystem crimsonSparks;
     private Light bindingLight;
     private Coroutine activeStunRoutine;
     private Animator targetAnimator;
     private float originalAnimSpeed = 1f;
+    private bool currentCrimsonMode;
+    private MaterialPropertyBlock crimsonPropBlock;
 
     public bool IsStunned { get; private set; }
 
@@ -25,7 +33,7 @@ public class GhostChainStunVFX : MonoBehaviour
     /// Kích hoạt xích trói ma thuật và khóa cứng cử động mục tiêu trong duration giây.
     /// Hoạt động cho cả con ma của chính mình lẫn Avatar con ma từ xa của người chơi khác!
     /// </summary>
-    public static GhostChainStunVFX ApplyChainStun(GameObject target, float duration, Vector3 pushDir, float pushDist, Animator anim = null)
+    public static GhostChainStunVFX ApplyChainStun(GameObject target, float duration, Vector3 pushDir, float pushDist, Animator anim = null, bool crimsonExorcism = false)
     {
         if (target == null) return null;
 
@@ -35,14 +43,16 @@ public class GhostChainStunVFX : MonoBehaviour
             comp = target.AddComponent<GhostChainStunVFX>();
         }
 
-        comp.TriggerStun(duration, pushDir, pushDist, anim);
+        comp.TriggerStun(duration, pushDir, pushDist, anim, crimsonExorcism);
         return comp;
     }
 
-    public void TriggerStun(float duration, Vector3 pushDir, float pushDist, Animator anim)
+    public void TriggerStun(float duration, Vector3 pushDir, float pushDist, Animator anim, bool crimsonExorcism = false)
     {
         if (anim != null) targetAnimator = anim;
         else if (targetAnimator == null) targetAnimator = GetComponentInChildren<Animator>(true);
+
+        currentCrimsonMode = crimsonExorcism;
 
         if (activeStunRoutine != null)
         {
@@ -56,14 +66,21 @@ public class GhostChainStunVFX : MonoBehaviour
     {
         IsStunned = true;
         EnsureChainsCreated();
+        ApplyVisualStyle();
 
         if (chainsRoot != null)
         {
             chainsRoot.SetActive(true);
+            chainsRoot.transform.localScale = currentCrimsonMode ? new Vector3(1f, 0.15f, 1f) : Vector3.one;
         }
         if (bindingLight != null)
         {
             bindingLight.enabled = true;
+        }
+        if (crimsonSparks != null)
+        {
+            if (currentCrimsonMode && !crimsonSparks.isPlaying) crimsonSparks.Play();
+            else if (!currentCrimsonMode && crimsonSparks.isPlaying) crimsonSparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
         // Khóa đứng yên Animator mục tiêu
@@ -78,20 +95,38 @@ public class GhostChainStunVFX : MonoBehaviour
             catch { }
         }
 
-        // Hiệu ứng giật lùi nhẹ (Knockback) trong 0.18s đầu
+        // Hiệu ứng giật lùi nhẹ (Knockback) nếu có lực đẩy; nếu ghim tại chỗ (pushDist <= 0.001f) thì bỏ qua
         float knockTime = 0.18f;
-        float elapsedKnock = 0f;
-        pushDir.y = 0f;
-        if (pushDir.sqrMagnitude > 0.001f) pushDir.Normalize();
-        else pushDir = -transform.forward;
-
-        float speed = pushDist / knockTime;
-        while (elapsedKnock < knockTime)
+        if (pushDist > 0.001f)
         {
-            float dt = Time.deltaTime;
-            elapsedKnock += dt;
-            transform.position += pushDir * (speed * dt);
-            yield return null;
+            float elapsedKnock = 0f;
+            pushDir.y = 0f;
+            if (pushDir.sqrMagnitude > 0.001f) pushDir.Normalize();
+            else pushDir = -transform.forward;
+
+            float speed = pushDist / knockTime;
+            while (elapsedKnock < knockTime)
+            {
+                float dt = Time.deltaTime;
+                elapsedKnock += dt;
+                transform.position += pushDir * (speed * dt);
+                yield return null;
+            }
+        }
+        else if (currentCrimsonMode && chainsRoot != null)
+        {
+            // Hiệu ứng 4 dây xích trồi từ dưới đất lên ghim chặt con ma
+            float eruptTime = 0.16f;
+            float elapsed = 0f;
+            while (elapsed < eruptTime)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / eruptTime);
+                float eased = 1f - Mathf.Pow(1f - t, 3f);
+                chainsRoot.transform.localScale = new Vector3(1f, Mathf.Lerp(0.15f, 1f, eased), 1f);
+                yield return null;
+            }
+            chainsRoot.transform.localScale = Vector3.one;
         }
 
         // Rung nhẹ ma thuật các mắt xích trong suốt thời gian bị trói
@@ -120,11 +155,16 @@ public class GhostChainStunVFX : MonoBehaviour
         IsStunned = false;
         if (chainsRoot != null)
         {
+            chainsRoot.transform.localScale = Vector3.one;
             chainsRoot.SetActive(false);
         }
         if (bindingLight != null)
         {
             bindingLight.enabled = false;
+        }
+        if (crimsonSparks != null && crimsonSparks.isPlaying)
+        {
+            crimsonSparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
         if (targetAnimator != null)
@@ -139,6 +179,14 @@ public class GhostChainStunVFX : MonoBehaviour
         }
     }
 
+    private void OnDisable()
+    {
+        if (IsStunned)
+        {
+            ReleaseStun();
+        }
+    }
+
     private void EnsureChainsCreated()
     {
         if (chainsRoot != null) return;
@@ -148,6 +196,7 @@ public class GhostChainStunVFX : MonoBehaviour
         {
             chainsRoot = existing.gameObject;
             bindingLight = chainsRoot.GetComponentInChildren<Light>();
+            crimsonSparks = chainsRoot.GetComponentInChildren<ParticleSystem>(true);
             return;
         }
 
@@ -155,31 +204,51 @@ public class GhostChainStunVFX : MonoBehaviour
         chainsRoot.transform.SetParent(transform, false);
         chainsRoot.transform.localPosition = new Vector3(0f, 0.95f, 0f);
 
-        // Khởi tạo Material xích ma thuật phát sáng URP Lit
-        if (s_SharedChainMaterial == null)
+        GameObject prefabToUse = customBindingChainsPrefab != null
+            ? customBindingChainsPrefab
+            : (Resources.Load<GameObject>("VFX/BindingChainsPrefab") ?? Resources.Load<GameObject>("VFX/Shackle"));
+
+        if (prefabToUse != null)
         {
-            Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            s_SharedChainMaterial = new Material(urpLit);
-            Color chainGlow = new Color(0.20f, 0.88f, 1.0f); // Xanh lam ma thuật rực rỡ
-            s_SharedChainMaterial.color = new Color(0.12f, 0.35f, 0.55f, 1.0f);
-            s_SharedChainMaterial.EnableKeyword("_EMISSION");
-            s_SharedChainMaterial.SetColor("_EmissionColor", chainGlow * 3.5f);
-            s_SharedChainMaterial.SetFloat("_Metallic", 0.85f);
-            s_SharedChainMaterial.SetFloat("_Smoothness", 0.75f);
+            GameObject assetChains = Instantiate(prefabToUse, chainsRoot.transform, false);
+            assetChains.name = "BindingChainsAsset";
+            assetChains.transform.localPosition = Vector3.zero;
+            assetChains.transform.localRotation = Quaternion.identity;
+            foreach (Collider col in assetChains.GetComponentsInChildren<Collider>(true))
+            {
+                col.enabled = false;
+            }
+        }
+        else
+        {
+            // Fallback khi chưa gán Prefab Asset: dùng mesh xích mặc định
+            if (s_SharedChainMaterial == null)
+            {
+                Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+                s_SharedChainMaterial = new Material(urpLit);
+                Color chainGlow = new Color(0.20f, 0.88f, 1.0f);
+                s_SharedChainMaterial.color = new Color(0.12f, 0.35f, 0.55f, 1.0f);
+                s_SharedChainMaterial.EnableKeyword("_EMISSION");
+                s_SharedChainMaterial.SetColor("_EmissionColor", chainGlow * 3.5f);
+                s_SharedChainMaterial.SetFloat("_Metallic", 0.85f);
+                s_SharedChainMaterial.SetFloat("_Smoothness", 0.75f);
+            }
+
+            if (s_SharedChainMesh == null)
+            {
+                s_SharedChainMesh = GenerateCompleteBindingChainsMesh();
+            }
+
+            MeshFilter mf = chainsRoot.AddComponent<MeshFilter>();
+            mf.sharedMesh = s_SharedChainMesh;
+
+            MeshRenderer mr = chainsRoot.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = s_SharedChainMaterial;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
-        // Tạo Mesh xích ma thuật
-        if (s_SharedChainMesh == null)
-        {
-            s_SharedChainMesh = GenerateCompleteBindingChainsMesh();
-        }
-
-        MeshFilter mf = chainsRoot.AddComponent<MeshFilter>();
-        mf.sharedMesh = s_SharedChainMesh;
-
-        MeshRenderer mr = chainsRoot.AddComponent<MeshRenderer>();
-        mr.sharedMaterial = s_SharedChainMaterial;
-        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        // Tia lửa đỏ xung quanh con ma khi bị trói bằng Pentacle
+        CreateCrimsonSparks();
 
         // Đèn tỏa sáng ma mị bao quanh xích
         GameObject lightObj = new GameObject("ChainGlowLight");
@@ -193,6 +262,118 @@ public class GhostChainStunVFX : MonoBehaviour
         bindingLight.shadows = LightShadows.None;
 
         chainsRoot.SetActive(false);
+    }
+
+    private void ApplyVisualStyle()
+    {
+        if (bindingLight != null)
+        {
+            bindingLight.color = currentCrimsonMode ? new Color(1.0f, 0.16f, 0.10f) : new Color(0.25f, 0.85f, 1.0f);
+        }
+
+        if (chainsRoot != null)
+        {
+            Renderer[] renderers = chainsRoot.GetComponentsInChildren<Renderer>(true);
+            if (currentCrimsonMode)
+            {
+                if (crimsonPropBlock == null) crimsonPropBlock = new MaterialPropertyBlock();
+                Color baseRed = new Color(0.75f, 0.08f, 0.06f, 1f);
+                Color emissionRed = new Color(1.0f, 0.14f, 0.08f) * 2.4f;
+
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    Renderer r = renderers[i];
+                    if (r == null || r is ParticleSystemRenderer) continue;
+                    r.GetPropertyBlock(crimsonPropBlock);
+                    crimsonPropBlock.SetColor("_BaseColor", baseRed);
+                    crimsonPropBlock.SetColor("_Color", baseRed);
+                    crimsonPropBlock.SetColor("_EmissionColor", emissionRed);
+                    r.SetPropertyBlock(crimsonPropBlock);
+
+                    // Đảm bảo bật keyword _EMISSION nếu material hỗ trợ
+                    foreach (Material mat in r.sharedMaterials)
+                    {
+                        if (mat != null) mat.EnableKeyword("_EMISSION");
+                    }
+                }
+            }
+            else
+            {
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    Renderer r = renderers[i];
+                    if (r == null || r is ParticleSystemRenderer) continue;
+                    r.SetPropertyBlock(null);
+                }
+            }
+        }
+    }
+
+    private void CreateCrimsonSparks()
+    {
+        if (s_SharedSparkTexture == null)
+        {
+            s_SharedSparkTexture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            float half = 15.5f;
+            for (int y = 0; y < 32; y++)
+            {
+                for (int x = 0; x < 32; x++)
+                {
+                    float dx = (x - half) / half;
+                    float dy = (y - half) / half;
+                    float a = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy));
+                    s_SharedSparkTexture.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+                }
+            }
+            s_SharedSparkTexture.Apply();
+        }
+
+        if (s_SharedSparkMaterial == null)
+        {
+            Shader psShader = Shader.Find("Universal Render Pipeline/Particles/Unlit")
+                ?? Shader.Find("Particles/Standard Unlit")
+                ?? Shader.Find("Sprites/Default");
+            s_SharedSparkMaterial = new Material(psShader);
+            if (s_SharedSparkMaterial.HasProperty("_BaseMap"))
+                s_SharedSparkMaterial.SetTexture("_BaseMap", s_SharedSparkTexture);
+            if (s_SharedSparkMaterial.HasProperty("_MainTex"))
+                s_SharedSparkMaterial.SetTexture("_MainTex", s_SharedSparkTexture);
+            if (s_SharedSparkMaterial.HasProperty("_Surface"))
+                s_SharedSparkMaterial.SetFloat("_Surface", 1f);
+        }
+
+        GameObject psGo = new GameObject("CrimsonBindingSparks");
+        psGo.transform.SetParent(chainsRoot.transform, false);
+        psGo.transform.localPosition = Vector3.zero;
+        crimsonSparks = psGo.AddComponent<ParticleSystem>();
+        crimsonSparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        var main = crimsonSparks.main;
+        main.loop = true;
+        main.duration = 1f;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.85f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 1.3f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.08f);
+        main.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(1.0f, 0.15f, 0.08f, 1f),
+            new Color(1.0f, 0.50f, 0.15f, 0.9f)
+        );
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 60;
+
+        var emission = crimsonSparks.emission;
+        emission.rateOverTime = 28f;
+
+        var shape = crimsonSparks.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.55f;
+
+        var psRenderer = psGo.GetComponent<ParticleSystemRenderer>();
+        if (psRenderer != null)
+        {
+            psRenderer.sharedMaterial = s_SharedSparkMaterial;
+            psRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
     }
 
     /// <summary>
@@ -238,22 +419,28 @@ public class GhostChainStunVFX : MonoBehaviour
             return new Vector3(x, -0.10f, z);
         });
 
-        // 4. Hai sợi xích ghim xuống đất (Ground Anchor Chains)
-        AddChainAlongCurve(linkMesh, allVertices, allNormals, allTriangles, 8, t =>
+        // 4. Bốn sợi xích chéo ghim chặt từ 4 góc mặt đất lên thân (Ground Anchor Chains)
+        Vector3[] groundAnchors = new Vector3[]
         {
-            float x = Mathf.Lerp(-0.40f, -0.75f, t);
-            float y = Mathf.Lerp(-0.15f, -0.92f, t);
-            float z = Mathf.Lerp(0.10f, 0.45f, t);
-            return new Vector3(x, y, z);
-        });
+            new Vector3(-0.85f, -0.92f,  0.75f),
+            new Vector3( 0.85f, -0.92f,  0.75f),
+            new Vector3(-0.85f, -0.92f, -0.75f),
+            new Vector3( 0.85f, -0.92f, -0.75f)
+        };
+        Vector3[] bodyAnchors = new Vector3[]
+        {
+            new Vector3(-0.34f, -0.05f,  0.22f),
+            new Vector3( 0.34f, -0.05f,  0.22f),
+            new Vector3(-0.34f, -0.05f, -0.22f),
+            new Vector3( 0.34f, -0.05f, -0.22f)
+        };
 
-        AddChainAlongCurve(linkMesh, allVertices, allNormals, allTriangles, 8, t =>
+        for (int a = 0; a < 4; a++)
         {
-            float x = Mathf.Lerp(0.40f, 0.75f, t);
-            float y = Mathf.Lerp(-0.15f, -0.92f, t);
-            float z = Mathf.Lerp(0.10f, 0.45f, t);
-            return new Vector3(x, y, z);
-        });
+            Vector3 gPos = groundAnchors[a];
+            Vector3 bPos = bodyAnchors[a];
+            AddChainAlongCurve(linkMesh, allVertices, allNormals, allTriangles, 10, t => Vector3.Lerp(bPos, gPos, t));
+        }
 
         Mesh combined = new Mesh();
         combined.name = "SpectralBindingChainsMesh";

@@ -78,6 +78,16 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Âm thanh khi đỡ đòn")]
     public AudioClip blockSound;
 
+    [Header("4b. Giới Hạn Xích Phong Ấn (Chỉ Con Người Nhặt Quanh Map)")]
+    [Tooltip("Số lượng Dây Xích Phong Ấn tối đa có thể mang theo (Mặc định: 5)")]
+    [Range(1, 10)] public int maxChainCharges = 5;
+
+    [Tooltip("Số lượng Dây Xích hiện có (Bắt đầu = 0, phải nhặt trên map mới dùng được phím E)")]
+    public int currentChainCharges = 0;
+
+    [Tooltip("Đã nhặt được Dấu Ấn Pentacle trên map chưa")]
+    public bool hasPentacleSeal = false;
+
     [Header("5. Kỹ Năng: Sóng Thần Ma Thuật (Rising Wave - Knockback 3m & Stun 5s)")]
     [Tooltip("Phím tung chiêu phép thuật (Mặc định: Chuột trái hoặc Q)")]
     public KeyCode magicAttackKey = KeyCode.Mouse0;
@@ -185,6 +195,9 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private Vector3 verticalVelocity;
     private bool isGrounded;
     private PumpkinGhostAI cachedGhost;
+    private PentacleHandSealVFX pentacleHandSealVFX;
+    private Text chainCountText;
+    private float nextChainConsumeTime = -10f;
     private readonly Queue<MagicWaveOrb> magicOrbPool = new Queue<MagicWaveOrb>(6);
     private Material runtimeFallbackOrbMaterial;
 
@@ -256,6 +269,9 @@ public class ThirdPersonPlayerController : MonoBehaviour
         EnsureReticleAndNoticeUI();
         EnsureLanternLight();
         EnsureTrajectoryLine();
+        UpdateChainCountUI();
+        ChainPickupSpawner.EnsureSpawnedInScene(transform.position);
+        ChainPickupHUD.EnsureInScene();
     }
 
     private void OnDisable()
@@ -371,6 +387,69 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 noticeGo.SetActive(false);
             }
         }
+
+        // 3. Text hiển thị số lượng Dây Xích Phong Ấn (ChainCountText)
+        if (chainCountText == null)
+        {
+            GameObject chainGo = GameObject.Find("ChainCountText");
+            if (chainGo != null)
+            {
+                chainCountText = chainGo.GetComponent<Text>();
+            }
+            else
+            {
+                chainGo = new GameObject("ChainCountText");
+                chainGo.transform.SetParent(canvas.transform, false);
+
+                RectTransform rt = chainGo.AddComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.5f, 0f);
+                rt.anchorMax = new Vector2(0.5f, 0f);
+                rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(0f, 36f);
+                rt.sizeDelta = new Vector2(360f, 36f);
+
+                chainCountText = chainGo.AddComponent<Text>();
+                chainCountText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (chainCountText.font == null) chainCountText.font = Font.CreateDynamicFontFromOSFont("Arial", 18);
+                chainCountText.fontSize = 20;
+                chainCountText.alignment = TextAnchor.MiddleCenter;
+                chainCountText.fontStyle = FontStyle.Bold;
+                chainCountText.color = new Color(1f, 0.45f, 0.38f, 1f);
+                chainCountText.raycastTarget = false;
+
+                UnityEngine.UI.Outline outline = chainGo.AddComponent<UnityEngine.UI.Outline>();
+                outline.effectColor = new Color(0f, 0f, 0f, 0.95f);
+                outline.effectDistance = new Vector2(1.5f, -1.5f);
+            }
+        }
+    }
+
+    public void UnlockPentacleSeal()
+    {
+        hasPentacleSeal = true;
+    }
+
+    public bool CanAddChainCharge()
+    {
+        return currentChainCharges < maxChainCharges;
+    }
+
+    public bool TryAddChainCharge(int amount = 1)
+    {
+        if (amount <= 0 || currentChainCharges >= maxChainCharges) return false;
+        currentChainCharges = Mathf.Clamp(currentChainCharges + amount, 0, maxChainCharges);
+        UpdateChainCountUI();
+        ShowTargetNotice($"Nhặt được Dấu Ấn Pentacle! ({currentChainCharges}/{maxChainCharges})");
+        return true;
+    }
+
+    private void UpdateChainCountUI()
+    {
+        if (chainCountText == null) return;
+        chainCountText.text = $"Dấu Ấn [E]: {currentChainCharges} / {maxChainCharges}";
+        chainCountText.color = currentChainCharges > 0
+            ? new Color(1f, 0.42f, 0.35f, 1f)
+            : new Color(0.85f, 0.85f, 0.85f, 0.90f);
     }
 
     public void ShowTargetNotice(string msg)
@@ -755,6 +834,23 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
         if (blockPressed)
         {
+            // Kiểm tra điều kiện: Phải nhặt được Dấu Ấn Pentacle & có Dây Xích mới dùng được phím E
+            if (Time.time >= nextChainConsumeTime && (!hasPentacleSeal || currentChainCharges <= 0))
+            {
+                if (blockPressedDown || isBlocking)
+                {
+                    if (!hasPentacleSeal)
+                        ShowTargetNotice("Chưa có Dấu Ấn Pentacle! Hãy tìm nhặt dưới sàn!");
+                    else
+                        ShowTargetNotice($"Hết Dây Xích! Tìm nhặt quanh bản đồ ({currentChainCharges}/{maxChainCharges})");
+                }
+                if (isBlocking)
+                {
+                    CancelBlock();
+                }
+                return;
+            }
+
             // Kiểm tra điều kiện: Buộc phải hướng về con ma mới nhấn/giữ E được (toán học hình nón, không cần Collider)
             PumpkinGhostAI targetGhost = GetTargetGhostInFacingCone(blockRange, blockFacingAngleThreshold);
 
@@ -777,13 +873,33 @@ public class ThirdPersonPlayerController : MonoBehaviour
                     }
                 }
 
-                // Giữ chân quái ma trong thời gian quy định
-                if (Time.time >= lastGhostHoldTime + 0.5f)
+                // Kích hoạt Dấu ấn Pentacle trên tay + Particle đỏ + LineRenderer xích nối tới ma
+                if (pentacleHandSealVFX == null)
                 {
+                    pentacleHandSealVFX = GetComponent<PentacleHandSealVFX>() ?? gameObject.AddComponent<PentacleHandSealVFX>();
+                }
+                Transform handAnchor = castHandTransform != null ? castHandTransform : throwPoint;
+                pentacleHandSealVFX.Activate(targetGhost.transform, handAnchor);
+
+                // Tiêu hao 1 Dây Xích cho mỗi lần phong ấn (kéo dài ghostHoldDuration giây)
+                if (Time.time >= nextChainConsumeTime)
+                {
+                    currentChainCharges = Mathf.Max(0, currentChainCharges - 1);
+                    nextChainConsumeTime = Time.time + ghostHoldDuration;
+                    UpdateChainCountUI();
+
                     cachedGhost = targetGhost;
                     targetGhost.Freeze(ghostHoldDuration);
+                    GhostChainStunVFX.ApplyChainStun(
+                        targetGhost.gameObject,
+                        ghostHoldDuration,
+                        Vector3.zero,
+                        0f,
+                        targetGhost.GetComponentInChildren<Animator>(true),
+                        true
+                    );
                     lastGhostHoldTime = Time.time;
-                    Debug.Log($"<color=#3498DB>[PrinceGreen - Phím E] Đang nhìn thẳng vào {targetGhost.name}! Đã khóa cứng trong {ghostHoldDuration} giây!</color>");
+                    Debug.Log($"<color=#3498DB>[PrinceGreen - Phím E] Đã dùng 1 Dây Xích trói {targetGhost.name} trong {ghostHoldDuration}s! (Còn {currentChainCharges}/{maxChainCharges})</color>");
                 }
             }
             else
@@ -813,6 +929,10 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private void CancelBlock()
     {
         isBlocking = false;
+        if (pentacleHandSealVFX != null)
+        {
+            pentacleHandSealVFX.Deactivate();
+        }
         if (playerAnimator != null && !string.IsNullOrEmpty(blockBoolName))
         {
             playerAnimator.SetBool(blockBoolName, false);
@@ -1168,13 +1288,14 @@ public class ThirdPersonPlayerController : MonoBehaviour
         }
 
         MagicWaveOrb orbScript = GetOrCreatePooledOrb();
+        orbScript.shooter = gameObject;
         orbScript.transform.SetPositionAndRotation(spawnPos, spawnRot);
         orbScript.speed = magicOrbSpeed;
         orbScript.knockbackDistance = magicOrbKnockback;
         orbScript.stunDuration = magicOrbStunDuration;
         orbScript.EnsureRedVisuals();
         orbScript.gameObject.SetActive(true);
-        orbScript.Launch(shootDir, targetPoint);
+        orbScript.Launch(shootDir, targetPoint, gameObject);
     }
 
     private void OnDrawGizmosSelected()
@@ -1210,7 +1331,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
         {
             orbObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             orbObj.name = "MagicWaveOrb_Pooled";
-            orbObj.transform.localScale = Vector3.one * 0.45f;
+            orbObj.transform.localScale = Vector3.one * 0.36f; // Thu nhỏ 20% theo yêu cầu
             Collider primCol = orbObj.GetComponent<Collider>();
             if (primCol != null) Destroy(primCol);
 
@@ -1740,15 +1861,16 @@ public class ThirdPersonPlayerController : MonoBehaviour
         if (virtualBlockHeld) return true;
 
         bool allowMouse = AllowDesktopMouseAction();
+        bool allowFForBlock = !ChainPickupHUD.ShouldSuppressBlockF;
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
         if (allowMouse && mouse != null && mouse.rightButton.isPressed) return true;
         var kb = Keyboard.current;
-        if (kb != null && (kb.fKey.isPressed || kb.eKey.isPressed)) return true;
+        if (kb != null && ((allowFForBlock && kb.fKey.isPressed) || kb.eKey.isPressed)) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKey(blockKey) || (allowMouse && Input.GetKey(KeyCode.Mouse1)) || Input.GetKey(KeyCode.F) || Input.GetKey(KeyCode.E)) return true;
+        if (Input.GetKey(blockKey) || (allowMouse && Input.GetKey(KeyCode.Mouse1)) || (allowFForBlock && Input.GetKey(KeyCode.F)) || Input.GetKey(KeyCode.E)) return true;
 #endif
 
         return false;
@@ -1759,15 +1881,16 @@ public class ThirdPersonPlayerController : MonoBehaviour
         if (virtualBlockHeld) return true;
 
         bool allowMouse = AllowDesktopMouseAction();
+        bool allowFForBlock = !ChainPickupHUD.ShouldSuppressBlockF;
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
         if (allowMouse && mouse != null && mouse.rightButton.wasPressedThisFrame) return true;
         var kb = Keyboard.current;
-        if (kb != null && (kb.fKey.wasPressedThisFrame || kb.eKey.wasPressedThisFrame)) return true;
+        if (kb != null && ((allowFForBlock && kb.fKey.wasPressedThisFrame) || kb.eKey.wasPressedThisFrame)) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(blockKey) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse1)) || Input.GetKeyDown(KeyCode.F) || Input.GetKeyDown(KeyCode.E)) return true;
+        if (Input.GetKeyDown(blockKey) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse1)) || (allowFForBlock && Input.GetKeyDown(KeyCode.F)) || Input.GetKeyDown(KeyCode.E)) return true;
 #endif
 
         return false;

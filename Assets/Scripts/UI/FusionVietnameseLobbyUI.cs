@@ -32,8 +32,6 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private GameObject waitingRoomViewObj;
 
     // UI Sảnh Chính (Main View)
-    private Text connectionStatusBadgeText;
-    private Image connectionStatusDotImage;
     private InputField roomIdInputField;
 
     // UI Bên Trong Phòng Chờ (Waiting Room View)
@@ -55,6 +53,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Text matchmakingSpinnerTimerText;
     private Text matchmakingSpinnerCountText;
     private Button matchmakingSpinnerCancelBtn;
+    private Button matchmakingSpinnerInstantSoloBtn;
+    private Text matchmakingSpinnerInstantSoloBtnText;
     private Sprite sprSpinnerArc;
     private bool isDirectMatchmakingActive = false;
     private Text topRightPlayerNameText;
@@ -75,11 +75,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private GameObject tabMultiplayerUnderline;
     private Text bottomConnectionStatusText;
     private Text bottomSloganText;
-    private Text connectionStatusLabelText;
     private Text roomIdLabelText;
     private Text roomIdInputPlaceholderText;
     private Text joinRoomBtnText;
-    private Text createRoomBtnText;
     private Text waitingHeaderTitleText;
     private Text waitingMyNameLabelText;
     private Text waitingSaveNameBtnText;
@@ -265,18 +263,18 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     // =========================================================================
     private void GenerateProceduralSprites()
     {
-        sprBackdropSky = CreateGothicNightSkySprite(1024, 576);
-        sprCardGradient = CreateVerticalCardGradientSprite(128, 512);
-        sprCircleBadge = CreateGlowingCircleSprite(128);
-        sprLinkIcon = CreateChainLinkIconSprite(128);
-        sprDoorIcon = CreatePortalDoorIconSprite(128);
-        sprGraveyardBottom = CreateGraveyardSilhouetteSprite(512, 96);
+        sprBackdropSky = CreateGothicNightSkySprite(1920, 1080);
+        sprCardGradient = CreateVerticalCardGradientSprite(256, 512);
+        sprCircleBadge = CreateGlowingCircleSprite(256);
+        sprLinkIcon = CreateChainLinkIconSprite(256);
+        sprDoorIcon = CreatePortalDoorIconSprite(256);
+        sprGraveyardBottom = CreateGraveyardSilhouetteSprite(1920, 160);
 
         for (int i = 0; i < 6; i++)
         {
-            sprCardIcons[i] = CreateModeIconSprite(i, 256);
+            sprCardIcons[i] = CreateModeIconSprite(i, 384);
         }
-        sprSpinnerArc = CreateSpinnerArcSprite(256);
+        sprSpinnerArc = CreateSpinnerArcSprite(384);
     }
 
     private Sprite CreateSpinnerArcSprite(int size)
@@ -329,9 +327,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
 
+        Color32[] pixels = new Color32[w * h];
+
         // Mặt trăng ở góc trên bên phải
         Vector2 moonCenter = new Vector2(w * 0.73f, h * 0.77f);
         float moonRadius = h * 0.17f;
+        float moonGlowMax = moonRadius * 3.5f;
 
         // Vị trí đèn lồng đỏ cổ kính góc bên trái
         Vector2 lanternCenter = new Vector2(w * 0.08f, h * 0.68f);
@@ -348,13 +349,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 ? Color.Lerp(midSky, topSky, (ty - 0.42f) / 0.58f)
                 : Color.Lerp(botMist, midSky, ty / 0.42f);
 
+            int rowOffset = y * w;
             for (int x = 0; x < w; x++)
             {
                 float tx = x / (float)(w - 1);
                 Color c = baseRow;
 
                 // 1. Hào quang mặt trăng với SmoothStep
-                float distMoon = Vector2.Distance(new Vector2(x, y), moonCenter);
+                float dxMoon = x - moonCenter.x;
+                float dyMoon = y - moonCenter.y;
+                float distMoon = Mathf.Sqrt(dxMoon * dxMoon + dyMoon * dyMoon);
                 if (distMoon < moonRadius)
                 {
                     float edge = Mathf.SmoothStep(0f, 1f, (moonRadius - distMoon) / 2.5f);
@@ -362,14 +366,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                     Color moonCol = new Color(0.92f - crater, 0.94f - crater, 1.0f, 0.98f);
                     c = Color.Lerp(c, moonCol, edge * 0.88f);
                 }
-                else if (distMoon < moonRadius * 3.5f)
+                else if (distMoon < moonGlowMax)
                 {
                     float glow = Mathf.Pow(1f - (distMoon - moonRadius) / (moonRadius * 2.5f), 2.2f);
                     c += new Color(0.18f, 0.32f, 0.68f, 0f) * (glow * 0.52f);
                 }
 
                 // 2. Ánh đèn lồng ma mị ấm áp bên trái
-                float distLantern = Vector2.Distance(new Vector2(x, y), lanternCenter);
+                float dxLantern = x - lanternCenter.x;
+                float dyLantern = y - lanternCenter.y;
+                float distLantern = Mathf.Sqrt(dxLantern * dxLantern + dyLantern * dyLantern);
                 if (distLantern < lanternRadius)
                 {
                     float lglow = Mathf.Pow(1f - distLantern / lanternRadius, 2.0f);
@@ -408,9 +414,10 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 c.g *= (1f - vig * 0.40f);
                 c.b *= (1f - vig * 0.30f);
 
-                tex.SetPixel(x, y, c);
+                pixels[rowOffset + x] = c;
             }
         }
+        tex.SetPixels32(pixels);
         tex.Apply();
         return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
     }
@@ -420,19 +427,23 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
+        Color32[] pixels = new Color32[w * h];
 
         for (int y = 0; y < h; y++)
         {
             float t = y / (float)(h - 1);
             float brightness = Mathf.Lerp(0.55f, 0.95f, Mathf.Abs(t - 0.45f) * 1.3f);
+            int rowOffset = y * w;
             for (int x = 0; x < w; x++)
             {
                 float tx = x / (float)(w - 1);
                 float edgeGlow = Mathf.Pow(Mathf.Abs(tx - 0.5f) * 2f, 2.5f) * 0.28f;
                 float val = Mathf.Clamp01(brightness + edgeGlow);
-                tex.SetPixel(x, y, new Color(val, val, val, 0.96f));
+                byte b = (byte)(val * 255f);
+                pixels[rowOffset + x] = new Color32(b, b, b, 245);
             }
         }
+        tex.SetPixels32(pixels);
         tex.Apply();
         return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
     }
@@ -487,42 +498,50 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
         tex.wrapMode = TextureWrapMode.Clamp;
         tex.filterMode = FilterMode.Bilinear;
-        ClearTex(tex, w, h);
+        Color32[] pixels = new Color32[w * h];
 
-        Color silCol = new Color(0.02f, 0.04f, 0.08f, 0.92f);
+        Color32 silCol = new Color32(5, 10, 20, 235);
+        float scaleY = h / 96f;
 
         for (int x = 0; x < w; x++)
         {
-            float groundH = 14f + Mathf.Sin(x * 0.05f) * 5f;
-            bool isFenceSpike = (x % 24 >= 10 && x % 24 <= 14);
-            float spikeH = isFenceSpike ? 38f : 20f;
-            bool isRail1 = true;
-            bool isRail2 = true;
+            float groundH = (14f + Mathf.Sin(x * 0.03f) * 6f) * scaleY;
+            bool isFenceSpike = (x % 36 >= 15 && x % 36 <= 21);
+            float spikeH = (isFenceSpike ? 42f : 24f) * scaleY;
+            float rail1Y = 28f * scaleY;
+            float rail2Y = 16f * scaleY;
 
-            bool isTomb1 = (x >= 60 && x <= 95);
-            bool isTomb2 = (x >= w - 100 && x <= w - 65);
+            bool isTomb1 = (x >= 80 && x <= 140);
+            bool isTomb2 = (x >= 420 && x <= 470);
+            bool isTomb3 = (x >= w - 480 && x <= w - 430);
+            bool isTomb4 = (x >= w - 160 && x <= w - 90);
 
             for (int y = 0; y < h; y++)
             {
                 bool fill = false;
                 if (y <= groundH) fill = true;
                 else if (isFenceSpike && y <= spikeH) fill = true;
-                else if (isRail1 && Mathf.Abs(y - 25f) <= 2.2f) fill = true;
-                else if (isRail2 && Mathf.Abs(y - 15f) <= 2.2f) fill = true;
-                else if (isTomb1 && y <= 52f) fill = true;
-                else if (isTomb2 && y <= 48f) fill = true;
+                else if (Mathf.Abs(y - rail1Y) <= 2.8f * scaleY) fill = true;
+                else if (Mathf.Abs(y - rail2Y) <= 2.8f * scaleY) fill = true;
+                else if (isTomb1 && y <= 56f * scaleY) fill = true;
+                else if (isTomb2 && y <= 48f * scaleY) fill = true;
+                else if (isTomb3 && y <= 50f * scaleY) fill = true;
+                else if (isTomb4 && y <= 54f * scaleY) fill = true;
 
-                if ((Mathf.Abs(x - 77) <= 3 && y >= 52 && y <= 74) || (Mathf.Abs(x - 77) <= 12 && Mathf.Abs(y - 64) <= 3.5f))
+                if ((Mathf.Abs(x - 110) <= 4 && y >= 56 * scaleY && y <= 84 * scaleY) ||
+                    (Mathf.Abs(x - 110) <= 16 && Mathf.Abs(y - 72 * scaleY) <= 4f * scaleY))
                     fill = true;
-                if ((Mathf.Abs(x - (w - 82)) <= 3 && y >= 48 && y <= 68) || (Mathf.Abs(x - (w - 82)) <= 11 && Mathf.Abs(y - 59) <= 3.5f))
+                if ((Mathf.Abs(x - (w - 125)) <= 4 && y >= 54 * scaleY && y <= 80 * scaleY) ||
+                    (Mathf.Abs(x - (w - 125)) <= 15 && Mathf.Abs(y - 68 * scaleY) <= 4f * scaleY))
                     fill = true;
 
                 if (fill)
                 {
-                    tex.SetPixel(x, y, silCol);
+                    pixels[y * w + x] = silCol;
                 }
             }
         }
+        tex.SetPixels32(pixels);
         tex.Apply();
         return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f));
     }
@@ -869,6 +888,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         // 6. Thanh Trạng Thái Dưới Cùng (Trái: ● Trạng thái kết nối: Kết nối tốt | Phải: PLAY TOGETHER • HAVE FUN)
         BuildBottomStatusBar(lobbyRootObj.transform, font);
 
+        // 7. Dải Cảnh Báo Bản Quyền & 18+ Bảo Hộ Pháp Lý Dưới Đáy Màn Hình
+        BuildBottomLegalDisclaimer(lobbyRootObj.transform, font);
+
         // Khởi tạo text ngôn ngữ đồng bộ
         UpdateAllLobbyLocalizedTexts();
 
@@ -922,14 +944,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         rt.anchorMin = new Vector2(0f, 1f);
         rt.anchorMax = new Vector2(0f, 1f);
         rt.pivot = new Vector2(0f, 1f);
-        rt.anchoredPosition = new Vector2(50f, -24f);
-        rt.sizeDelta = new Vector2(260f, 72f);
+        rt.anchoredPosition = new Vector2(50f, -20f);
+        rt.sizeDelta = new Vector2(400f, 75f);
 
         GameObject titleObj = new GameObject("LogoText");
         titleObj.transform.SetParent(logoObj.transform, false);
         RectTransform trt = titleObj.AddComponent<RectTransform>();
-        trt.anchorMin = Vector2.zero;
-        trt.anchorMax = Vector2.one;
+        trt.anchorMin = new Vector2(0f, 0.40f);
+        trt.anchorMax = new Vector2(1f, 1f);
         trt.offsetMin = Vector2.zero;
         trt.offsetMax = Vector2.zero;
 
@@ -940,7 +962,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         titleTxt.alignment = TextAnchor.MiddleLeft;
         titleTxt.lineSpacing = 0.88f;
         titleTxt.supportRichText = true;
-        titleTxt.text = "<size=24><color=#E6F0FF>GHOST</color></size>\n<size=34><color=#FF2A3A>MAZE</color></size>";
+        titleTxt.text = "<size=24><color=#E6F0FF>GHOST</color></size> <size=30><color=#FF2A3A>MAZE</color></size>";
 
         Outline outline = titleObj.AddComponent<Outline>();
         outline.effectColor = new Color(0.02f, 0.04f, 0.09f, 0.95f);
@@ -949,6 +971,62 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Shadow shadow = titleObj.AddComponent<Shadow>();
         shadow.effectColor = new Color(0.85f, 0.12f, 0.18f, 0.45f);
         shadow.effectDistance = new Vector2(1f, -1f);
+
+        // Hàng thông tin phụ: Tag 18+ & Khẩu hiệu phụ đề
+        GameObject subRow = new GameObject("SubtitleAndAgeRow");
+        subRow.transform.SetParent(logoObj.transform, false);
+        RectTransform srt = subRow.AddComponent<RectTransform>();
+        srt.anchorMin = new Vector2(0f, 0f);
+        srt.anchorMax = new Vector2(1f, 0.40f);
+        srt.offsetMin = Vector2.zero;
+        srt.offsetMax = Vector2.zero;
+
+        GameObject ageObj = new GameObject("AgePill");
+        ageObj.transform.SetParent(subRow.transform, false);
+        RectTransform art = ageObj.AddComponent<RectTransform>();
+        art.anchorMin = new Vector2(0f, 0.1f);
+        art.anchorMax = new Vector2(0f, 0.9f);
+        art.pivot = new Vector2(0f, 0.5f);
+        art.anchoredPosition = new Vector2(0f, 0f);
+        art.sizeDelta = new Vector2(98f, 22f);
+
+        Image ageBg = ageObj.AddComponent<Image>();
+        ageBg.color = new Color(0.65f, 0.10f, 0.12f, 0.90f);
+        Outline aol = ageObj.AddComponent<Outline>();
+        aol.effectColor = new Color(1f, 0.35f, 0.35f, 0.85f);
+        aol.effectDistance = new Vector2(1f, -1f);
+
+        GameObject ageTxtObj = new GameObject("Text");
+        ageTxtObj.transform.SetParent(ageObj.transform, false);
+        RectTransform atrt = ageTxtObj.AddComponent<RectTransform>();
+        atrt.anchorMin = Vector2.zero;
+        atrt.anchorMax = Vector2.one;
+        atrt.offsetMin = Vector2.zero;
+        atrt.offsetMax = Vector2.zero;
+
+        headerAgeRatingText = ageTxtObj.AddComponent<Text>();
+        headerAgeRatingText.font = font;
+        headerAgeRatingText.fontSize = 11;
+        headerAgeRatingText.fontStyle = FontStyle.Bold;
+        headerAgeRatingText.alignment = TextAnchor.MiddleCenter;
+        headerAgeRatingText.color = Color.white;
+        headerAgeRatingText.text = GameLocalizationManager.T("AGE_TAG_PILL", "🔞 18+ MATURE");
+
+        GameObject subObj = new GameObject("SubtitleText");
+        subObj.transform.SetParent(subRow.transform, false);
+        RectTransform strt = subObj.AddComponent<RectTransform>();
+        strt.anchorMin = new Vector2(0f, 0f);
+        strt.anchorMax = new Vector2(1f, 1f);
+        strt.offsetMin = new Vector2(108f, 0f);
+        strt.offsetMax = Vector2.zero;
+
+        headerSubtitleText = subObj.AddComponent<Text>();
+        headerSubtitleText.font = font;
+        headerSubtitleText.fontSize = 13;
+        headerSubtitleText.fontStyle = FontStyle.Normal;
+        headerSubtitleText.alignment = TextAnchor.MiddleLeft;
+        headerSubtitleText.color = new Color(0.72f, 0.82f, 0.95f, 0.90f);
+        headerSubtitleText.text = GameLocalizationManager.T("HEADER_SUBTITLE", "⚡ MÊ CUNG HUYỀN BÍ ● SINH TỒN TỔ ĐỘI 4 NGƯỜI ⚡");
     }
 
     private void BuildTopCenterNavTabs(Transform parent, Font font)
@@ -1023,7 +1101,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         ol2.effectDistance = new Vector2(1f, 1f);
 
         Button btn2 = tab2.AddComponent<Button>();
-        btn2.onClick.AddListener(() => OnCard1_StartSinglePlayer());
+        btn2.onClick.AddListener(() => OnSoloTabClicked());
 
         GameObject t2Obj = new GameObject("Text");
         t2Obj.transform.SetParent(tab2.transform, false);
@@ -1083,7 +1161,45 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         rrt.anchorMax = new Vector2(1f, 1f);
         rrt.pivot = new Vector2(1f, 1f);
         rrt.anchoredPosition = new Vector2(-45f, -24f);
-        rrt.sizeDelta = new Vector2(370f, 48f);
+        rrt.sizeDelta = new Vector2(550f, 48f);
+
+        // 0. Nút Chuyển Đổi Ngôn Ngữ Nhanh: 🌐 [VI] 🇻🇳 Tiếng Việt (Click để đổi Tiếng Việt / English / Español / 中文)
+        GameObject langPill = new GameObject("HeaderLanguagePill");
+        langPill.transform.SetParent(rightBar.transform, false);
+        RectTransform lrt = langPill.AddComponent<RectTransform>();
+        lrt.anchorMin = new Vector2(0f, 0.5f);
+        lrt.anchorMax = new Vector2(0f, 0.5f);
+        lrt.pivot = new Vector2(0f, 0.5f);
+        lrt.anchoredPosition = new Vector2(0f, 0f);
+        lrt.sizeDelta = new Vector2(175f, 44f);
+
+        Image lbg = langPill.AddComponent<Image>();
+        lbg.color = new Color(0.06f, 0.12f, 0.24f, 0.95f);
+        Outline lol = langPill.AddComponent<Outline>();
+        lol.effectColor = new Color(0.20f, 0.55f, 0.95f, 0.85f);
+        lol.effectDistance = new Vector2(1.5f, 1.5f);
+
+        Button lbtn = langPill.AddComponent<Button>();
+        lbtn.onClick.AddListener(() =>
+        {
+            GameLocalizationManager.CycleNextLanguage();
+        });
+
+        GameObject ltxtObj = new GameObject("Text");
+        ltxtObj.transform.SetParent(langPill.transform, false);
+        RectTransform ltrt = ltxtObj.AddComponent<RectTransform>();
+        ltrt.anchorMin = Vector2.zero;
+        ltrt.anchorMax = Vector2.one;
+        ltrt.offsetMin = new Vector2(8f, 0f);
+        ltrt.offsetMax = new Vector2(-8f, 0f);
+
+        headerLanguageBtnText = ltxtObj.AddComponent<Text>();
+        headerLanguageBtnText.font = font;
+        headerLanguageBtnText.fontSize = 14;
+        headerLanguageBtnText.fontStyle = FontStyle.Bold;
+        headerLanguageBtnText.alignment = TextAnchor.MiddleCenter;
+        headerLanguageBtnText.color = new Color(0.65f, 0.92f, 1.0f);
+        UpdateLanguageButtonLabel();
 
         // 1. Profile Capsule: 👤 Player_001 ▾
         GameObject profilePill = new GameObject("PlayerProfilePill");
@@ -1092,8 +1208,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         prt.anchorMin = new Vector2(0f, 0.5f);
         prt.anchorMax = new Vector2(0f, 0.5f);
         prt.pivot = new Vector2(0f, 0.5f);
-        prt.anchoredPosition = new Vector2(0f, 0f);
-        prt.sizeDelta = new Vector2(215f, 44f);
+        prt.anchoredPosition = new Vector2(185f, 0f);
+        prt.sizeDelta = new Vector2(195f, 44f);
 
         Image pbg = profilePill.AddComponent<Image>();
         pbg.color = new Color(0.06f, 0.09f, 0.18f, 0.92f);
@@ -1115,12 +1231,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform ptrt = ptxtObj.AddComponent<RectTransform>();
         ptrt.anchorMin = Vector2.zero;
         ptrt.anchorMax = Vector2.one;
-        ptrt.offsetMin = new Vector2(12f, 0f);
-        ptrt.offsetMax = new Vector2(-12f, 0f);
+        ptrt.offsetMin = new Vector2(10f, 0f);
+        ptrt.offsetMax = new Vector2(-10f, 0f);
 
         topRightPlayerNameText = ptxtObj.AddComponent<Text>();
         topRightPlayerNameText.font = font;
-        topRightPlayerNameText.fontSize = 15;
+        topRightPlayerNameText.fontSize = 14;
         topRightPlayerNameText.fontStyle = FontStyle.Bold;
         topRightPlayerNameText.alignment = TextAnchor.MiddleCenter;
         topRightPlayerNameText.color = new Color(0.92f, 0.96f, 1.0f);
@@ -1133,7 +1249,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         drt.anchorMin = new Vector2(0f, 0.5f);
         drt.anchorMax = new Vector2(0f, 0.5f);
         drt.pivot = new Vector2(0.5f, 0.5f);
-        drt.anchoredPosition = new Vector2(230f, 0f);
+        drt.anchoredPosition = new Vector2(392f, 0f);
         drt.sizeDelta = new Vector2(1.5f, 24f);
         Image dimg = divObj.AddComponent<Image>();
         dimg.color = new Color(0.35f, 0.48f, 0.75f, 0.60f);
@@ -1145,7 +1261,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         srt.anchorMin = new Vector2(0f, 0.5f);
         srt.anchorMax = new Vector2(0f, 0.5f);
         srt.pivot = new Vector2(0.5f, 0.5f);
-        srt.anchoredPosition = new Vector2(262f, 0f);
+        srt.anchoredPosition = new Vector2(420f, 0f);
         srt.sizeDelta = new Vector2(44f, 44f);
 
         Image sbg = setBtn.AddComponent<Image>();
@@ -1170,6 +1286,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         stxtC.alignment = TextAnchor.MiddleCenter;
         stxtC.color = new Color(1f, 0.92f, 0.40f);
         stxtC.text = "⚙️";
+        lobbySettingsBtnText = stxtC;
 
         // 4. Power/Quit Button ⏻
         GameObject quitBtn = new GameObject("QuickQuitIconBtn");
@@ -1178,7 +1295,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         qrt.anchorMin = new Vector2(0f, 0.5f);
         qrt.anchorMax = new Vector2(0f, 0.5f);
         qrt.pivot = new Vector2(0.5f, 0.5f);
-        qrt.anchoredPosition = new Vector2(318f, 0f);
+        qrt.anchoredPosition = new Vector2(476f, 0f);
         qrt.sizeDelta = new Vector2(44f, 44f);
 
         Image qbg = quitBtn.AddComponent<Image>();
@@ -1637,7 +1754,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         Text ttTxt = titleObj.AddComponent<Text>();
         ttTxt.font = font;
-        ttTxt.fontSize = isRoyalCenterCard ? 22 : 20;
+        ttTxt.fontSize = isRoyalCenterCard ? 24 : 22;
         ttTxt.fontStyle = FontStyle.Bold;
         ttTxt.alignment = TextAnchor.MiddleCenter;
         ttTxt.color = isRoyalCenterCard ? new Color(1f, 0.92f, 0.65f) : Color.white;
@@ -1649,7 +1766,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         Outline ttOut = titleObj.AddComponent<Outline>();
         ttOut.effectColor = new Color(0f, 0f, 0f, 0.90f);
-        ttOut.effectDistance = new Vector2(1.5f, -1.5f);
+        ttOut.effectDistance = new Vector2(1.0f, -1.0f);
 
         // 7. Mô tả phụ của Thẻ (Subtitle 2 dòng)
         GameObject subObj = new GameObject("CardSubtitle");
@@ -1663,7 +1780,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         Text stTxt = subObj.AddComponent<Text>();
         stTxt.font = font;
-        stTxt.fontSize = 14;
+        stTxt.fontSize = 17;
         stTxt.fontStyle = FontStyle.Normal;
         stTxt.alignment = TextAnchor.MiddleCenter;
         stTxt.lineSpacing = 1.15f;
@@ -1686,7 +1803,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             new Color(themeColor.r, themeColor.g, themeColor.b, 1f),
             btnLabel,
             font,
-            16,
+            17,
             () => onClickAction?.Invoke()
         );
         if (index >= 0 && index < cardBtnTexts.Length)
@@ -1729,7 +1846,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         brt.anchorMin = new Vector2(0f, 0f);
         brt.anchorMax = new Vector2(1f, 0f);
         brt.pivot = new Vector2(0.5f, 0f);
-        brt.anchoredPosition = new Vector2(0f, 12f);
+        brt.anchoredPosition = new Vector2(0f, 30f);
         brt.sizeDelta = new Vector2(0f, 38f);
 
         // Trái: ● Trạng thái kết nối: Kết nối tốt
@@ -1763,7 +1880,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         bottomSloganText = rightObj.AddComponent<Text>();
         bottomSloganText.font = font;
-        bottomSloganText.fontSize = 14;
+        bottomSloganText.fontSize = 16;
         bottomSloganText.fontStyle = FontStyle.Bold;
         bottomSloganText.alignment = TextAnchor.MiddleRight;
         bottomSloganText.supportRichText = true;
@@ -2072,7 +2189,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         waitingReadyBtnOutline = readyBtn.GetComponent<Outline>();
         waitingReadyBtnText = readyBtn.GetComponentInChildren<Text>();
 
-        // Nút Bắt Đầu Ngay (Dành cho Chủ phòng nếu muốn Test nhanh không cần chờ đủ 4 máy)
+        // Nút Bắt Đầu Ngay (Cho phép Chủ phòng vào trận bất cứ lúc nào, hỗ trợ cả 1, 2, 3 và 4 người)
         Button forceBtn = CreateStyledActionButton(
             mainBox.transform,
             "ForceStartTestBtn",
@@ -2082,16 +2199,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             new Vector2(460f, 60f),
             new Color(0.16f, 0.62f, 0.36f, 0.95f),
             new Color(0.35f, 0.98f, 0.62f, 1f),
-            "⚡ Chủ Phòng: Bắt Đầu Ngay (Test Nhanh) [F1]",
+            "⚡ Chủ Phòng: Bắt Đầu Vào Trận Ngay ➔",
             font,
             19,
             OnHostForceStartClicked
         );
         waitingForceStartBtnObj = forceBtn.gameObject;
-        if (!Application.isEditor && waitingForceStartBtnObj != null)
-        {
-            waitingForceStartBtnObj.SetActive(false);
-        }
+        waitingForceStartBtnObj.SetActive(true);
     }
 
     private PlayerSlotUI CreateWaitingPlayerSlotCard(Transform parent, int slotIndex, float posX, Font font)
@@ -2253,7 +2367,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
         rt.anchoredPosition = new Vector2(0f, -30f);
-        rt.sizeDelta = new Vector2(580f, 260f);
+        rt.sizeDelta = new Vector2(660f, 300f);
 
         Image bg = matchmakingSpinnerOverlayObj.AddComponent<Image>();
         bg.color = new Color(0.04f, 0.07f, 0.16f, 0.97f);
@@ -2329,16 +2443,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         matchmakingSpinnerCountText.alignment = TextAnchor.MiddleCenter;
         matchmakingSpinnerCountText.color = Color.white;
         matchmakingSpinnerCountText.supportRichText = true;
-        matchmakingSpinnerCountText.text = "👥 Đã tìm thấy: <color=#2EE87A>1 / 4</color> người chơi (Đủ 4 tự vào)";
+        matchmakingSpinnerCountText.text = "👥 Đã tìm thấy: <color=#2EE87A>1 / 4</color> người chơi (Bấm nút xanh để vào Solo ngay)";
 
-        // Nút HỦY TÌM TRẬN
+        // 1. Nút HỦY TÌM TRẬN (Bên trái)
         Button cancelBtn = CreateStyledActionButton(
             matchmakingSpinnerOverlayObj.transform,
             "CancelMatchmakingBtn",
             new Vector2(0.5f, 0f),
             new Vector2(0.5f, 0f),
-            new Vector2(0f, 18f),
-            new Vector2(230f, 44f),
+            new Vector2(-140f, 20f),
+            new Vector2(230f, 46f),
             new Color(0.75f, 0.20f, 0.20f, 0.95f),
             new Color(1f, 0.45f, 0.45f, 1f),
             GameLocalizationManager.T("SPINNER_CANCEL_BTN", "🛑 HỦY TÌM TRẬN"),
@@ -2348,6 +2462,24 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         );
         matchmakingSpinnerCancelBtn = cancelBtn;
         matchmakingSpinnerCancelBtnText = cancelBtn != null ? cancelBtn.GetComponentInChildren<Text>() : null;
+
+        // 2. Nút VÀO CHƠI SOLO NGAY (Bên phải - Không cần chờ ai!)
+        Button instantSoloBtn = CreateStyledActionButton(
+            matchmakingSpinnerOverlayObj.transform,
+            "InstantSoloFromSpinnerBtn",
+            new Vector2(0.5f, 0f),
+            new Vector2(0.5f, 0f),
+            new Vector2(140f, 20f),
+            new Vector2(270f, 46f),
+            new Color(0.16f, 0.62f, 0.36f, 0.95f),
+            new Color(0.35f, 0.98f, 0.62f, 1f),
+            "⚡ Vào Chơi Solo Ngay ➔",
+            font,
+            16,
+            OnInstantSoloFromMatchmakingClicked
+        );
+        matchmakingSpinnerInstantSoloBtn = instantSoloBtn;
+        matchmakingSpinnerInstantSoloBtnText = instantSoloBtn != null ? instantSoloBtn.GetComponentInChildren<Text>() : null;
 
         matchmakingSpinnerOverlayObj.SetActive(false);
     }
@@ -2502,6 +2634,26 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         EnterWaitingRoomWithId(rid, false);
     }
 
+    public void OnSoloTabClicked()
+    {
+        Debug.Log("<color=#2EE87A>[Lobby] Người chơi bấm Tab 'Chơi Đơn' -> Tự động khởi động màn chơi Solo với Ma AI Pumpkin!</color>");
+        CancelDirectMatchmaking();
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.StartSoloDropInLocally();
+        }
+    }
+
+    public void OnInstantSoloFromMatchmakingClicked()
+    {
+        Debug.Log("<color=#2EE87A>[Lobby] Người chơi bấm 'Vào Chơi Solo Ngay' từ bảng tìm trận!</color>");
+        CancelDirectMatchmaking();
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.StartSoloDropInLocally();
+        }
+    }
+
     public void OnCard1_StartSinglePlayer()
     {
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
@@ -2608,16 +2760,15 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             return;
         }
 
-        // 3. Nếu phòng chưa đủ 4 người (1, 2 hoặc 3 người):
-        // Nếu là người đi đơn 1 mình (Solo) -> Bắt đầu tìm trận ngay!
+        // 3. Nếu là người đi đơn 1 mình (Solo) -> Bắt đầu chơi Solo với Ma AI ngay lập tức!
         if (currentCount <= 1)
         {
-            photonMgr.StartSoloPartyMatchmaking();
-            UpdateWaitingRoomUI();
+            Debug.Log("<color=#2EE87A>[Lobby] Người chơi đơn bấm Sẵn Sàng -> Vào trận Solo với Ma AI ngay lập tức!</color>");
+            photonMgr.StartSoloDropInLocally();
             return;
         }
 
-        // Nếu là tổ đội (2 hoặc 3 người):
+        // 4. Nếu là tổ đội (2 hoặc 3 người):
         if (!photonMgr.IsLocalMaster)
         {
             // Thành viên trong đội: bật/tắt sẵn sàng
@@ -2625,14 +2776,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         }
         else
         {
-            // Chủ phòng tổ đội: kiểm tra xem các thành viên đã sẵn sàng hết chưa
+            // Chủ phòng tổ đội:
+            // Nếu tất cả thành viên khác đã sẵn sàng -> Vào trận ngay! (Hỗ trợ 2 hoặc 3 người mượt mà)
             if (photonMgr.AreAllOtherPlayersReady())
             {
-                photonMgr.StartSoloPartyMatchmaking();
+                Debug.Log($"<color=#2EE87A>[Lobby] Chủ phòng bấm Sẵn Sàng khi cả tổ đội ({currentCount} người) đã sẵn sàng -> Bắt đầu trận đấu ngay!</color>");
+                photonMgr.HostForceStartGame();
             }
             else
             {
-                photonMgr.AddSystemMessage("⚠️ Hãy nhắc đồng đội trong tổ đội bấm [Sẵn Sàng] trước khi Bắt Đầu Tìm Trận!");
+                photonMgr.AddSystemMessage("⚠️ Hãy nhắc đồng đội trong tổ đội bấm [Sẵn Sàng] trước khi Bắt Đầu!");
             }
         }
         UpdateWaitingRoomUI();
@@ -2676,23 +2829,19 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         bool isPhotonConnected = photonMgr != null && photonMgr.IsConnectedToMaster;
         bool isMatchRunning = PhotonMultiplayerChatVoice.IsGameStarted;
 
-        // 1. Cập nhật Badge Trạng Thái Kết Nối góc trên bên trái
-        if (connectionStatusBadgeText != null && connectionStatusDotImage != null)
+        // 1. Cập nhật Trạng Thái Kết Nối (Bottom Status Bar)
+        if (bottomConnectionStatusText != null)
         {
             if (isPhotonConnected)
             {
-                connectionStatusBadgeText.text = "Đã kết nối (Toàn Cầu)";
-                connectionStatusBadgeText.color = colConnected;
-                connectionStatusDotImage.color = colConnected;
+                bottomConnectionStatusText.text = $"<color=#00FF9D>●</color> {GameLocalizationManager.T("LOBBY_STATUS_GOOD", "Trạng thái kết nối: Đã kết nối Toàn Cầu")}";
             }
             else
             {
                 string st = (photonMgr != null && !string.IsNullOrEmpty(photonMgr.LastLobbyStatus))
                     ? photonMgr.LastLobbyStatus
-                    : "Đang kết nối...";
-                connectionStatusBadgeText.text = st;
-                connectionStatusBadgeText.color = colConnecting;
-                connectionStatusDotImage.color = colConnecting;
+                    : GameLocalizationManager.T("LOBBY_CONN_CONNECTING", "Đang kết nối...");
+                bottomConnectionStatusText.text = $"<color=#FFB300>●</color> {st}";
             }
         }
 
@@ -2750,7 +2899,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         }
 
         var photonMgr = PhotonMultiplayerChatVoice.Instance;
-        int sec = Mathf.FloorToInt(PhotonMultiplayerChatVoice.MatchmakingSearchDuration);
+        float searchDur = PhotonMultiplayerChatVoice.MatchmakingSearchDuration;
+        int sec = Mathf.FloorToInt(searchDur);
         string timeStr = $"{sec / 60:D2}:{sec % 60:D2}";
         if (matchmakingSpinnerTimerText != null)
         {
@@ -2776,9 +2926,26 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             {
                 matchmakingSpinnerCancelBtn.gameObject.SetActive(false);
             }
+            if (matchmakingSpinnerInstantSoloBtn != null && matchmakingSpinnerInstantSoloBtn.gameObject.activeSelf)
+            {
+                matchmakingSpinnerInstantSoloBtn.gameObject.SetActive(false);
+            }
         }
         else
         {
+            // TỰ ĐỘNG BẢO VỆ: Nếu tìm trận quá 12 giây mà chưa đủ 4 người, tự động chuyển vào màn Solo với Ma AI Pumpkin (hoàn toàn không lo bị treo)
+            if (searchDur >= 12f && count < 4)
+            {
+                Debug.Log("<color=#F39C12>[Lobby] Đã tìm trận 12s không có thêm người chơi, tự động khởi động Solo với Ma AI Pumpkin!</color>");
+                CancelDirectMatchmaking();
+                if (photonMgr != null)
+                {
+                    photonMgr.AddSystemMessage("⚡ Tự động bắt đầu chế độ Solo với Ma AI Pumpkin...");
+                    photonMgr.StartSoloDropInLocally();
+                }
+                return;
+            }
+
             if (matchmakingSpinnerTitleText != null)
             {
                 matchmakingSpinnerTitleText.text = "🔍 ĐANG TÌM TRẬN ĐẤU...";
@@ -2786,11 +2953,15 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             }
             if (matchmakingSpinnerCountText != null)
             {
-                matchmakingSpinnerCountText.text = $"👥 Đã tìm thấy: <color=#2EE87A>{count} / 4</color> người chơi (Đủ 4 tự vào)";
+                matchmakingSpinnerCountText.text = $"👥 Đã tìm thấy: <color=#2EE87A>{count} / 4</color> người chơi (Bấm nút xanh để vào Solo ngay)";
             }
             if (matchmakingSpinnerCancelBtn != null && !matchmakingSpinnerCancelBtn.gameObject.activeSelf)
             {
                 matchmakingSpinnerCancelBtn.gameObject.SetActive(true);
+            }
+            if (matchmakingSpinnerInstantSoloBtn != null && !matchmakingSpinnerInstantSoloBtn.gameObject.activeSelf)
+            {
+                matchmakingSpinnerInstantSoloBtn.gameObject.SetActive(true);
             }
         }
     }
@@ -2973,8 +3144,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             {
                 if (currentCount <= 1)
                 {
-                    waitingStatusBannerText.text = $"🎮 PHÒNG CHUẨN BỊ (ĐẤU ĐƠN): Bấm [⚔️ BẮT ĐẦU TÌM TRẬN] để tự động ghép cặp cùng 3 người chơi khác!";
-                    waitingStatusBannerText.color = new Color(0.40f, 0.75f, 1.0f, 1f);
+                    waitingStatusBannerText.text = "🎮 PHÒNG CHƠI ĐƠN: Bấm [🎮 VÀO CHƠI SOLO VỚI MA AI NGAY ➔] để khám phá mê cung ngay lập tức!";
+                    waitingStatusBannerText.color = new Color(0.25f, 0.95f, 0.65f, 1f);
                 }
                 else
                 {
@@ -2982,13 +3153,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                     if (photonMgr != null && photonMgr.IsLocalMaster)
                     {
                         waitingStatusBannerText.text = allOthers
-                            ? $"⚡ TẤT CẢ ĐỒNG ĐỘI ĐÃ SẴN SÀNG! Đội trưởng hãy bấm [BẮT ĐẦU TÌM TRẬN] để ghép thêm {required - currentCount} bạn lẻ!"
+                            ? $"⚡ TẤT CẢ ĐỒNG ĐỘI ĐÃ SẴN SÀNG! Chủ phòng hãy bấm [⚡ BẮT ĐẦU NGAY ({currentCount} NGƯỜI) ➔] để xuất kích!"
                             : $"⏳ PHÒNG TỔ ĐỘI ({currentCount}/{required} NGƯỜI): Đang chờ đồng đội bấm ✔ SẴN SÀNG...";
                         waitingStatusBannerText.color = allOthers ? new Color(0.20f, 1.0f, 0.65f, 1f) : new Color(1.0f, 0.84f, 0.28f, 1f);
                     }
                     else
                     {
-                        waitingStatusBannerText.text = $"🎮 PHÒNG TỔ ĐỘI ({currentCount}/{required} NGƯỜI): Hãy bấm ✔ SẴN SÀNG để Đội trưởng bắt đầu tìm trận!";
+                        waitingStatusBannerText.text = $"🎮 PHÒNG TỔ ĐỘI ({currentCount}/{required} NGƯỜI): Hãy bấm ✔ SẴN SÀNG để Chủ phòng bắt đầu trận đấu!";
                         waitingStatusBannerText.color = new Color(0.35f, 0.95f, 1.0f, 1f);
                     }
                 }
@@ -3004,6 +3175,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             bool canForce = photonMgr == null || photonMgr.IsLocalMaster;
             waitingForceStartBtnObj.SetActive(canForce);
+            Text fsText = waitingForceStartBtnObj.GetComponentInChildren<Text>();
+            if (fsText != null)
+            {
+                fsText.text = currentCount <= 1
+                    ? "⚡ Bắt Đầu Solo Với Ma AI ➔"
+                    : $"⚡ Chủ Phòng: Vào Trận Ngay ({currentCount} Người) ➔";
+            }
         }
 
         if (waitingReadyBtnText != null)
@@ -3055,20 +3233,20 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 // Chưa đủ 4 người
                 if (currentCount <= 1)
                 {
-                    // Người chơi đơn 1 mình
-                    waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_BTN_START_SEARCH", "⚔️ BẮT ĐẦU TÌM TRẬN (SẴN SÀNG)");
-                    if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.95f, 0.52f, 0.10f, 0.95f);
-                    if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.00f, 0.75f, 0.25f, 1f);
+                    // Người chơi đơn 1 mình: Cho vào chơi ngay lập tức với Ma Bí Ngô AI
+                    waitingReadyBtnText.text = "🎮 VÀO CHƠI SOLO VỚI MA AI NGAY ➔";
+                    if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.16f, 0.62f, 0.36f, 0.95f);
+                    if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.98f, 0.62f, 1f);
                 }
                 else
                 {
                     // Tổ đội (2 hoặc 3 người)
                     if (photonMgr != null && !photonMgr.IsLocalMaster)
                     {
-                        // Thành viên trong đội
+                        // Thành viên trong đội: Bấm sẵn sàng
                         waitingReadyBtnText.text = isMeReady
                             ? GameLocalizationManager.T("WAITING_BTN_READY_CANCEL", "✔ ĐÃ SẴN SÀNG (Click để hủy)")
-                            : GameLocalizationManager.T("WAITING_BTN_READY_CONFIRM", "✔ BẤM ĐỂ SẴN SÀNG");
+                            : GameLocalizationManager.T("WAITING_BTN_READY_CONFIRM", "✔ BẤM ĐỂ XÁC NHẬN SẴN SÀNG");
                         if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = isMeReady ? new Color(0.16f, 0.62f, 0.36f, 0.95f) : new Color(0.18f, 0.45f, 0.85f, 0.95f);
                         if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = isMeReady ? new Color(0.35f, 0.98f, 0.62f, 1f) : new Color(0.35f, 0.70f, 1.00f, 1f);
                     }
@@ -3078,13 +3256,13 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                         bool allOthers = photonMgr != null && photonMgr.AreAllOtherPlayersReady();
                         if (allOthers)
                         {
-                            waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_BTN_START_SEARCH", "⚔️ BẮT ĐẦU TÌM TRẬN");
-                            if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.95f, 0.52f, 0.10f, 0.95f);
-                            if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(1.00f, 0.75f, 0.25f, 1f);
+                            waitingReadyBtnText.text = $"⚡ TẤT CẢ ĐÃ SẴN SÀNG — BẮT ĐẦU NGAY ({currentCount} NGƯỜI) ➔";
+                            if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.16f, 0.62f, 0.36f, 0.95f);
+                            if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.98f, 0.62f, 1f);
                         }
                         else
                         {
-                            waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_READY_NO", "⏳ CHỜ TỔ ĐỘI SẴN SÀNG...");
+                            waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_READY_NO", "⏳ CHỜ TỔ ĐỘI BẤM SẴN SÀNG...");
                             if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.35f, 0.40f, 0.50f, 0.95f);
                             if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.50f, 0.55f, 0.65f, 1f);
                         }
@@ -3168,7 +3346,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         bottomDisclaimerText = txtGo.AddComponent<Text>();
         bottomDisclaimerText.font = font;
-        bottomDisclaimerText.fontSize = 12;
+        bottomDisclaimerText.fontSize = 15;
         bottomDisclaimerText.alignment = TextAnchor.MiddleCenter;
         bottomDisclaimerText.color = new Color(0.72f, 0.78f, 0.85f, 0.90f);
         bottomDisclaimerText.supportRichText = true;
@@ -3209,11 +3387,6 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             bottomDisclaimerText.text = GameLocalizationManager.T("AGE_DISCLAIMER_FULL");
         }
 
-        if (connectionStatusLabelText != null)
-        {
-            connectionStatusLabelText.text = GameLocalizationManager.T("LOBBY_CONN_STATUS_LABEL", "Trạng thái kết nối:");
-        }
-
         if (roomIdLabelText != null)
         {
             roomIdLabelText.text = GameLocalizationManager.T("LOBBY_ROOM_ID_LABEL", "ID Phòng:");
@@ -3227,11 +3400,6 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         if (joinRoomBtnText != null)
         {
             joinRoomBtnText.text = GameLocalizationManager.T("BTN_JOIN_ROOM", "➔  Tham gia");
-        }
-
-        if (createRoomBtnText != null)
-        {
-            createRoomBtnText.text = GameLocalizationManager.T("BTN_CREATE_ROOM", "👑  Tạo phòng");
         }
 
         if (topRightPlayerNameText != null)

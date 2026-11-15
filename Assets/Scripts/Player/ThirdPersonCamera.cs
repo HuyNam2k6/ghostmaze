@@ -117,6 +117,55 @@ public class ThirdPersonCamera : MonoBehaviour
     private float defaultNearClip;
     private Transform rendererCacheOwner;
 
+    [Header("Hiệu Ứng Rung Màn Hình (Screen Shake)")]
+    private float shakeIntensity = 0f;
+    private float shakeDuration = 0f;
+    private float shakeTimer = 0f;
+    private Vector3 currentShakeOffset = Vector3.zero;
+    private Vector3 currentShakeRotOffset = Vector3.zero;
+
+    /// <summary>
+    /// Kích hoạt hiệu ứng rung màn hình nhẹ khi trúng đòn hoặc bắn trúng quái ma bí ngô
+    /// </summary>
+    public static void TriggerScreenShake(float intensity = 0.08f, float duration = 0.22f)
+    {
+        var cam = Instance;
+        if (cam != null)
+        {
+            cam.StartShake(intensity, duration);
+        }
+    }
+
+    public void StartShake(float intensity, float duration)
+    {
+        shakeIntensity = intensity;
+        shakeDuration = Mathf.Max(0.04f, duration);
+        shakeTimer = shakeDuration;
+    }
+
+    private void UpdateShake()
+    {
+        if (shakeTimer > 0f)
+        {
+            shakeTimer -= Time.unscaledDeltaTime;
+            float progress = Mathf.Clamp01(shakeTimer / shakeDuration);
+            float damp = progress * progress; // Giảm dần phi tuyến tính mượt mà
+
+            float seed = Time.unscaledTime * 42f;
+            float offsetX = (Mathf.PerlinNoise(seed, 0f) * 2f - 1f) * shakeIntensity * damp;
+            float offsetY = (Mathf.PerlinNoise(0f, seed) * 2f - 1f) * shakeIntensity * damp;
+            float offsetZ = (Mathf.PerlinNoise(seed, seed) * 2f - 1f) * (shakeIntensity * 0.4f) * damp;
+
+            currentShakeOffset = new Vector3(offsetX, offsetY, offsetZ);
+            currentShakeRotOffset = new Vector3(offsetY * 18f, offsetX * 18f, offsetX * 8f);
+        }
+        else
+        {
+            currentShakeOffset = Vector3.zero;
+            currentShakeRotOffset = Vector3.zero;
+        }
+    }
+
     private static bool _manualUIPanelOpen = false;
 
     /// <summary>
@@ -585,8 +634,10 @@ public class ThirdPersonCamera : MonoBehaviour
             cachedCamera.nearClipPlane = smoothBlend > 0.6f ? firstPersonNearClip : defaultNearClip;
         }
 
-        transform.position = finalPos;
-        transform.rotation = rotation;
+        UpdateShake();
+
+        transform.position = finalPos + currentShakeOffset;
+        transform.rotation = rotation * Quaternion.Euler(currentShakeRotOffset);
     }
 
     /// <summary>

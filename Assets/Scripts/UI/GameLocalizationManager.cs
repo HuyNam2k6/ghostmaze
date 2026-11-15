@@ -751,34 +751,34 @@ public static class GameLocalizationManager
             "✔ 设置已自动保存"
         } },
         { "SETTINGS_GRAPHICS_HEADER", new string[] {
-            "🎨 1. CHẤT LƯỢNG ĐỒ HỌA (GRAPHICS)",
-            "🎨 1. GRAPHICS QUALITY",
-            "🎨 1. CALIDAD GRÁFICA",
-            "🎨 1. 画面质量"
+            "🎨 1. ĐỒ HỌA 3D (3D GRAPHICS - UI/UX LUÔN SIÊU NÉT)",
+            "🎨 1. 3D GRAPHICS (UI/UX ALWAYS CRISP 100%)",
+            "🎨 1. GRÁFICOS 3D (UI/UX SIEMPRE NÍTIDO 100%)",
+            "🎨 1. 3D画面质量 (UI/UX 始终100%高清锐利)"
         } },
         { "SETTINGS_GRAPHICS_BOOST_BTN", new string[] {
-            "🌟 TĂNG ĐỒ HỌA CỰC ĐẠI (SIÊU NÉT 130%)",
-            "🌟 ULTRA GRAPHICS (CRISP 130%)",
-            "🌟 GRÁFICOS ULTRA (NÍTIDO 130%)",
-            "🌟 极限画质 (130%高精锐化)"
+            "🌟 ĐỒ HỌA 3D TỐI ĐA (BÓNG ĐỔ & MSAA 4X)",
+            "🌟 MAX 3D GRAPHICS (FULL SHADOWS & 4X MSAA)",
+            "🌟 GRÁFICOS 3D ULTRA (SOMBRAS Y 4X MSAA)",
+            "🌟 顶级3D画质 (全阴影与4倍抗锯齿)"
         } },
         { "SETTINGS_GRAPHICS_ULTRA", new string[] {
-            "🌟 Siêu Đẹp (130%)",
-            "🌟 Ultra (130%)",
-            "🌟 Ultra (130%)",
-            "🌟 极限 (130%)"
+            "🌟 3D Siêu Đẹp",
+            "🌟 3D Ultra",
+            "🌟 3D Ultra",
+            "🌟 3D 极限"
         } },
         { "SETTINGS_GRAPHICS_MED", new string[] {
-            "⚖️ Cân Bằng (100%)",
-            "⚖️ Balanced (100%)",
-            "⚖️ Equilibrado (100%)",
-            "⚖️ 平衡 (100%)"
+            "⚖️ 3D Cân Bằng",
+            "⚖️ 3D Balanced",
+            "⚖️ 3D Equilibrado",
+            "⚖️ 3D 平衡"
         } },
         { "SETTINGS_GRAPHICS_LOW", new string[] {
-            "⚡ Tiết Kiệm (85%)",
-            "⚡ Power Save (85%)",
-            "⚡ Ahorro (85%)",
-            "⚡ 流畅省电 (85%)"
+            "⚡ 3D Tiết Kiệm",
+            "⚡ 3D Power Save",
+            "⚡ 3D Ahorro",
+            "⚡ 3D 流畅省电"
         } },
         { "SETTINGS_FPS_HEADER", new string[] {
             "⚡ 2. TỐC ĐỘ KHUNG HÌNH (FPS)",

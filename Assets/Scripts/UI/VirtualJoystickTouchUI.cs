@@ -786,18 +786,18 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
     private void EnsureAllProceduralSprites()
     {
-        if (joystickBaseSprite == null) joystickBaseSprite = CreateJoystickBaseSprite(256);
-        if (joystickHandleSprite == null) joystickHandleSprite = CreateJoystickHandleSprite(128);
-        if (fppCapsuleSprite == null) fppCapsuleSprite = CreateCapsuleSprite(160, 64, 30);
-        if (cameraIconSprite == null) cameraIconSprite = CreateCameraIconSprite(48);
-        if (autoRunIconSprite == null) autoRunIconSprite = CreateRunIconSprite(48);
-        if (jumpButtonSprite == null) jumpButtonSprite = CreateJumpButtonSprite(256);
-        if (punchButtonSprite == null) punchButtonSprite = CreatePunchButtonSprite(256);
-        if (crosshairSprite == null) crosshairSprite = CreateCrosshairSprite(64);
+        if (joystickBaseSprite == null) joystickBaseSprite = CreateJoystickBaseSprite(512);
+        if (joystickHandleSprite == null) joystickHandleSprite = CreateJoystickHandleSprite(256);
+        if (fppCapsuleSprite == null) fppCapsuleSprite = CreateCapsuleSprite(240, 80, 40);
+        if (cameraIconSprite == null) cameraIconSprite = CreateCameraIconSprite(128);
+        if (autoRunIconSprite == null) autoRunIconSprite = CreateRunIconSprite(128);
+        if (jumpButtonSprite == null) jumpButtonSprite = CreateJumpButtonSprite(384);
+        if (punchButtonSprite == null) punchButtonSprite = CreatePunchButtonSprite(384);
+        if (crosshairSprite == null) crosshairSprite = CreateCrosshairSprite(128);
 
         if (cachedFont == null)
         {
-            cachedFont = UIFontHelper.GetCrispFont(14);
+            cachedFont = UIFontHelper.GetCrispFont(36);
         }
     }
 
@@ -807,13 +807,10 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         canvasGo.transform.SetParent(transform, false);
 
         touchCanvas = canvasGo.AddComponent<Canvas>();
-        touchCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
         touchCanvas.sortingOrder = 35;
 
         CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 0.5f;
+        UIFontHelper.ConfigureCrispCanvas(touchCanvas, scaler);
 
         canvasGo.AddComponent<GraphicRaycaster>();
 
@@ -1064,7 +1061,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         autoRunBtnText = textGo.AddComponent<Text>();
         autoRunBtnText.font = cachedFont;
         autoRunBtnText.text = "TỰ CHẠY";
-        autoRunBtnText.fontSize = 14;
+        autoRunBtnText.fontSize = 15;
         autoRunBtnText.fontStyle = FontStyle.Bold;
         autoRunBtnText.alignment = TextAnchor.MiddleCenter;
         autoRunBtnText.color = new Color(0.55f, 0.96f, 1.0f, 0.98f);
@@ -1072,7 +1069,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
         Shadow shadow = textGo.AddComponent<Shadow>();
         shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
-        shadow.effectDistance = new Vector2(1.5f, -1.5f);
+        shadow.effectDistance = new Vector2(1.0f, -1.0f);
 
         UpdateAutoRunBtnLabel();
         RegisterCustomHUDTarget(btnGo, "AutoRun", "Nút Tự Chạy (Auto-Run)", autoRunBtnRect, null, new Vector2(338f, 132f), 1f);
@@ -1329,7 +1326,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
         Outline outline = textGo.AddComponent<Outline>();
         outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
-        outline.effectDistance = new Vector2(1.2f, -1.2f);
+        outline.effectDistance = new Vector2(0.8f, -0.8f);
 
         EventTrigger trigger = btnGo.AddComponent<EventTrigger>();
         EventTrigger.Entry downEntry = new EventTrigger.Entry();
@@ -2032,7 +2029,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         toggleCursorText = textGo.AddComponent<Text>();
         toggleCursorText.font = cachedFont;
         toggleCursorText.text = "🖱️ Hiện Chuột [T]";
-        toggleCursorText.fontSize = 14;
+        toggleCursorText.fontSize = 15;
         toggleCursorText.fontStyle = FontStyle.Bold;
         toggleCursorText.alignment = TextAnchor.MiddleCenter;
         toggleCursorText.color = new Color(0.9f, 0.95f, 1f, 0.95f);

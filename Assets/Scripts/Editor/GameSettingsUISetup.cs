@@ -79,7 +79,7 @@ public static class GameSettingsUISetup
         GameObject fpsCounterGo = CreateTextObject("FPSCounter", fpsBadge.transform,
             Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
             Vector2.zero, Vector2.zero,
-            "<color=#2ECC71>120 FPS</color>  (8.3 ms)", 14, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
+            "<color=#2ECC71>120 FPS</color>  (8.3 ms)", 15, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white);
         manager.fpsCounterText = fpsCounterGo.GetComponent<Text>();
 
         // 5.2 THANH MÁU NGƯỜI CHƠI (PLAYER HP BAR - Ngay dưới FPS Badge)
@@ -104,13 +104,13 @@ public static class GameSettingsUISetup
         CreateTextObject("PlayerHP_Title", hpPanel.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -6f), new Vector2(-24f, 22f),
-            "❤️ MÁU PLAYER", 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.82f, 0.85f));
+            "❤️ MÁU PLAYER", 14, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1.0f, 0.82f, 0.85f));
 
         // Số máu '100 / 100 HP'
         GameObject hpValTxtGo = CreateTextObject("PlayerHP_ValueText", hpPanel.transform,
             new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0.5f, 1f),
             new Vector2(0f, -6f), new Vector2(-24f, 22f),
-            "100 / 100 HP", 12, FontStyle.Bold, TextAnchor.MiddleRight, Color.white);
+            "100 / 100 HP", 15, FontStyle.Bold, TextAnchor.MiddleRight, Color.white);
 
         // Khung rãnh thanh máu (Track)
         GameObject hpTrack = new GameObject("PlayerHP_Track");

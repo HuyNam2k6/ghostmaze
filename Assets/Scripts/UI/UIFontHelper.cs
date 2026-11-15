@@ -62,15 +62,14 @@ public static class UIFontHelper
     }
 
     /// <summary>
-    /// Cấu hình Canvas và CanvasScaler chuẩn Full HD 1080p, tắt pixelPerfect để tránh răng cưa subpixel và tăng dynamicPixelsPerUnit lên 3.0x cực sắc nét
+    /// Cấu hình Canvas và CanvasScaler chuẩn Full HD 1080p, tắt pixelPerfect để tránh xung đột tỷ lệ và tăng dynamicPixelsPerUnit lên 2.0x cực sắc nét
     /// </summary>
     public static void ConfigureCrispCanvas(Canvas canvas, CanvasScaler scaler)
     {
         if (canvas != null)
         {
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // TẮT pixelPerfect trên canvas scaled: Unity làm mờ chữ khi cố ép điểm ảnh float vào màn hình không nguyên
-            canvas.pixelPerfect = false;
+            canvas.pixelPerfect = false; // Tắt pixelPerfect khi dùng CanvasScaler ScaleWithScreenSize để triệt tiêu hiện tượng nhòe / vỡ nét do nội suy subpixel lệch tỷ lệ
         }
 
         if (scaler != null)
@@ -80,7 +79,7 @@ public static class UIFontHelper
             scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
             scaler.matchWidthOrHeight = 0.5f;
             scaler.referencePixelsPerUnit = 100f;
-            scaler.dynamicPixelsPerUnit = 3.0f; // Tăng độ phân giải raster của font chữ lên 3.0 lần siêu sắc nét chống mờ
+            scaler.dynamicPixelsPerUnit = 2.0f; // 2.0x tối ưu chuẩn: Nét gấp đôi mà không bị vỡ atlas bộ đệm font
         }
     }
 
@@ -95,7 +94,7 @@ public static class UIFontHelper
     /// <summary>
     /// Quét đệ quy toàn bộ Text trong GameObject và áp dụng Font sắc nét, tăng kích cỡ tối thiểu
     /// </summary>
-    public static void ApplyCrispnessRecursively(GameObject root, int minFontSize = 15)
+    public static void ApplyCrispnessRecursively(GameObject root, int minFontSize = 16)
     {
         if (root == null) return;
         Font crisp = GetCrispFont(36);
@@ -111,6 +110,84 @@ public static class UIFontHelper
             }
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
             t.verticalOverflow = VerticalWrapMode.Overflow;
+
+            Outline outline = t.GetComponent<Outline>();
+            if (outline != null)
+            {
+                if (t.fontSize <= 18)
+                {
+                    outline.effectDistance = new Vector2(0.8f, -0.8f);
+                    Color oc = outline.effectColor;
+                    oc.a = 0.75f;
+                    outline.effectColor = oc;
+                }
+                else
+                {
+                    outline.effectDistance = new Vector2(1.2f, -1.2f);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tự động quét và nâng cấp toàn bộ Canvases và Text trong Scene lên độ sắc nét cao nhất
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    public static void AutoCrispSceneOnLoad()
+    {
+        ApplyCrispnessToActiveScene();
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += (scene, mode) =>
+        {
+            ApplyCrispnessToActiveScene();
+        };
+    }
+
+    public static void ApplyCrispnessToActiveScene()
+    {
+        Font crisp = GetCrispFont(36);
+        Canvas[] allCanvases = Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include);
+        for (int i = 0; i < allCanvases.Length; i++)
+        {
+            Canvas c = allCanvases[i];
+            if (c == null) continue;
+
+            CanvasScaler scaler = c.GetComponent<CanvasScaler>();
+            ConfigureCrispCanvas(c, scaler);
+
+            Text[] texts = c.GetComponentsInChildren<Text>(true);
+            for (int j = 0; j < texts.Length; j++)
+            {
+                Text t = texts[j];
+                if (t == null) continue;
+
+                if (t.font == null || t.font.name == "Arial" || t.font.name == "LegacyRuntime")
+                {
+                    t.font = crisp;
+                }
+
+                if (t.fontSize < 15)
+                {
+                    t.fontSize = 15;
+                }
+                t.horizontalOverflow = HorizontalWrapMode.Wrap;
+                t.verticalOverflow = VerticalWrapMode.Overflow;
+
+                Outline outline = t.GetComponent<Outline>();
+                if (outline != null)
+                {
+                    if (t.fontSize <= 18)
+                    {
+                        outline.effectDistance = new Vector2(0.8f, -0.8f);
+                        Color oc = outline.effectColor;
+                        oc.a = 0.75f;
+                        outline.effectColor = oc;
+                    }
+                    else
+                    {
+                        outline.effectDistance = new Vector2(1.2f, -1.2f);
+                    }
+                }
+            }
         }
     }
 }

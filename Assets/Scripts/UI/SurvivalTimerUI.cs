@@ -1386,7 +1386,7 @@ public class SurvivalTimerUI : MonoBehaviour
 
         endReplayStatusText = voteStatusObj.AddComponent<Text>();
         endReplayStatusText.font = defaultFont;
-        endReplayStatusText.fontSize = 14;
+        endReplayStatusText.fontSize = 16;
         endReplayStatusText.fontStyle = FontStyle.Bold;
         endReplayStatusText.alignment = TextAnchor.MiddleCenter;
         endReplayStatusText.supportRichText = true;

@@ -1573,6 +1573,12 @@ public class PumpkinGhostAI : MonoBehaviour
 
         GhostChainStunVFX.ApplyChainStun(gameObject, freezeDuration, pushDirection, pushDistance, animator);
 
+        // Hiệu ứng rung màn hình nhẹ bên phía người chơi làm Ma khi bị trúng đòn cầu
+        if (isPlayerControlled || this == PlayerControlledGhost || (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsLocalPlayerGhostRole()))
+        {
+            ThirdPersonCamera.TriggerScreenShake(0.10f, 0.25f);
+        }
+
         if (freezeRoutine != null)
         {
             StopCoroutine(freezeRoutine);

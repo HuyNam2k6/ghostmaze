@@ -496,18 +496,14 @@ namespace GhostMaze.UI
             cGo.transform.SetParent(transform, false);
             Canvas canvas = cGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.pixelPerfect = true;
+            canvas.pixelPerfect = false;
             canvas.sortingOrder = 45;
 
             CanvasScaler scaler = cGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920f, 1080f);
-            scaler.matchWidthOrHeight = 0.5f;
-            scaler.dynamicPixelsPerUnit = 2.5f;
-            scaler.referencePixelsPerUnit = 100f;
+            UIFontHelper.ConfigureCrispCanvas(canvas, scaler);
             cGo.AddComponent<GraphicRaycaster>();
 
-            Font defaultFont = UIFontHelper.GetCrispFont(14);
+            Font defaultFont = UIFontHelper.GetCrispFont(36);
 
             // Khung chứa chính (MiniMap_Container)
             miniMapRoot = new GameObject("MiniMap_Container");

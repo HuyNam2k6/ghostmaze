@@ -417,7 +417,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         BroadcastLocalReadyState();
     }
 
-    private void StartSoloDropInLocally()
+    public void StartSoloDropInLocally()
     {
         IsSoloPlayMode = true;
         IsFullMultiplayerMatchActive = false;
@@ -2863,13 +2863,17 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 float pushDist = Convert.ToSingle(orbArr[3]);
                 float stunDur = Convert.ToSingle(orbArr[4]);
 
-                if (targetActor == myActor
-                    && SurvivalTimerUI.Instance != null
-                    && SurvivalTimerUI.Instance.CachedGhostVessel != null
-                    && SurvivalTimerUI.Instance.CachedGhostVessel.isPlayerControlled
-                    && SurvivalTimerUI.Instance.CachedGhostVessel.gameObject.activeInHierarchy)
+                if (targetActor == myActor)
                 {
-                    SurvivalTimerUI.Instance.CachedGhostVessel.ApplyKnockbackAndFreeze(pushDir, pushDist, stunDur);
+                    if (SurvivalTimerUI.Instance != null
+                        && SurvivalTimerUI.Instance.CachedGhostVessel != null
+                        && SurvivalTimerUI.Instance.CachedGhostVessel.isPlayerControlled
+                        && SurvivalTimerUI.Instance.CachedGhostVessel.gameObject.activeInHierarchy)
+                    {
+                        SurvivalTimerUI.Instance.CachedGhostVessel.ApplyKnockbackAndFreeze(pushDir, pushDist, stunDur);
+                    }
+                    // Rung màn hình bên phía người chơi làm Ma khi bị trúng đạn cầu
+                    ThirdPersonCamera.TriggerScreenShake(0.10f, 0.25f);
                 }
 
                 // Đồng bộ hiệu ứng xích trói và đứng yên cho con ma trên màn hình của tất cả người chơi khác
@@ -3526,6 +3530,13 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     public void HostForceStartGame()
     {
+        int count = CurrentRoomPlayersCount;
+        if (count <= 1)
+        {
+            StartSoloDropInLocally();
+            return;
+        }
+
         HostAssignRandomRoles();
         if (client != null && client.InRoom)
         {
@@ -3844,14 +3855,88 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             chatHistoryText = vpTrans.GetComponentInChildren<Text>(true);
         }
 
-        UIFontHelper.ApplyCrispnessRecursively(panel, 12);
+        UIFontHelper.ApplyCrispnessRecursively(panel, 15);
+        UpgradeChatVisualClarity(panel);
         chatPanelRect.gameObject.SetActive(true);
         return true;
     }
 
+    public void UpgradeChatVisualClarity(GameObject panel)
+    {
+        if (panel == null) return;
+
+        // 1. Nâng cấp Viewport chứa tin nhắn thành kính tối (dark obsidian glass) có viền cyan phát sáng
+        Transform vpTrans = panel.transform.Find("ChatHistoryViewport");
+        if (vpTrans != null)
+        {
+            Image vpImg = vpTrans.GetComponent<Image>();
+            if (vpImg != null)
+            {
+                vpImg.color = new Color(0.04f, 0.07f, 0.13f, 0.90f);
+            }
+            Outline vpOl = vpTrans.GetComponent<Outline>();
+            if (vpOl == null) vpOl = vpTrans.gameObject.AddComponent<Outline>();
+            if (vpOl != null)
+            {
+                vpOl.enabled = true;
+                vpOl.effectColor = new Color(0.20f, 0.55f, 0.95f, 0.55f);
+                vpOl.effectDistance = new Vector2(1f, -1f);
+            }
+            Text histText = vpTrans.GetComponentInChildren<Text>(true);
+            if (histText != null)
+            {
+                histText.fontSize = 14;
+                histText.color = new Color(0.96f, 0.98f, 1f, 1f);
+                Shadow sh = histText.GetComponent<Shadow>();
+                if (sh == null) sh = histText.gameObject.AddComponent<Shadow>();
+                if (sh != null)
+                {
+                    sh.effectColor = new Color(0f, 0f, 0f, 0.95f);
+                    sh.effectDistance = new Vector2(1f, -1f);
+                }
+            }
+        }
+
+        // 2. Nâng cấp Speaking Indicator
+        Transform spkTrans = panel.transform.Find("SpeakingIndicator");
+        if (spkTrans != null)
+        {
+            Text spkText = spkTrans.GetComponent<Text>();
+            if (spkText != null)
+            {
+                spkText.fontSize = 14;
+                spkText.fontStyle = FontStyle.Bold;
+                spkText.color = new Color(0.00f, 1.0f, 0.75f, 1f);
+                Shadow sh = spkText.GetComponent<Shadow>();
+                if (sh == null) sh = spkText.gameObject.AddComponent<Shadow>();
+                if (sh != null)
+                {
+                    sh.effectColor = new Color(0f, 0f, 0f, 0.95f);
+                    sh.effectDistance = new Vector2(1f, -1f);
+                }
+            }
+        }
+
+        // 3. Nâng cấp InputField
+        Transform inputTrans = panel.transform.Find("ChatInputRow/ChatInputField");
+        if (inputTrans != null)
+        {
+            Image inpImg = inputTrans.GetComponent<Image>();
+            if (inpImg != null) inpImg.color = new Color(0.06f, 0.10f, 0.18f, 0.95f);
+            Outline inpOl = inputTrans.GetComponent<Outline>();
+            if (inpOl == null) inpOl = inputTrans.gameObject.AddComponent<Outline>();
+            if (inpOl != null)
+            {
+                inpOl.enabled = true;
+                inpOl.effectColor = new Color(0.25f, 0.50f, 0.85f, 0.60f);
+                inpOl.effectDistance = new Vector2(1f, -1f);
+            }
+        }
+    }
+
     private void BuildChatAndVoiceUI()
     {
-        Font defaultFont = UIFontHelper.GetCrispFont(14);
+        Font defaultFont = UIFontHelper.GetCrispFont(36);
 
         // 1. Kiểm tra xem người dùng đã tạo sẵn PhotonChatVoicePanel trên Scene hay chưa
         GameObject existingPanel = GameObject.Find("PhotonChatVoicePanel");
@@ -4063,7 +4148,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         statusBadgeText = statusTxtObj.AddComponent<Text>();
         statusBadgeText.font = defaultFont;
-        statusBadgeText.fontSize = 11;
+        statusBadgeText.fontSize = 14;
         statusBadgeText.fontStyle = FontStyle.Bold;
         statusBadgeText.alignment = TextAnchor.MiddleCenter;
         statusBadgeText.color = new Color(0.35f, 0.95f, 0.60f, 1f);
@@ -4094,7 +4179,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         micButtonText = micTxtObj.AddComponent<Text>();
         micButtonText.font = defaultFont;
-        micButtonText.fontSize = 11;
+        micButtonText.fontSize = 14;
         micButtonText.fontStyle = FontStyle.Bold;
         micButtonText.alignment = TextAnchor.MiddleCenter;
         micButtonText.color = Color.white;
@@ -4125,7 +4210,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         Text voiceSetTxt = voiceSetTxtObj.AddComponent<Text>();
         voiceSetTxt.font = defaultFont;
-        voiceSetTxt.fontSize = 11;
+        voiceSetTxt.fontSize = 14;
         voiceSetTxt.fontStyle = FontStyle.Bold;
         voiceSetTxt.alignment = TextAnchor.MiddleCenter;
         voiceSetTxt.color = Color.white;
@@ -4192,8 +4277,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         vpRect.sizeDelta = new Vector2(0f, 178f);
 
         Image vpBg = chatHistoryViewportObj.AddComponent<Image>();
-        vpBg.color = new Color(0.03f, 0.05f, 0.09f, 0.45f);
+        vpBg.color = new Color(0.04f, 0.07f, 0.13f, 0.90f);
         vpBg.raycastTarget = false;
+        Outline vpOl = chatHistoryViewportObj.AddComponent<Outline>();
+        vpOl.effectColor = new Color(0.20f, 0.55f, 0.95f, 0.55f);
+        vpOl.effectDistance = new Vector2(1f, -1f);
         chatHistoryViewportObj.AddComponent<RectMask2D>();
 
         GameObject historyObj = new GameObject("ChatHistoryText");
@@ -4233,6 +4321,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         // Dựng Badge hiển thị ID Phòng & tiến độ đợi 4/4 Sẵn Sàng khi đang Chơi Đơn trong Map
         if (soloRoomBadgeObj == null) BuildSoloRoomBadgeUI(canvas, defaultFont);
+
+        if (chatPanelRect != null)
+        {
+            UpgradeChatVisualClarity(chatPanelRect.gameObject);
+        }
 
         if (startChatMinimized)
         {

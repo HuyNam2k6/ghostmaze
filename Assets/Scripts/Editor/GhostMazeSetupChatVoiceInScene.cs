@@ -52,7 +52,7 @@ public static class GhostMazeSetupChatVoiceInScene
         if (existingPanel != null)
         {
             existingPanel.gameObject.SetActive(true);
-            UIFontHelper.ApplyCrispnessRecursively(existingPanel.gameObject, 12);
+            UIFontHelper.ApplyCrispnessRecursively(existingPanel.gameObject, 15);
             if (forceNotify)
             {
                 Selection.activeGameObject = existingPanel.gameObject;
@@ -62,7 +62,7 @@ public static class GhostMazeSetupChatVoiceInScene
         }
 
         // 3. Nạp Font chữ sắc nét (Roboto / GameFont)
-        Font crispFont = UIFontHelper.GetCrispFont(14);
+        Font crispFont = UIFontHelper.GetCrispFont(36);
 
         // 4. Khởi tạo Khung Chat & Voice chính (PhotonChatVoicePanel)
         GameObject panel = new GameObject("PhotonChatVoicePanel");
@@ -196,22 +196,22 @@ public static class GhostMazeSetupChatVoiceInScene
         // 1. ChatBadgeButton
         CreateBottomBarButton(bottomBar.transform, "ChatBadgeButton", new Vector2(0f, 0f), new Vector2(0.28f, 1f),
             new Vector2(0f, 0f), new Vector2(-2f, 0f), new Color(0.12f, 0.18f, 0.25f, 0.92f),
-            "Chat [Enter] ●", 11, new Color(0.35f, 0.95f, 0.60f, 1f), crispFont);
+            "Chat [Enter] ●", 14, new Color(0.35f, 0.95f, 0.60f, 1f), crispFont);
 
         // 2. MicToggleButton
         CreateBottomBarButton(bottomBar.transform, "MicToggleButton", new Vector2(0.28f, 0f), new Vector2(0.68f, 1f),
             new Vector2(2f, 0f), new Vector2(-2f, 0f), new Color(0.65f, 0.22f, 0.22f, 0.92f),
-            "🎙 MIC: TẮT [V]", 11, Color.white, crispFont);
+            "🎙 MIC: TẮT [V]", 14, Color.white, crispFont);
 
         // 3. VoiceSettingsButton
         CreateBottomBarButton(bottomBar.transform, "VoiceSettingsButton", new Vector2(0.68f, 0f), new Vector2(0.88f, 1f),
             new Vector2(2f, 0f), new Vector2(-2f, 0f), new Color(0.18f, 0.48f, 0.88f, 0.92f),
-            "🔊 VOICE", 11, Color.white, crispFont);
+            "🔊 VOICE", 14, Color.white, crispFont);
 
         // 4. MinimizeChatButton
         CreateBottomBarButton(bottomBar.transform, "MinimizeChatButton", new Vector2(0.88f, 0f), new Vector2(1f, 1f),
             new Vector2(2f, 0f), Vector2.zero, new Color(0.16f, 0.22f, 0.30f, 0.92f),
-            "▼", 12, Color.white, crispFont);
+            "▼", 14, Color.white, crispFont);
 
         // SpeakingIndicator (Dòng chữ hiển thị người nói)
         GameObject speakObj = new GameObject("SpeakingIndicator");
@@ -225,12 +225,15 @@ public static class GhostMazeSetupChatVoiceInScene
 
         Text speakTxt = speakObj.AddComponent<Text>();
         speakTxt.font = crispFont;
-        speakTxt.fontSize = 12;
-        speakTxt.fontStyle = FontStyle.Italic;
+        speakTxt.fontSize = 14;
+        speakTxt.fontStyle = FontStyle.Bold;
         speakTxt.alignment = TextAnchor.MiddleLeft;
-        speakTxt.color = new Color(0.3f, 1f, 0.55f, 1f);
+        speakTxt.color = new Color(0.00f, 1.0f, 0.75f, 1f);
         speakTxt.text = "";
         speakTxt.raycastTarget = false;
+        Shadow spkShadow = speakObj.AddComponent<Shadow>();
+        spkShadow.effectColor = new Color(0f, 0f, 0f, 0.95f);
+        spkShadow.effectDistance = new Vector2(1f, -1f);
 
         // ChatHistoryViewport (Lịch sử tin nhắn nổi trên ô nhập)
         GameObject vpObj = new GameObject("ChatHistoryViewport");
@@ -243,8 +246,11 @@ public static class GhostMazeSetupChatVoiceInScene
         vpRect.sizeDelta = new Vector2(0f, 178f);
 
         Image vpBg = vpObj.AddComponent<Image>();
-        vpBg.color = new Color(0.03f, 0.05f, 0.09f, 0.45f);
+        vpBg.color = new Color(0.04f, 0.07f, 0.13f, 0.90f);
         vpBg.raycastTarget = false;
+        Outline vpOl = vpObj.AddComponent<Outline>();
+        vpOl.effectColor = new Color(0.20f, 0.55f, 0.95f, 0.55f);
+        vpOl.effectDistance = new Vector2(1f, -1f);
         vpObj.AddComponent<RectMask2D>();
 
         GameObject histObj = new GameObject("ChatHistoryText");
@@ -258,7 +264,7 @@ public static class GhostMazeSetupChatVoiceInScene
 
         Text histTxt = histObj.AddComponent<Text>();
         histTxt.font = crispFont;
-        histTxt.fontSize = 14;
+        histTxt.fontSize = 16;
         histTxt.lineSpacing = 1.08f;
         histTxt.alignment = TextAnchor.LowerLeft;
         histTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
