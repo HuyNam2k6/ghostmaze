@@ -59,6 +59,7 @@ public class MagicWaveOrb : MonoBehaviour
     private static Material s_RedTrailMaterial;
     private static readonly RaycastHit[] s_HitBuffer = new RaycastHit[16];
     private static readonly Collider[] s_OverlapBuffer = new Collider[12];
+    private int groundBounceCount = 0;
 
     public void SetPoolCallback(Action<MagicWaveOrb> onReturnToPool)
     {
@@ -74,6 +75,7 @@ public class MagicWaveOrb : MonoBehaviour
         aliveTimer = 0f;
         hasHitWall = false;
         wallTimer = 0f;
+        groundBounceCount = 0;
         EnsureRedVisuals();
 
         if (trailRenderer != null)
@@ -374,8 +376,16 @@ public class MagicWaveOrb : MonoBehaviour
         // Nếu va chạm với mặt đất phẳng hoặc dốc nhẹ (hitNorm hướng lên):
         if (hitNorm.y > 0.65f)
         {
-            // Nếu lực nảy thẳng đứng quá nhỏ, triệt tiêu trục Y và cho lăn chậm dần
-            if (Mathf.Abs(reflected.y) < 1.0f)
+            if (groundBounceCount < 4)
+            {
+                // Nhảy lật bật liên tiếp 4 nhịp trước khi lăn chậm dần
+                float minBounceY = 4.2f * Mathf.Pow(0.72f, groundBounceCount);
+                reflected.y = Mathf.Max(Mathf.Abs(reflected.y), minBounceY);
+                reflected.x *= 0.88f;
+                reflected.z *= 0.88f;
+                groundBounceCount++;
+            }
+            else if (Mathf.Abs(reflected.y) < 0.8f)
             {
                 reflected.y = 0f;
                 reflected.x *= 0.85f;

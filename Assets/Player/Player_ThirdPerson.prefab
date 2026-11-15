@@ -488,7 +488,7 @@ MonoBehaviour:
   jumpHeight: 1.25
   gravity: -20
   jumpCooldown: 0.35
-  jumpTakeoffDelay: 0.6
+  jumpTakeoffDelay: 0.1
   blockKey: 324
   blockRange: 4.5
   blockFacingAngleThreshold: 65

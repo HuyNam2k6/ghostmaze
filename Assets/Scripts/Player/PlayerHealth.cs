@@ -210,6 +210,11 @@ public class PlayerHealth : MonoBehaviour
             clawScratchImage.transform.localScale = Vector3.one * 1.15f; // Giật nảy nhẹ khi trúng đòn cào
         }
 
+        if (playerCtrl != null)
+        {
+            playerCtrl.OnTakeDamageInterrupt();
+        }
+
         if (playerCtrl != null && playerCtrl.playerAnimator != null)
         {
             bool isMoving = playerCtrl.ReadMoveInput().sqrMagnitude > 0.01f;
@@ -237,16 +242,15 @@ public class PlayerHealth : MonoBehaviour
             audioSource.PlayOneShot(hurtSound);
         }
 
-        // Đẩy lùi nhẹ nhân vật khi trúng đòn
+        // Đẩy lùi nhẹ nhân vật khi trúng đòn (giữ Y = 0 để không kẹt lơ lửng hay lún vào tường)
         if (characterController != null && characterController.enabled && gameObject.activeInHierarchy)
         {
             Vector3 knockDir = (transform.position - attackerPos);
             knockDir.y = 0f;
             if (knockDir.sqrMagnitude > 0.001f)
             {
-                knockDir = knockDir.normalized;
-                knockDir.y = 0.1f;
-                characterController.Move(knockDir * 1.1f);
+                knockDir.Normalize();
+                characterController.Move(knockDir * 0.35f);
             }
         }
 

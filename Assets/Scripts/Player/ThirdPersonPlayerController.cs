@@ -56,8 +56,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("Khoảng thời gian tối thiểu giữa 2 lần nhảy (giây) tránh kích hoạt đúp hoạt ảnh nhảy")]
     [Range(0.1f, 1f)] public float jumpCooldown = 0.35f;
 
-    [Tooltip("Thời gian chờ nhún chân lấy đà trong hoạt ảnh trước khi nhân vật thực sự bật bổng lên không trung (giây) - Mặc định 0.60s khớp Frame 18")]
-    [Range(0.02f, 1.5f)] public float jumpTakeoffDelay = 0.60f;
+    [Tooltip("Thời gian chờ nhún chân lấy đà trong hoạt ảnh trước khi nhân vật thực sự bật bổng lên không trung (giây) - Mặc định 0.10s")]
+    [Range(0.02f, 1.5f)] public float jumpTakeoffDelay = 0.10f;
 
     [Header("4. Kỹ Năng: Đỡ Đòn & Giữ Chân Ma (Block Skill - Freeze 3s)")]
     [Tooltip("Phím đỡ đòn (Mặc định: Chuột phải)")]
@@ -205,6 +205,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private static readonly Collider[] s_OverlapBuffer = new Collider[8];
 
     private float magicCastStartTime = -10f;
+    private float jumpAnticipationStartTime = -10f;
 
     private void Awake()
     {
@@ -769,10 +770,14 @@ public class ThirdPersonPlayerController : MonoBehaviour
             }
         }
 
-        // Tự động giải phóng trạng thái ném phép nếu bị kẹt (fail-safe chống đứng im)
+        // Tự động giải phóng trạng thái ném phép / nhún nhảy nếu bị kẹt (fail-safe chống đứng im)
         if (isCastingMagic && Time.time >= magicCastStartTime + Mathf.Max(1.5f, magicAttackLockDuration + 0.3f))
         {
             isCastingMagic = false;
+        }
+        if (isJumpAnticipating && Time.time >= jumpAnticipationStartTime + Mathf.Max(1.0f, jumpTakeoffDelay + 0.35f))
+        {
+            isJumpAnticipating = false;
         }
 
         bool isMatchRunning = PhotonMultiplayerChatVoice.IsGameStarted
@@ -1533,8 +1538,23 @@ public class ThirdPersonPlayerController : MonoBehaviour
     /// <summary>
     /// Xử lý di chuyển tương đối theo hướng Camera (Góc nhìn thứ 3)
     /// </summary>
+    public void OnTakeDamageInterrupt()
+    {
+        isJumpAnticipating = false;
+        isCastingMagic = false;
+        if (playerAnimator != null && playerAnimator.applyRootMotion)
+        {
+            playerAnimator.applyRootMotion = false;
+        }
+    }
+
     private void HandleMovement()
     {
+        if (playerAnimator != null && playerAnimator.applyRootMotion)
+        {
+            playerAnimator.applyRootMotion = false;
+        }
+
         // Khóa di chuyển khi: Mở bảng UI hoặc đang nhún chân lấy đà nhảy (Frame 18)
         if (ThirdPersonCamera.isUIPanelOpen || isJumpAnticipating)
         {
@@ -1685,6 +1705,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private IEnumerator RoutineJumpTakeoff()
     {
         isJumpAnticipating = true;
+        jumpAnticipationStartTime = Time.time;
 
         // 1. Kích hoạt ngay hoạt ảnh nhún chân chuẩn bị nhảy (vị trí bị khóa cứng trên sàn)
         if (playerAnimator != null && !string.IsNullOrEmpty(jumpTriggerName))
