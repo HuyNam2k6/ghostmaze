@@ -218,6 +218,24 @@ public class GhostChainStunVFX : MonoBehaviour
             {
                 col.enabled = false;
             }
+
+            // Tự động căn chỉnh tỷ lệ model Shackle vừa vặn bao quanh thân con ma (~1.15m)
+            Renderer[] childRenderers = assetChains.GetComponentsInChildren<Renderer>(true);
+            if (childRenderers.Length > 0)
+            {
+                Bounds b = childRenderers[0].bounds;
+                for (int i = 1; i < childRenderers.Length; i++)
+                {
+                    b.Encapsulate(childRenderers[i].bounds);
+                }
+                float maxDim = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+                if (maxDim > 2.5f || maxDim < 0.35f)
+                {
+                    float targetSize = 1.15f;
+                    float s = targetSize / Mathf.Max(0.001f, maxDim);
+                    assetChains.transform.localScale = Vector3.one * s;
+                }
+            }
         }
         else
         {

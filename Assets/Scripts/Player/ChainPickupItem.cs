@@ -193,6 +193,25 @@ public class ChainPickupItem : MonoBehaviour
             {
                 col.enabled = false;
             }
+
+            // Tự động scale vật phẩm Pentacle trên sàn (~0.45m)
+            Renderer[] childRenderers = vis.GetComponentsInChildren<Renderer>(true);
+            if (childRenderers.Length > 0)
+            {
+                Bounds b = childRenderers[0].bounds;
+                for (int i = 1; i < childRenderers.Length; i++)
+                {
+                    b.Encapsulate(childRenderers[i].bounds);
+                }
+                float maxDim = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+                if (maxDim > 1.2f || maxDim < 0.2f)
+                {
+                    float targetSize = 0.45f;
+                    float s = targetSize / Mathf.Max(0.001f, maxDim);
+                    vis.transform.localScale = Vector3.one * s;
+                }
+            }
+
             visualTransform = vis.transform;
         }
         else

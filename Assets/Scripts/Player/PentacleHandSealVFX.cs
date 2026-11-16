@@ -219,7 +219,32 @@ public class PentacleHandSealVFX : MonoBehaviour
             sealVisual.name = "CustomPentacleModel";
             sealVisual.transform.localPosition = Vector3.zero;
             sealVisual.transform.localRotation = Quaternion.identity;
-            sealVisual.transform.localScale = Vector3.one * sealScale;
+
+            // Căn chỉnh tỷ lệ model Pentacle vừa vặn với bàn tay (~0.28m)
+            Renderer[] childRenderers = sealVisual.GetComponentsInChildren<Renderer>(true);
+            if (childRenderers.Length > 0)
+            {
+                Bounds b = childRenderers[0].bounds;
+                for (int i = 1; i < childRenderers.Length; i++)
+                {
+                    b.Encapsulate(childRenderers[i].bounds);
+                }
+                float maxDim = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
+                if (maxDim > 1.2f || maxDim < 0.1f)
+                {
+                    float targetSize = 0.28f;
+                    float s = targetSize / Mathf.Max(0.001f, maxDim);
+                    sealVisual.transform.localScale = Vector3.one * s;
+                }
+                else
+                {
+                    sealVisual.transform.localScale = Vector3.one * sealScale;
+                }
+            }
+            else
+            {
+                sealVisual.transform.localScale = Vector3.one * sealScale;
+            }
         }
         else
         {
