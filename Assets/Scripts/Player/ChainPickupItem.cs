@@ -15,6 +15,7 @@ public enum ChainSealPickupType
 public class ChainPickupItem : MonoBehaviour
 {
     public static readonly List<ChainPickupItem> ActivePickups = new List<ChainPickupItem>();
+    private static readonly List<ChainPickupItem> s_PooledPickups = new List<ChainPickupItem>();
 
     [Header("Loại & Asset Vật Phẩm")]
     public ChainSealPickupType itemType = ChainSealPickupType.Chain;
@@ -28,18 +29,45 @@ public class ChainPickupItem : MonoBehaviour
     [Tooltip("Tốc độ xoay vật phẩm trên mặt sàn")]
     public float rotateSpeed = 55f;
 
+    [Tooltip("Khoảng cách tối đa bật đèn điểm của vật phẩm để tránh vượt giới hạn đèn URP (m)")]
+    public float lightCullDistance = 18.0f;
+
     private static Mesh s_SharedPentacleMesh;
     private static Material s_SharedPentacleMaterial;
+    private static Camera s_CachedMainCamera;
 
     private Transform visualTransform;
+    private Light pickupLight;
     private float baseY;
     private float animPhase;
+    private float nextLightCheckTime;
     private bool isCollected;
 
     public string DisplayName => itemType == ChainSealPickupType.PentacleSeal ? "Dấu Ấn Pentacle" : "Dây Xích";
 
     public static ChainPickupItem CreateAt(Vector3 groundPosition, ChainSealPickupType type, GameObject modelPrefab = null, Transform parent = null)
     {
+        // Tái sử dụng từ Object Pool nếu có sẵn để triệt tiêu Instantiate/Destroy liên tục qua các ván
+        for (int i = s_PooledPickups.Count - 1; i >= 0; i--)
+        {
+            ChainPickupItem pooled = s_PooledPickups[i];
+            if (pooled == null)
+            {
+                s_PooledPickups.RemoveAt(i);
+                continue;
+            }
+            if (pooled.itemType == type && pooled.customModelPrefab == modelPrefab)
+            {
+                s_PooledPickups.RemoveAt(i);
+                if (parent != null && pooled.transform.parent != parent)
+                {
+                    pooled.transform.SetParent(parent, false);
+                }
+                pooled.ResetAndPlace(groundPosition);
+                return pooled;
+            }
+        }
+
         GameObject go = new GameObject(type == ChainSealPickupType.PentacleSeal ? "PentacleSealPickup" : "ChainPickupItem");
         if (parent != null) go.transform.SetParent(parent, false);
         go.transform.position = groundPosition + Vector3.up * 0.22f;
@@ -48,7 +76,37 @@ public class ChainPickupItem : MonoBehaviour
         item.itemType = type;
         item.customModelPrefab = modelPrefab;
         item.BuildVisual();
+        item.baseY = go.transform.position.y;
+        item.animPhase = Random.Range(0f, Mathf.PI * 2f);
         return item;
+    }
+
+    public void ResetAndPlace(Vector3 groundPosition)
+    {
+        isCollected = false;
+        transform.position = groundPosition + Vector3.up * 0.22f;
+        baseY = transform.position.y;
+        animPhase = Random.Range(0f, Mathf.PI * 2f);
+        nextLightCheckTime = 0f;
+        if (!gameObject.activeSelf)
+        {
+            gameObject.SetActive(true);
+        }
+    }
+
+    public void RecycleToPool()
+    {
+        isCollected = true;
+        ActivePickups.Remove(this);
+        if (pickupLight != null) pickupLight.enabled = false;
+        if (gameObject != null)
+        {
+            gameObject.SetActive(false);
+            if (!s_PooledPickups.Contains(this))
+            {
+                s_PooledPickups.Add(this);
+            }
+        }
     }
 
     private void OnEnable()
@@ -67,6 +125,7 @@ public class ChainPickupItem : MonoBehaviour
     private void OnDestroy()
     {
         ActivePickups.Remove(this);
+        s_PooledPickups.Remove(this);
     }
 
     private void Start()
@@ -83,7 +142,8 @@ public class ChainPickupItem : MonoBehaviour
     {
         if (isCollected) return;
 
-        float t = Time.time + animPhase;
+        float now = Time.time;
+        float t = now + animPhase;
         Vector3 pos = transform.position;
         pos.y = baseY + Mathf.Sin(t * 2.4f) * 0.06f;
         transform.position = pos;
@@ -91,6 +151,25 @@ public class ChainPickupItem : MonoBehaviour
         if (visualTransform != null)
         {
             visualTransform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime, Space.World);
+        }
+
+        // Bật/tắt đèn điểm theo khoảng cách tới Camera để không lấn giới hạn Additional Lights của URP
+        if (pickupLight != null && now >= nextLightCheckTime)
+        {
+            nextLightCheckTime = now + 0.2f;
+            if (s_CachedMainCamera == null || !s_CachedMainCamera.isActiveAndEnabled)
+            {
+                s_CachedMainCamera = Camera.main;
+            }
+            if (s_CachedMainCamera != null)
+            {
+                float sqrDist = (s_CachedMainCamera.transform.position - pos).sqrMagnitude;
+                bool shouldEnable = sqrDist <= (lightCullDistance * lightCullDistance);
+                if (pickupLight.enabled != shouldEnable)
+                {
+                    pickupLight.enabled = shouldEnable;
+                }
+            }
         }
     }
 
@@ -131,26 +210,32 @@ public class ChainPickupItem : MonoBehaviour
         {
             if (!player.CanAddChainCharge())
             {
-                player.ShowTargetNotice($"Đã đầy {player.maxChainCharges}/{player.maxChainCharges} Dấu Ấn!");
+                player.ShowTargetNotice(string.Format(
+                    GameLocalizationManager.T("NOTICE_SEAL_FULL", "Đã đầy {0}/{1} Dấu Ấn!"),
+                    player.maxChainCharges,
+                    player.maxChainCharges
+                ));
                 return false;
             }
             player.UnlockPentacleSeal();
             player.TryAddChainCharge(1);
-            isCollected = true;
-            Destroy(gameObject);
+            RecycleToPool();
             return true;
         }
 
         if (!player.CanAddChainCharge())
         {
-            player.ShowTargetNotice($"Đã đầy {player.maxChainCharges}/{player.maxChainCharges} Dây Xích!");
+            player.ShowTargetNotice(string.Format(
+                GameLocalizationManager.T("NOTICE_CHAIN_FULL", "Đã đầy {0}/{1} Dây Xích!"),
+                player.maxChainCharges,
+                player.maxChainCharges
+            ));
             return false;
         }
 
         if (player.TryAddChainCharge(1))
         {
-            isCollected = true;
-            Destroy(gameObject);
+            RecycleToPool();
             return true;
         }
 
@@ -174,6 +259,8 @@ public class ChainPickupItem : MonoBehaviour
 
     private void BuildVisual()
     {
+        EnsurePentacleVisualResources();
+
         GameObject prefabToUse = customModelPrefab;
         if (prefabToUse == null)
         {
@@ -194,10 +281,24 @@ public class ChainPickupItem : MonoBehaviour
                 col.enabled = false;
             }
 
-            // Tự động scale vật phẩm Pentacle trên sàn (~0.45m)
+            // Gán vật liệu URP phát sáng đỏ và tự động scale vật phẩm Pentacle trên sàn (~0.45m)
             Renderer[] childRenderers = vis.GetComponentsInChildren<Renderer>(true);
             if (childRenderers.Length > 0)
             {
+                for (int i = 0; i < childRenderers.Length; i++)
+                {
+                    Renderer r = childRenderers[i];
+                    if (r == null || r is ParticleSystemRenderer) continue;
+                    if (s_SharedPentacleMaterial != null)
+                    {
+                        int matCount = Mathf.Max(1, r.sharedMaterials.Length);
+                        Material[] mats = new Material[matCount];
+                        for (int m = 0; m < matCount; m++) mats[m] = s_SharedPentacleMaterial;
+                        r.sharedMaterials = mats;
+                    }
+                    r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+
                 Bounds b = childRenderers[0].bounds;
                 for (int i = 1; i < childRenderers.Length; i++)
                 {
@@ -208,7 +309,7 @@ public class ChainPickupItem : MonoBehaviour
                 {
                     float targetSize = 0.45f;
                     float s = targetSize / Mathf.Max(0.001f, maxDim);
-                    vis.transform.localScale = Vector3.one * s;
+                    vis.transform.localScale = vis.transform.localScale * s;
                 }
             }
 
@@ -234,12 +335,12 @@ public class ChainPickupItem : MonoBehaviour
         GameObject lightGo = new GameObject("PickupLight");
         lightGo.transform.SetParent(visualTransform, false);
         lightGo.transform.localPosition = Vector3.up * 0.15f;
-        Light l = lightGo.AddComponent<Light>();
-        l.type = LightType.Point;
-        l.color = new Color(1.0f, 0.16f, 0.10f);
-        l.intensity = 1.8f;
-        l.range = 2.8f;
-        l.shadows = LightShadows.None;
+        pickupLight = lightGo.AddComponent<Light>();
+        pickupLight.type = LightType.Point;
+        pickupLight.color = new Color(1.0f, 0.16f, 0.10f);
+        pickupLight.intensity = 1.8f;
+        pickupLight.range = 2.8f;
+        pickupLight.shadows = LightShadows.None;
     }
 
     private static void EnsurePentacleVisualResources()

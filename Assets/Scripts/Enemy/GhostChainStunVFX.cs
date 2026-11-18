@@ -3,35 +3,45 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Hiệu ứng Xích Trói Ma Thuật (Spectral Binding Chains):
-/// Xuất hiện các vòng xích ma thuật 3D phát sáng quấn chéo chữ X qua ngực, ngang eo và ghim chặt
-/// con ma / đối thủ xuống đất khi bị ném trúng bởi Quả Cầu Ma Pháp (MagicWaveOrb).
-/// Hoạt động đồng bộ 100% trên cả máy chủ, máy người ném, máy con ma và toàn bộ khán giả!
+/// Hiệu ứng Xích Trói Ma Thuật sử dụng trực tiếp 3D Model Asset (Shackle.fbx):
+/// - Không dùng mesh xích tự vẽ bằng code nữa.
+/// - Khi kích hoạt chế độ trừ tà đỏ (crimsonExorcism = true), nhuộm toàn bộ model Shackle
+///   thành màu đỏ rực lửa phát sáng bập bùng kèm tia lửa cháy & ánh sáng đỏ xung quanh con ma.
 /// </summary>
 public class GhostChainStunVFX : MonoBehaviour
 {
-    [Tooltip("Prefab xích 3D tải từ Asset (để trống sẽ tự tìm Resources/VFX/BindingChainsPrefab)")]
+    [Tooltip("Prefab xích 3D tải từ Asset (để trống sẽ tự load Resources/VFX/Shackle)")]
     public GameObject customBindingChainsPrefab;
+    [Tooltip("Kích thước mục tiêu của vòng xích bao quanh thân ma (m)")]
+    public float chainTargetSize = 1.15f;
+    [Tooltip("Cường độ đèn phát sáng cơ bản của xích trói")]
+    public float glowLightIntensity = 5.0f;
+    [Tooltip("Bán kính chiếu sáng của đèn xích trói (m)")]
+    public float glowLightRange = 5.0f;
 
-    private static Material s_SharedChainMaterial;
+    private static readonly int s_EmissionColorId = Shader.PropertyToID("_EmissionColor");
+    private static Material s_FieryRedShackleMaterial;
+    private static Material s_CyanShackleMaterial;
     private static Material s_SharedSparkMaterial;
     private static Texture2D s_SharedSparkTexture;
-    private static Mesh s_SharedChainMesh;
 
     private GameObject chainsRoot;
-    private ParticleSystem crimsonSparks;
+    private GameObject assetChainsInstance;
+    private readonly List<Renderer> assetRenderers = new List<Renderer>();
+    private readonly List<Material[]> cachedCrimsonMatArrays = new List<Material[]>();
+    private readonly List<Material[]> cachedCyanMatArrays = new List<Material[]>();
+    private MaterialPropertyBlock emissionPropertyBlock;
+    private ParticleSystem fierySparks;
     private Light bindingLight;
     private Coroutine activeStunRoutine;
     private Animator targetAnimator;
     private float originalAnimSpeed = 1f;
     private bool currentCrimsonMode;
-    private MaterialPropertyBlock crimsonPropBlock;
 
     public bool IsStunned { get; private set; }
 
     /// <summary>
-    /// Kích hoạt xích trói ma thuật và khóa cứng cử động mục tiêu trong duration giây.
-    /// Hoạt động cho cả con ma của chính mình lẫn Avatar con ma từ xa của người chơi khác!
+    /// Kích hoạt xích Shackle từ Asset và khóa cứng mục tiêu trong duration giây.
     /// </summary>
     public static GhostChainStunVFX ApplyChainStun(GameObject target, float duration, Vector3 pushDir, float pushDist, Animator anim = null, bool crimsonExorcism = false)
     {
@@ -64,6 +74,7 @@ public class GhostChainStunVFX : MonoBehaviour
 
     private IEnumerator RoutineChainStun(float duration, Vector3 pushDir, float pushDist)
     {
+        bool wasAlreadyStunned = IsStunned;
         IsStunned = true;
         EnsureChainsCreated();
         ApplyVisualStyle();
@@ -71,22 +82,29 @@ public class GhostChainStunVFX : MonoBehaviour
         if (chainsRoot != null)
         {
             chainsRoot.SetActive(true);
-            chainsRoot.transform.localScale = currentCrimsonMode ? new Vector3(1f, 0.15f, 1f) : Vector3.one;
+            chainsRoot.transform.localScale = currentCrimsonMode ? new Vector3(1f, 0.25f, 1f) : Vector3.one;
         }
         if (bindingLight != null)
         {
             bindingLight.enabled = true;
         }
-        if (crimsonSparks != null)
+        if (fierySparks != null)
         {
-            if (currentCrimsonMode && !crimsonSparks.isPlaying) crimsonSparks.Play();
-            else if (!currentCrimsonMode && crimsonSparks.isPlaying) crimsonSparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            if (currentCrimsonMode && !fierySparks.isPlaying) fierySparks.Play();
+            else if (!currentCrimsonMode && fierySparks.isPlaying) fierySparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
-        // Khóa đứng yên Animator mục tiêu
+        // Khóa đứng yên Animator mục tiêu (chỉ lưu tốc độ gốc khi chưa bị choáng trước đó và tránh kẹt ở 1.8f của đòn đánh dở)
         if (targetAnimator != null)
         {
-            originalAnimSpeed = targetAnimator.speed > 0.01f ? targetAnimator.speed : 1f;
+            if (!wasAlreadyStunned && targetAnimator.speed > 0.01f && targetAnimator.speed <= 1.25f)
+            {
+                originalAnimSpeed = targetAnimator.speed;
+            }
+            else if (!wasAlreadyStunned)
+            {
+                originalAnimSpeed = 1f;
+            }
             targetAnimator.speed = 0f;
             try
             {
@@ -95,8 +113,7 @@ public class GhostChainStunVFX : MonoBehaviour
             catch { }
         }
 
-        // Hiệu ứng giật lùi nhẹ (Knockback) nếu có lực đẩy; nếu ghim tại chỗ (pushDist <= 0.001f) thì bỏ qua
-        float knockTime = 0.18f;
+        float knockTime = 0.16f;
         if (pushDist > 0.001f)
         {
             float elapsedKnock = 0f;
@@ -115,21 +132,20 @@ public class GhostChainStunVFX : MonoBehaviour
         }
         else if (currentCrimsonMode && chainsRoot != null)
         {
-            // Hiệu ứng 4 dây xích trồi từ dưới đất lên ghim chặt con ma
-            float eruptTime = 0.16f;
+            // Hiệu ứng xích Shackle bật lên siết chặt vào thân con ma
             float elapsed = 0f;
-            while (elapsed < eruptTime)
+            while (elapsed < knockTime)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / eruptTime);
+                float t = Mathf.Clamp01(elapsed / knockTime);
                 float eased = 1f - Mathf.Pow(1f - t, 3f);
-                chainsRoot.transform.localScale = new Vector3(1f, Mathf.Lerp(0.15f, 1f, eased), 1f);
+                chainsRoot.transform.localScale = new Vector3(1f, Mathf.Lerp(0.25f, 1f, eased), 1f);
                 yield return null;
             }
             chainsRoot.transform.localScale = Vector3.one;
         }
 
-        // Rung nhẹ ma thuật các mắt xích trong suốt thời gian bị trói
+        // Rung siết + nhấp nháy rực lửa đỏ bập bùng suốt thời gian bị trói
         float remaining = Mathf.Max(0.1f, duration - knockTime);
         float timer = 0f;
         Vector3 baseLocalPos = chainsRoot != null ? chainsRoot.transform.localPosition : Vector3.up * 0.95f;
@@ -139,14 +155,28 @@ public class GhostChainStunVFX : MonoBehaviour
             timer += Time.deltaTime;
             if (chainsRoot != null)
             {
-                // Rung nhẹ như xích đang xiết chặt lấy con ma
                 float shake = Mathf.Sin(timer * 25f) * 0.012f;
                 chainsRoot.transform.localPosition = baseLocalPos + new Vector3(shake, Mathf.Cos(timer * 20f) * 0.008f, shake);
+            }
+
+            if (currentCrimsonMode)
+            {
+                float firePulse = 4.6f + Mathf.Sin(timer * 14f) * 1.1f + Mathf.Cos(timer * 23f) * 0.5f;
+                if (emissionPropertyBlock == null) emissionPropertyBlock = new MaterialPropertyBlock();
+                emissionPropertyBlock.SetColor(s_EmissionColorId, new Color(1.0f, 0.14f, 0.02f) * firePulse);
+                for (int i = 0; i < assetRenderers.Count; i++)
+                {
+                    Renderer r = assetRenderers[i];
+                    if (r != null) r.SetPropertyBlock(emissionPropertyBlock);
+                }
+                if (bindingLight != null)
+                {
+                    bindingLight.intensity = (glowLightIntensity * 0.9f) + Mathf.Sin(timer * 16f) * 1.4f;
+                }
             }
             yield return null;
         }
 
-        // Hết thời gian: Mở khóa giải phóng xích
         ReleaseStun();
     }
 
@@ -162,9 +192,9 @@ public class GhostChainStunVFX : MonoBehaviour
         {
             bindingLight.enabled = false;
         }
-        if (crimsonSparks != null && crimsonSparks.isPlaying)
+        if (fierySparks != null && fierySparks.isPlaying)
         {
-            crimsonSparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            fierySparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
 
         if (targetAnimator != null)
@@ -189,15 +219,23 @@ public class GhostChainStunVFX : MonoBehaviour
 
     private void EnsureChainsCreated()
     {
+        EnsureSharedMaterials();
         if (chainsRoot != null) return;
 
         Transform existing = transform.Find("GhostBindingChains_Root");
         if (existing != null)
         {
-            chainsRoot = existing.gameObject;
-            bindingLight = chainsRoot.GetComponentInChildren<Light>();
-            crimsonSparks = chainsRoot.GetComponentInChildren<ParticleSystem>(true);
-            return;
+            Transform assetT = existing.Find("BindingChainsAsset");
+            if (assetT != null)
+            {
+                chainsRoot = existing.gameObject;
+                bindingLight = chainsRoot.GetComponentInChildren<Light>(true);
+                fierySparks = chainsRoot.GetComponentInChildren<ParticleSystem>(true);
+                assetChainsInstance = assetT.gameObject;
+                CacheAssetRenderers();
+                return;
+            }
+            Destroy(existing.gameObject);
         }
 
         chainsRoot = new GameObject("GhostBindingChains_Root");
@@ -210,124 +248,158 @@ public class GhostChainStunVFX : MonoBehaviour
 
         if (prefabToUse != null)
         {
-            GameObject assetChains = Instantiate(prefabToUse, chainsRoot.transform, false);
-            assetChains.name = "BindingChainsAsset";
-            assetChains.transform.localPosition = Vector3.zero;
-            assetChains.transform.localRotation = Quaternion.identity;
-            foreach (Collider col in assetChains.GetComponentsInChildren<Collider>(true))
+            assetChainsInstance = Instantiate(prefabToUse, chainsRoot.transform, false);
+            assetChainsInstance.name = "BindingChainsAsset";
+            assetChainsInstance.transform.localPosition = Vector3.zero;
+            assetChainsInstance.transform.localRotation = Quaternion.identity;
+
+            foreach (Collider col in assetChainsInstance.GetComponentsInChildren<Collider>(true))
             {
                 col.enabled = false;
             }
 
+            CacheAssetRenderers();
+
             // Tự động căn chỉnh tỷ lệ model Shackle vừa vặn bao quanh thân con ma (~1.15m)
-            Renderer[] childRenderers = assetChains.GetComponentsInChildren<Renderer>(true);
-            if (childRenderers.Length > 0)
+            if (assetRenderers.Count > 0)
             {
-                Bounds b = childRenderers[0].bounds;
-                for (int i = 1; i < childRenderers.Length; i++)
+                Bounds b = assetRenderers[0].bounds;
+                for (int i = 1; i < assetRenderers.Count; i++)
                 {
-                    b.Encapsulate(childRenderers[i].bounds);
+                    b.Encapsulate(assetRenderers[i].bounds);
                 }
                 float maxDim = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
                 if (maxDim > 2.5f || maxDim < 0.35f)
                 {
-                    float targetSize = 1.15f;
+                    float targetSize = Mathf.Max(0.25f, chainTargetSize);
                     float s = targetSize / Mathf.Max(0.001f, maxDim);
-                    assetChains.transform.localScale = Vector3.one * s;
+                    assetChainsInstance.transform.localScale = assetChainsInstance.transform.localScale * s;
                 }
             }
         }
         else
         {
-            // Fallback khi chưa gán Prefab Asset: dùng mesh xích mặc định
-            if (s_SharedChainMaterial == null)
-            {
-                Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-                s_SharedChainMaterial = new Material(urpLit);
-                Color chainGlow = new Color(0.20f, 0.88f, 1.0f);
-                s_SharedChainMaterial.color = new Color(0.12f, 0.35f, 0.55f, 1.0f);
-                s_SharedChainMaterial.EnableKeyword("_EMISSION");
-                s_SharedChainMaterial.SetColor("_EmissionColor", chainGlow * 3.5f);
-                s_SharedChainMaterial.SetFloat("_Metallic", 0.85f);
-                s_SharedChainMaterial.SetFloat("_Smoothness", 0.75f);
-            }
-
-            if (s_SharedChainMesh == null)
-            {
-                s_SharedChainMesh = GenerateCompleteBindingChainsMesh();
-            }
-
-            MeshFilter mf = chainsRoot.AddComponent<MeshFilter>();
-            mf.sharedMesh = s_SharedChainMesh;
-
-            MeshRenderer mr = chainsRoot.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = s_SharedChainMaterial;
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            Debug.LogWarning("[GhostChainStunVFX] Không tìm thấy Prefab/Model tại Resources/VFX/Shackle hoặc BindingChainsPrefab!");
         }
 
-        // Tia lửa đỏ xung quanh con ma khi bị trói bằng Pentacle
-        CreateCrimsonSparks();
+        CreateFierySparks();
 
-        // Đèn tỏa sáng ma mị bao quanh xích
         GameObject lightObj = new GameObject("ChainGlowLight");
         lightObj.transform.SetParent(chainsRoot.transform, false);
         lightObj.transform.localPosition = Vector3.zero;
         bindingLight = lightObj.AddComponent<Light>();
         bindingLight.type = LightType.Point;
-        bindingLight.color = new Color(0.25f, 0.85f, 1.0f);
-        bindingLight.intensity = 4.0f;
-        bindingLight.range = 4.5f;
+        bindingLight.color = new Color(1.0f, 0.20f, 0.04f);
+        bindingLight.intensity = glowLightIntensity;
+        bindingLight.range = glowLightRange;
         bindingLight.shadows = LightShadows.None;
 
         chainsRoot.SetActive(false);
+    }
+
+    private void CacheAssetRenderers()
+    {
+        assetRenderers.Clear();
+        cachedCrimsonMatArrays.Clear();
+        cachedCyanMatArrays.Clear();
+        if (assetChainsInstance == null) return;
+
+        EnsureSharedMaterials();
+        foreach (Renderer r in assetChainsInstance.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r == null || r is ParticleSystemRenderer) continue;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            assetRenderers.Add(r);
+
+            int matCount = Mathf.Max(1, r.sharedMaterials.Length);
+            Material[] crimsonArr = new Material[matCount];
+            Material[] cyanArr = new Material[matCount];
+            for (int m = 0; m < matCount; m++)
+            {
+                crimsonArr[m] = s_FieryRedShackleMaterial;
+                cyanArr[m] = s_CyanShackleMaterial;
+            }
+            cachedCrimsonMatArrays.Add(crimsonArr);
+            cachedCyanMatArrays.Add(cyanArr);
+        }
     }
 
     private void ApplyVisualStyle()
     {
         if (bindingLight != null)
         {
-            bindingLight.color = currentCrimsonMode ? new Color(1.0f, 0.16f, 0.10f) : new Color(0.25f, 0.85f, 1.0f);
+            bindingLight.color = currentCrimsonMode
+                ? new Color(1.0f, 0.18f, 0.03f)
+                : new Color(0.25f, 0.85f, 1.0f);
+            bindingLight.intensity = glowLightIntensity;
+            bindingLight.range = glowLightRange;
         }
 
-        if (chainsRoot != null)
+        for (int i = 0; i < assetRenderers.Count; i++)
         {
-            Renderer[] renderers = chainsRoot.GetComponentsInChildren<Renderer>(true);
-            if (currentCrimsonMode)
+            Renderer r = assetRenderers[i];
+            if (r == null) continue;
+            r.SetPropertyBlock(null);
+            if (currentCrimsonMode && i < cachedCrimsonMatArrays.Count)
             {
-                if (crimsonPropBlock == null) crimsonPropBlock = new MaterialPropertyBlock();
-                Color baseRed = new Color(0.75f, 0.08f, 0.06f, 1f);
-                Color emissionRed = new Color(1.0f, 0.14f, 0.08f) * 2.4f;
-
-                for (int i = 0; i < renderers.Length; i++)
-                {
-                    Renderer r = renderers[i];
-                    if (r == null || r is ParticleSystemRenderer) continue;
-                    r.GetPropertyBlock(crimsonPropBlock);
-                    crimsonPropBlock.SetColor("_BaseColor", baseRed);
-                    crimsonPropBlock.SetColor("_Color", baseRed);
-                    crimsonPropBlock.SetColor("_EmissionColor", emissionRed);
-                    r.SetPropertyBlock(crimsonPropBlock);
-
-                    // Đảm bảo bật keyword _EMISSION nếu material hỗ trợ
-                    foreach (Material mat in r.sharedMaterials)
-                    {
-                        if (mat != null) mat.EnableKeyword("_EMISSION");
-                    }
-                }
+                r.sharedMaterials = cachedCrimsonMatArrays[i];
             }
-            else
+            else if (!currentCrimsonMode && i < cachedCyanMatArrays.Count)
             {
-                for (int i = 0; i < renderers.Length; i++)
-                {
-                    Renderer r = renderers[i];
-                    if (r == null || r is ParticleSystemRenderer) continue;
-                    r.SetPropertyBlock(null);
-                }
+                r.sharedMaterials = cachedCyanMatArrays[i];
             }
         }
     }
 
-    private void CreateCrimsonSparks()
+    private static void EnsureSharedMaterials()
+    {
+        Shader urpLit = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        Texture2D shackleTex = Resources.Load<Texture2D>("VFX/Shackle_Diff");
+
+        if (s_FieryRedShackleMaterial == null)
+        {
+            s_FieryRedShackleMaterial = new Material(urpLit);
+            s_FieryRedShackleMaterial.name = "M_FieryRedShackle";
+            if (shackleTex != null)
+            {
+                if (s_FieryRedShackleMaterial.HasProperty("_BaseMap"))
+                    s_FieryRedShackleMaterial.SetTexture("_BaseMap", shackleTex);
+                if (s_FieryRedShackleMaterial.HasProperty("_MainTex"))
+                    s_FieryRedShackleMaterial.SetTexture("_MainTex", shackleTex);
+            }
+            Color moltenRed = new Color(0.95f, 0.10f, 0.03f, 1f);
+            s_FieryRedShackleMaterial.color = moltenRed;
+            if (s_FieryRedShackleMaterial.HasProperty("_BaseColor"))
+                s_FieryRedShackleMaterial.SetColor("_BaseColor", moltenRed);
+            s_FieryRedShackleMaterial.EnableKeyword("_EMISSION");
+            s_FieryRedShackleMaterial.SetColor("_EmissionColor", new Color(1.0f, 0.15f, 0.02f) * 5.2f);
+            s_FieryRedShackleMaterial.SetFloat("_Metallic", 0.75f);
+            s_FieryRedShackleMaterial.SetFloat("_Smoothness", 0.78f);
+        }
+
+        if (s_CyanShackleMaterial == null)
+        {
+            s_CyanShackleMaterial = new Material(urpLit);
+            s_CyanShackleMaterial.name = "M_CyanShackle";
+            if (shackleTex != null)
+            {
+                if (s_CyanShackleMaterial.HasProperty("_BaseMap"))
+                    s_CyanShackleMaterial.SetTexture("_BaseMap", shackleTex);
+                if (s_CyanShackleMaterial.HasProperty("_MainTex"))
+                    s_CyanShackleMaterial.SetTexture("_MainTex", shackleTex);
+            }
+            Color cyanBase = new Color(0.18f, 0.65f, 0.95f, 1f);
+            s_CyanShackleMaterial.color = cyanBase;
+            if (s_CyanShackleMaterial.HasProperty("_BaseColor"))
+                s_CyanShackleMaterial.SetColor("_BaseColor", cyanBase);
+            s_CyanShackleMaterial.EnableKeyword("_EMISSION");
+            s_CyanShackleMaterial.SetColor("_EmissionColor", new Color(0.20f, 0.88f, 1.0f) * 3.5f);
+            s_CyanShackleMaterial.SetFloat("_Metallic", 0.80f);
+            s_CyanShackleMaterial.SetFloat("_Smoothness", 0.75f);
+        }
+    }
+
+    private void CreateFierySparks()
     {
         if (s_SharedSparkTexture == null)
         {
@@ -360,31 +432,40 @@ public class GhostChainStunVFX : MonoBehaviour
                 s_SharedSparkMaterial.SetFloat("_Surface", 1f);
         }
 
-        GameObject psGo = new GameObject("CrimsonBindingSparks");
+        GameObject psGo = new GameObject("FieryBindingSparks");
         psGo.transform.SetParent(chainsRoot.transform, false);
         psGo.transform.localPosition = Vector3.zero;
-        crimsonSparks = psGo.AddComponent<ParticleSystem>();
-        crimsonSparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        fierySparks = psGo.AddComponent<ParticleSystem>();
+        fierySparks.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
-        var main = crimsonSparks.main;
+        var main = fierySparks.main;
         main.loop = true;
         main.duration = 1f;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.4f, 0.85f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 1.3f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.08f);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.45f, 0.95f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.6f, 1.8f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.11f);
+        main.gravityModifier = -0.35f; // Tàn lửa bốc bay lên trên như lửa cháy
         main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(1.0f, 0.15f, 0.08f, 1f),
-            new Color(1.0f, 0.50f, 0.15f, 0.9f)
+            new Color(1.0f, 0.10f, 0.02f, 1f),
+            new Color(1.0f, 0.55f, 0.08f, 0.95f)
         );
         main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.maxParticles = 60;
+        main.maxParticles = 90;
 
-        var emission = crimsonSparks.emission;
-        emission.rateOverTime = 28f;
+        var emission = fierySparks.emission;
+        emission.rateOverTime = 45f;
 
-        var shape = crimsonSparks.shape;
+        var shape = fierySparks.shape;
         shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = 0.55f;
+        shape.radius = 0.58f;
+
+        var sizeOverLifetime = fierySparks.sizeOverLifetime;
+        sizeOverLifetime.enabled = true;
+        sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(
+            new Keyframe(0f, 0.6f),
+            new Keyframe(0.2f, 1f),
+            new Keyframe(1f, 0f)
+        ));
 
         var psRenderer = psGo.GetComponent<ParticleSystemRenderer>();
         if (psRenderer != null)
@@ -392,202 +473,5 @@ public class GhostChainStunVFX : MonoBehaviour
             psRenderer.sharedMaterial = s_SharedSparkMaterial;
             psRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
-    }
-
-    /// <summary>
-    /// Dựng toàn bộ hệ thống mắt xích 3D:
-    /// 1. Sợi xích chéo ngực 1 (Vai trái -> Hông phải)
-    /// 2. Sợi xích chéo ngực 2 (Vai phải -> Hông trái) tạo thành chữ X khóa chặt thân
-    /// 3. Sợi xích ngang đai eo quấn quanh người
-    /// 4. Hai sợi xích ghim chặt xuống đất
-    /// </summary>
-    private static Mesh GenerateCompleteBindingChainsMesh()
-    {
-        List<Vector3> allVertices = new List<Vector3>();
-        List<Vector3> allNormals = new List<Vector3>();
-        List<int> allTriangles = new List<int>();
-
-        // Tạo một mắt xích mẫu (Single Chain Link Mesh: Oval Ring)
-        Mesh linkMesh = CreateOvalChainLinkMesh(0.048f, 0.088f, 0.018f, 14, 8);
-
-        // 1. Chuỗi xích chéo ngực A: từ (-0.32, 0.50, 0.15) qua ngực (0.0, 0.15, 0.38) đến (0.35, -0.28, -0.15)
-        AddChainAlongCurve(linkMesh, allVertices, allNormals, allTriangles, 11, t =>
-        {
-            float x = Mathf.Lerp(-0.35f, 0.38f, t);
-            float y = Mathf.Lerp(0.50f, -0.32f, t);
-            float z = Mathf.Sin(t * Mathf.PI) * 0.42f - Mathf.Cos(t * Mathf.PI) * 0.08f;
-            return new Vector3(x, y, z);
-        });
-
-        // 2. Chuỗi xích chéo ngực B: từ (0.32, 0.50, 0.15) qua ngực (0.0, 0.15, 0.38) đến (-0.35, -0.28, -0.15) [Chữ X]
-        AddChainAlongCurve(linkMesh, allVertices, allNormals, allTriangles, 11, t =>
-        {
-            float x = Mathf.Lerp(0.35f, -0.38f, t);
-            float y = Mathf.Lerp(0.50f, -0.32f, t);
-            float z = Mathf.Sin(t * Mathf.PI) * 0.42f - Mathf.Cos(t * Mathf.PI) * 0.08f;
-            return new Vector3(x, y, z);
-        });
-
-        // 3. Chuỗi xích ngang eo: Vòng tròn bao quanh thân (bán kính 0.44m, cao y = -0.10m)
-        AddChainAlongCurve(linkMesh, allVertices, allNormals, allTriangles, 14, t =>
-        {
-            float angle = t * Mathf.PI * 2f;
-            float x = Mathf.Cos(angle) * 0.44f;
-            float z = Mathf.Sin(angle) * 0.40f;
-            return new Vector3(x, -0.10f, z);
-        });
-
-        // 4. Bốn sợi xích chéo ghim chặt từ 4 góc mặt đất lên thân (Ground Anchor Chains)
-        Vector3[] groundAnchors = new Vector3[]
-        {
-            new Vector3(-0.85f, -0.92f,  0.75f),
-            new Vector3( 0.85f, -0.92f,  0.75f),
-            new Vector3(-0.85f, -0.92f, -0.75f),
-            new Vector3( 0.85f, -0.92f, -0.75f)
-        };
-        Vector3[] bodyAnchors = new Vector3[]
-        {
-            new Vector3(-0.34f, -0.05f,  0.22f),
-            new Vector3( 0.34f, -0.05f,  0.22f),
-            new Vector3(-0.34f, -0.05f, -0.22f),
-            new Vector3( 0.34f, -0.05f, -0.22f)
-        };
-
-        for (int a = 0; a < 4; a++)
-        {
-            Vector3 gPos = groundAnchors[a];
-            Vector3 bPos = bodyAnchors[a];
-            AddChainAlongCurve(linkMesh, allVertices, allNormals, allTriangles, 10, t => Vector3.Lerp(bPos, gPos, t));
-        }
-
-        Mesh combined = new Mesh();
-        combined.name = "SpectralBindingChainsMesh";
-        combined.SetVertices(allVertices);
-        combined.SetNormals(allNormals);
-        combined.SetTriangles(allTriangles, 0);
-        combined.RecalculateBounds();
-        return combined;
-    }
-
-    /// <summary>
-    /// Đặt các mắt xích nối nhau dọc theo đường cong tham số, xoay so le 0° và 90° để tạo thành dây xích chuẩn xác.
-    /// </summary>
-    private static void AddChainAlongCurve(Mesh linkMesh, List<Vector3> outVerts, List<Vector3> outNormals, List<int> outTris, int linkCount, System.Func<float, Vector3> pathFunc)
-    {
-        Vector3[] baseVerts = linkMesh.vertices;
-        Vector3[] baseNormals = linkMesh.normals;
-        int[] baseTris = linkMesh.triangles;
-
-        for (int i = 0; i < linkCount; i++)
-        {
-            float t = i / (float)linkCount;
-            float tNext = (i + 1) / (float)linkCount;
-
-            Vector3 pos = pathFunc(t);
-            Vector3 nextPos = pathFunc(tNext);
-            Vector3 forward = (nextPos - pos).normalized;
-            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
-
-            // Xoay so le 90 độ giữa các mắt xích liền kề
-            float rollAngle = (i % 2 == 0) ? 0f : 90f;
-            Quaternion rot = Quaternion.LookRotation(forward) * Quaternion.Euler(0f, 0f, rollAngle);
-
-            int startVertex = outVerts.Count;
-            for (int v = 0; v < baseVerts.Length; v++)
-            {
-                outVerts.Add(pos + rot * baseVerts[v]);
-                outNormals.Add(rot * baseNormals[v]);
-            }
-            for (int k = 0; k < baseTris.Length; k++)
-            {
-                outTris.Add(startVertex + baseTris[k]);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Tạo Mesh một mắt xích hình oval khép kín chuẩn 3D.
-    /// </summary>
-    private static Mesh CreateOvalChainLinkMesh(float innerWidth, float innerLength, float tubeRadius, int pathSegments, int tubeSides)
-    {
-        Mesh mesh = new Mesh();
-        mesh.name = "ChainLinkMesh";
-
-        List<Vector3> vertices = new List<Vector3>();
-        List<Vector3> normals = new List<Vector3>();
-        List<int> triangles = new List<int>();
-
-        // Tạo đường cong khép kín hình oval gồm 2 cung tròn và 2 đoạn thẳng
-        Vector3[] pathPoints = new Vector3[pathSegments];
-        Vector3[] pathTangents = new Vector3[pathSegments];
-        Vector3[] pathNormals = new Vector3[pathSegments];
-
-        float halfLen = innerLength * 0.5f;
-        float halfWid = innerWidth * 0.5f;
-
-        for (int i = 0; i < pathSegments; i++)
-        {
-            float angle = (i / (float)pathSegments) * Mathf.PI * 2f;
-            float sinA = Mathf.Sin(angle);
-            float cosA = Mathf.Cos(angle);
-
-            // Nửa trên cung tròn (+halfLen), nửa dưới cung tròn (-halfLen)
-            float yOffset = cosA >= 0f ? halfLen : -halfLen;
-            Vector3 p = new Vector3(sinA * halfWid, yOffset + cosA * (halfLen * 0.35f), 0f);
-            pathPoints[i] = p;
-        }
-
-        for (int i = 0; i < pathSegments; i++)
-        {
-            int next = (i + 1) % pathSegments;
-            Vector3 tang = (pathPoints[next] - pathPoints[i]).normalized;
-            pathTangents[i] = tang;
-            pathNormals[i] = Vector3.Cross(tang, Vector3.forward).normalized;
-        }
-
-        // Quét ống tròn quanh đường cong oval
-        for (int i = 0; i < pathSegments; i++)
-        {
-            Vector3 center = pathPoints[i];
-            Vector3 tang = pathTangents[i];
-            Vector3 norm = pathNormals[i];
-            Vector3 binorm = Vector3.Cross(tang, norm);
-
-            for (int s = 0; s < tubeSides; s++)
-            {
-                float rad = (s / (float)tubeSides) * Mathf.PI * 2f;
-                Vector3 radial = (Mathf.Cos(rad) * norm + Mathf.Sin(rad) * binorm).normalized;
-                vertices.Add(center + radial * tubeRadius);
-                normals.Add(radial);
-            }
-        }
-
-        for (int i = 0; i < pathSegments; i++)
-        {
-            int nextSlice = (i + 1) % pathSegments;
-            for (int s = 0; s < tubeSides; s++)
-            {
-                int nextSide = (s + 1) % tubeSides;
-
-                int current = i * tubeSides + s;
-                int right = i * tubeSides + nextSide;
-                int top = nextSlice * tubeSides + s;
-                int topRight = nextSlice * tubeSides + nextSide;
-
-                triangles.Add(current);
-                triangles.Add(top);
-                triangles.Add(right);
-
-                triangles.Add(right);
-                triangles.Add(top);
-                triangles.Add(topRight);
-            }
-        }
-
-        mesh.SetVertices(vertices);
-        mesh.SetNormals(normals);
-        mesh.SetTriangles(triangles, 0);
-        mesh.RecalculateBounds();
-        return mesh;
     }
 }

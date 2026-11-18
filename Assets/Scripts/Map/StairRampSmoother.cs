@@ -25,35 +25,31 @@ public class StairRampSmoother : MonoBehaviour
         Instance = this;
         if (Application.isPlaying && autoSmoothOnStart)
         {
-            SmoothAllStaircases();
+            SmoothStairsInternal(rampThickness, rampSurfaceLift, false);
         }
     }
 
     private void OnEnable()
     {
         Instance = this;
-        if (Application.isPlaying && autoSmoothOnStart)
-        {
-            SmoothAllStaircases();
-        }
     }
 
     [ContextMenu("Smooth All Staircases Now")]
     public int SmoothAllStaircases()
     {
-        return SmoothStairsInternal(rampThickness, rampSurfaceLift);
+        return SmoothStairsInternal(rampThickness, rampSurfaceLift, true);
     }
 
 #if UNITY_EDITOR
     [MenuItem("Tools/Map/Smooth All Staircases (Làm Mịn Cầu Thang)")]
     public static void MenuSmoothStaircases()
     {
-        int count = SmoothStairsInternal(0.40f, 0.02f);
+        int count = SmoothStairsInternal(0.40f, 0.02f, true);
         EditorUtility.DisplayDialog("Làm Mịn Cầu Thang", $"Đã làm mịn thành công {count} nhịp cầu thang!\nNhân vật có thể chạy lên xuống mượt mà 100% không bị khựng.", "OK");
     }
 #endif
 
-    public static int SmoothStairsInternal(float thickness = 0.40f, float lift = 0.02f)
+    public static int SmoothStairsInternal(float thickness = 0.40f, float lift = 0.02f, bool forceRebuild = false)
     {
         GameObject bridgesGroup = GameObject.Find("Arched Bridges & Staircases");
         if (bridgesGroup == null)
@@ -72,6 +68,35 @@ public class StairRampSmoother : MonoBehaviour
         if (bridgesGroup == null) return 0;
 
         Transform parent = bridgesGroup.transform;
+
+        // Nếu đã dựng sẵn các dốc SmoothStairRamp hợp lệ và không ép dựng lại -> Bỏ qua dựng lại cầu thang chính (tiết kiệm 90+ lần Instantiate/Destroy lúc vào trận), nhưng vẫn đảm bảo dốc thềm Nhà Thờ đã có
+        if (!forceRebuild)
+        {
+            int existingMainRamps = 0;
+            bool anyEnabledStepCol = false;
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                Transform c = parent.GetChild(i);
+                if (c == null) continue;
+                if (c.name.StartsWith("SmoothStairRamp_") && c.name.EndsWith("_Main") && c.gameObject.activeInHierarchy)
+                {
+                    existingMainRamps++;
+                }
+                else if (c.name.StartsWith("BridgeStep_"))
+                {
+                    BoxCollider stepCol = c.GetComponent<BoxCollider>();
+                    if (stepCol != null && stepCol.enabled)
+                    {
+                        anyEnabledStepCol = true;
+                    }
+                }
+            }
+            if (existingMainRamps > 0 && !anyEnabledStepCol)
+            {
+                EnsureCathedralTerraceRamps(parent, thickness, lift);
+                return existingMainRamps;
+            }
+        }
 
         // 1. Xóa các SmoothStairRamp cũ (nếu có) để dựng lại chuẩn xác từng nhịp cầu thang
         List<GameObject> oldRamps = new List<GameObject>();
@@ -175,7 +200,48 @@ public class StairRampSmoother : MonoBehaviour
             count++;
         }
 
+        // 3. Tạo dốc mượt dẫn từ sân đá Cathedral Courtyard (Y ~ 8.50m) lên thềm Cathedral_StoneTerrace (Y ~ 9.20m) quanh thềm cửa chính nhà thờ
+        EnsureCathedralTerraceRamps(parent, thickness, lift);
+
         return count;
+    }
+
+    private static void EnsureCathedralTerraceRamps(Transform parent, float thickness, float lift)
+    {
+        if (parent == null) return;
+        if (parent.Find("SmoothStairRamp_CathedralTerrace_Front") != null) return;
+
+        GameObject cathTerrace = GameObject.Find("Cathedral_StoneTerrace");
+        if (cathTerrace == null) return;
+
+        Transform t = cathTerrace.transform;
+        float topY = t.position.y + Mathf.Abs(t.lossyScale.y) * 0.5f + lift;
+        float bottomY = t.position.y - Mathf.Abs(t.lossyScale.y) * 0.5f - 0.04f;
+        float fullWidth = Mathf.Abs(t.lossyScale.x);
+        float fullDepth = Mathf.Abs(t.lossyScale.z);
+        float halfWidth = fullWidth * 0.5f;
+        float halfDepth = fullDepth * 0.5f;
+
+        // Cạnh trước (-forward) đối diện sân & cổng cầu thang chính
+        Vector3 frontDir = -t.forward;
+        Vector3 frontEdgeTop = new Vector3(t.position.x, topY, t.position.z) + frontDir * (halfDepth - 0.25f);
+        Vector3 frontStart = frontEdgeTop + frontDir * 2.8f;
+        frontStart.y = bottomY;
+        CreateRampSegment(parent, "SmoothStairRamp_CathedralTerrace_Front", frontStart, frontEdgeTop, fullWidth + 1.5f, thickness, 0.45f);
+
+        // Cạnh bên trái (-right) nơi cầu thang lớn đổ chéo lên sân Nhà Thờ
+        Vector3 leftDir = -t.right;
+        Vector3 leftEdgeTop = new Vector3(t.position.x, topY, t.position.z) + leftDir * (halfWidth - 0.25f);
+        Vector3 leftStart = leftEdgeTop + leftDir * 2.6f;
+        leftStart.y = bottomY;
+        CreateRampSegment(parent, "SmoothStairRamp_CathedralTerrace_Left", leftStart, leftEdgeTop, fullDepth + 1.0f, thickness, 0.45f);
+
+        // Cạnh bên phải (+right)
+        Vector3 rightDir = t.right;
+        Vector3 rightEdgeTop = new Vector3(t.position.x, topY, t.position.z) + rightDir * (halfWidth - 0.25f);
+        Vector3 rightStart = rightEdgeTop + rightDir * 2.6f;
+        rightStart.y = bottomY;
+        CreateRampSegment(parent, "SmoothStairRamp_CathedralTerrace_Right", rightStart, rightEdgeTop, fullDepth + 1.0f, thickness, 0.45f);
     }
 
     private static void CreateRampSegment(Transform parent, string name, Vector3 startTop, Vector3 endTop, float width, float thickness, float extraLen)

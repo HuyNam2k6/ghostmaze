@@ -104,6 +104,15 @@ public class ThirdPersonPlayerController : MonoBehaviour
     [Tooltip("(Tùy chọn) Bàn tay phóng quả cầu ma thuật (dùng làm vị trí dự phòng nếu chưa gán throwPoint)")]
     public Transform castHandTransform;
 
+    [System.NonSerialized] public float palmFingerLerp = 0.58f;
+    [System.NonSerialized] public Vector3 palmWorldFineOffset = new Vector3(0f, 0.005f, 0.015f);
+
+    private Transform rightHandWristBone;
+    private Transform rightHandMiddleKnuckleBone;
+    private Transform rightHandIndexKnuckleBone;
+    private Transform rightHandPinkyKnuckleBone;
+    private bool hasResolvedDeformPalmBones;
+
     [Tooltip("Hướng bắn: True = Bắn thẳng vào tâm ngắm chấm trắng trên màn hình; False = Bay thẳng theo hướng mặt của Điểm Ném")]
     public bool aimTowardsCrosshair = true;
 
@@ -271,8 +280,15 @@ public class ThirdPersonPlayerController : MonoBehaviour
         EnsureLanternLight();
         EnsureTrajectoryLine();
         UpdateChainCountUI();
+        GameLocalizationManager.OnLanguageChanged -= OnLanguageChangedRefreshHUD;
+        GameLocalizationManager.OnLanguageChanged += OnLanguageChangedRefreshHUD;
         ChainPickupSpawner.EnsureSpawnedInScene(transform.position);
         ChainPickupHUD.EnsureInScene();
+    }
+
+    private void OnLanguageChangedRefreshHUD(GameLocalizationManager.Language _)
+    {
+        UpdateChainCountUI();
     }
 
     private void OnDisable()
@@ -305,6 +321,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
         if (lanternLight != null)
         {
             lanternLight.enabled = true;
+            lanternLight.renderMode = LightRenderMode.ForcePixel;
             lanternLight.color = new Color(1.0f, 0.68f, 0.28f);
             lanternLight.range = 8.5f;
             lanternLight.intensity = 3.2f;
@@ -373,8 +390,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 rt.sizeDelta = new Vector2(400f, 40f);
 
                 skillNoticeText = noticeGo.AddComponent<Text>();
-                skillNoticeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                if (skillNoticeText.font == null) skillNoticeText.font = Font.CreateDynamicFontFromOSFont("Arial", 18);
+                skillNoticeText.font = UIFontHelper.GetCrispFont(20);
+                if (skillNoticeText.font == null) skillNoticeText.font = Font.CreateDynamicFontFromOSFont("Arial", 20);
                 skillNoticeText.fontSize = 20;
                 skillNoticeText.alignment = TextAnchor.MiddleCenter;
                 skillNoticeText.fontStyle = FontStyle.Bold;
@@ -410,8 +427,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 rt.sizeDelta = new Vector2(360f, 36f);
 
                 chainCountText = chainGo.AddComponent<Text>();
-                chainCountText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                if (chainCountText.font == null) chainCountText.font = Font.CreateDynamicFontFromOSFont("Arial", 18);
+                chainCountText.font = UIFontHelper.GetCrispFont(20);
+                if (chainCountText.font == null) chainCountText.font = Font.CreateDynamicFontFromOSFont("Arial", 20);
                 chainCountText.fontSize = 20;
                 chainCountText.alignment = TextAnchor.MiddleCenter;
                 chainCountText.fontStyle = FontStyle.Bold;
@@ -430,6 +447,23 @@ public class ThirdPersonPlayerController : MonoBehaviour
         hasPentacleSeal = true;
     }
 
+    public void ResetForNewMatch()
+    {
+        currentChainCharges = 0;
+        hasPentacleSeal = false;
+        nextChainConsumeTime = -10f;
+        if (isAimingThrow)
+        {
+            CancelMagicAim();
+        }
+        if (isBlocking)
+        {
+            CancelBlock();
+        }
+        UpdateChainCountUI();
+        ChainPickupSpawner.EnsureSpawnedInScene(transform.position);
+    }
+
     public bool CanAddChainCharge()
     {
         return currentChainCharges < maxChainCharges;
@@ -440,14 +474,22 @@ public class ThirdPersonPlayerController : MonoBehaviour
         if (amount <= 0 || currentChainCharges >= maxChainCharges) return false;
         currentChainCharges = Mathf.Clamp(currentChainCharges + amount, 0, maxChainCharges);
         UpdateChainCountUI();
-        ShowTargetNotice($"Nhặt được Dấu Ấn Pentacle! ({currentChainCharges}/{maxChainCharges})");
+        ShowTargetNotice(string.Format(
+            GameLocalizationManager.T("NOTICE_SEAL_PICKED", "Nhặt được Dấu Ấn Pentacle! ({0}/{1})"),
+            currentChainCharges,
+            maxChainCharges
+        ));
         return true;
     }
 
     private void UpdateChainCountUI()
     {
         if (chainCountText == null) return;
-        chainCountText.text = $"Dấu Ấn [E]: {currentChainCharges} / {maxChainCharges}";
+        chainCountText.text = string.Format(
+            GameLocalizationManager.T("HUD_SEAL_COUNTER", "Dấu Ấn [E]: {0} / {1}"),
+            currentChainCharges,
+            maxChainCharges
+        );
         chainCountText.color = currentChainCharges > 0
             ? new Color(1f, 0.42f, 0.35f, 1f)
             : new Color(0.85f, 0.85f, 0.85f, 0.90f);
@@ -470,63 +512,244 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private void AutoFindCastHand()
     {
         EnsureAnimationEventForwarder();
+        ResolveAnimatedRightPalmBones();
 
-        Transform customShootPoint = FindCustomShootPoint(transform);
-        if (customShootPoint != null)
+        // Nếu throwPoint đang gắn nhầm vào xương điều khiển tĩnh (Ctrl_Hand_IK_Right không di chuyển theo animation Mixamo), loại bỏ để dùng đúng lòng bàn tay động!
+        if (throwPoint != null && IsUnanimatedControlRigHierarchy(throwPoint))
         {
-            throwPoint = customShootPoint;
-            Debug.Log($"<color=#68D391>[ThirdPersonPlayerController] Đã tự động nhận diện điểm bắn tùy chỉnh: '{throwPoint.name}' tại {throwPoint.position}</color>");
+            throwPoint = null;
         }
-        else if (throwPoint == null)
+        if (castHandTransform != null && IsUnanimatedControlRigHierarchy(castHandTransform))
         {
-            throwPoint = FindBoneRecursive(transform, "ThrowPoint");
-            if (throwPoint == null)
+            castHandTransform = null;
+        }
+
+        if (throwPoint == null)
+        {
+            Transform customShootPoint = FindCustomShootPoint(transform);
+            if (customShootPoint != null && !IsUnanimatedControlRigHierarchy(customShootPoint))
             {
-                throwPoint = FindBoneRecursive(transform, "MagicThrowPoint");
+                throwPoint = customShootPoint;
             }
         }
 
         if (castHandTransform == null)
         {
-            castHandTransform = FindBoneRecursive(transform, "Ctrl_Hand_IK_Right");
-            if (castHandTransform == null)
-                castHandTransform = FindBoneRecursive(transform, "RightHand");
-            if (castHandTransform == null)
-                castHandTransform = FindBoneRecursive(transform, "LeftHand");
+            castHandTransform = rightHandWristBone;
+        }
+    }
+
+    private void ResolveAnimatedRightPalmBones()
+    {
+        if (hasResolvedDeformPalmBones && rightHandWristBone != null) return;
+        hasResolvedDeformPalmBones = true;
+
+        // 1. Ưu tiên cao nhất: Tìm trực tiếp trong mảng SkinnedMeshRenderer.bones (xương thực sự kéo lưới 3D bàn tay chuyển động trên màn hình!)
+        var smrs = GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        for (int s = 0; s < smrs.Length; s++)
+        {
+            var bones = smrs[s] != null ? smrs[s].bones : null;
+            if (bones == null || bones.Length == 0) continue;
+            for (int b = 0; b < bones.Length; b++)
+            {
+                Transform bone = bones[b];
+                if (bone == null || IsUnanimatedControlRigBoneName(bone.name)) continue;
+                string bn = bone.name;
+                if (rightHandWristBone == null && MatchesBoneSuffix(bn, "RightHand"))
+                    rightHandWristBone = bone;
+                else if (rightHandMiddleKnuckleBone == null && (MatchesBoneSuffix(bn, "RightHandMiddle1") || MatchesBoneSuffix(bn, "Middle1_Right")))
+                    rightHandMiddleKnuckleBone = bone;
+                else if (rightHandIndexKnuckleBone == null && (MatchesBoneSuffix(bn, "RightHandIndex1") || MatchesBoneSuffix(bn, "Index1_Right")))
+                    rightHandIndexKnuckleBone = bone;
+                else if (rightHandPinkyKnuckleBone == null && (MatchesBoneSuffix(bn, "RightHandPinky1") || MatchesBoneSuffix(bn, "Pinky1_Right")))
+                    rightHandPinkyKnuckleBone = bone;
+            }
+            if (rightHandWristBone != null) break;
         }
 
-        if (throwPoint == null)
+        // 2. Fallback qua Humanoid Animator hoặc tìm trong cây Transform
+        if (rightHandWristBone == null && playerAnimator != null && playerAnimator.isHuman)
         {
-            CreateOrAttachThrowPoint();
+            rightHandWristBone = playerAnimator.GetBoneTransform(HumanBodyBones.RightHand);
+            rightHandMiddleKnuckleBone = playerAnimator.GetBoneTransform(HumanBodyBones.RightMiddleProximal);
+            rightHandIndexKnuckleBone = playerAnimator.GetBoneTransform(HumanBodyBones.RightIndexProximal);
+            rightHandPinkyKnuckleBone = playerAnimator.GetBoneTransform(HumanBodyBones.RightLittleProximal);
         }
+
+        if (rightHandWristBone == null)
+        {
+            rightHandWristBone = FindDeformBoneBySuffix(transform, "mixamorig:RightHand")
+                ?? FindDeformBoneBySuffix(transform, "RightHand")
+                ?? FindDeformBoneBySuffix(transform, "Hand_R")
+                ?? FindDeformBoneBySuffix(transform, "hand.R");
+        }
+
+        if (rightHandMiddleKnuckleBone == null && rightHandWristBone != null)
+        {
+            rightHandMiddleKnuckleBone = FindDeformBoneBySuffix(rightHandWristBone, "RightHandMiddle1")
+                ?? FindDeformBoneBySuffix(rightHandWristBone, "Middle1")
+                ?? FindDeformBoneBySuffix(rightHandWristBone, "RightHandIndex1");
+        }
+
+        if (rightHandIndexKnuckleBone == null && rightHandWristBone != null)
+        {
+            rightHandIndexKnuckleBone = FindDeformBoneBySuffix(rightHandWristBone, "RightHandIndex1")
+                ?? FindDeformBoneBySuffix(rightHandWristBone, "Index1");
+        }
+
+        if (rightHandPinkyKnuckleBone == null && rightHandWristBone != null)
+        {
+            rightHandPinkyKnuckleBone = FindDeformBoneBySuffix(rightHandWristBone, "RightHandPinky1")
+                ?? FindDeformBoneBySuffix(rightHandWristBone, "Pinky1");
+        }
+    }
+
+    private static bool MatchesBoneSuffix(string boneName, string suffix)
+    {
+        if (string.IsNullOrEmpty(boneName)) return false;
+        return boneName.Equals(suffix, System.StringComparison.OrdinalIgnoreCase)
+            || boneName.EndsWith(":" + suffix, System.StringComparison.OrdinalIgnoreCase)
+            || boneName.EndsWith("_" + suffix, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsUnanimatedControlRigBoneName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        return name.StartsWith("Ctrl_", System.StringComparison.OrdinalIgnoreCase)
+            || name.IndexOf("_IK_", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.IndexOf("_FK_", System.StringComparison.OrdinalIgnoreCase) >= 0
+            || name.EndsWith("_IK", System.StringComparison.OrdinalIgnoreCase)
+            || name.EndsWith("_FK", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsUnanimatedControlRigHierarchy(Transform t)
+    {
+        Transform cur = t;
+        while (cur != null && cur != transform)
+        {
+            if (IsUnanimatedControlRigBoneName(cur.name))
+            {
+                return true;
+            }
+            cur = cur.parent;
+        }
+        return false;
+    }
+
+    private Transform FindDeformBoneBySuffix(Transform parent, string suffix)
+    {
+        if (parent == null) return null;
+        if (!IsUnanimatedControlRigBoneName(parent.name)
+            && (parent.name.Equals(suffix, System.StringComparison.OrdinalIgnoreCase)
+                || parent.name.EndsWith(":" + suffix, System.StringComparison.OrdinalIgnoreCase)
+                || parent.name.EndsWith("_" + suffix, System.StringComparison.OrdinalIgnoreCase)))
+        {
+            return parent;
+        }
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform found = FindDeformBoneBySuffix(parent.GetChild(i), suffix);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Tính toán chính xác tọa độ & hướng của tâm Lòng Bàn Tay Phải theo không gian thế giới thực (mét),
+    /// bám khít 100% theo chuyển động tay ở mọi frame animation (Block, RisingWave, Idle, Run).
+    /// </summary>
+    public bool TryGetRightPalmWorldPose(out Vector3 palmWorldPos, out Quaternion palmWorldRot)
+    {
+        ResolveAnimatedRightPalmBones();
+
+        if (rightHandWristBone != null)
+        {
+            Vector3 wristPos = rightHandWristBone.position;
+            Vector3 fingerDir = rightHandWristBone.up;
+            if (rightHandMiddleKnuckleBone != null)
+            {
+                Vector3 toKnuckle = rightHandMiddleKnuckleBone.position - wristPos;
+                if (toKnuckle.sqrMagnitude > 0.000001f)
+                {
+                    fingerDir = toKnuckle.normalized;
+                }
+                palmWorldPos = Vector3.Lerp(wristPos, rightHandMiddleKnuckleBone.position, palmFingerLerp);
+            }
+            else
+            {
+                palmWorldPos = wristPos + rightHandWristBone.up * 0.045f;
+            }
+
+            // Pháp tuyến lòng bàn tay phải: tích có hướng giữa trục ngón tay và trục ngang bàn tay (Út -> Trỏ)
+            Vector3 palmNormal = transform.forward;
+            if (rightHandIndexKnuckleBone != null && rightHandPinkyKnuckleBone != null)
+            {
+                Vector3 pinkyToIndex = rightHandIndexKnuckleBone.position - rightHandPinkyKnuckleBone.position;
+                Vector3 cross = Vector3.Cross(fingerDir, pinkyToIndex);
+                if (cross.sqrMagnitude > 0.000001f)
+                {
+                    palmNormal = cross.normalized;
+                    // Đảm bảo hướng ra phía trước ngực khi nhân vật giơ tay đỡ đòn
+                    if (Vector3.Dot(palmNormal, transform.forward) < -0.15f)
+                    {
+                        palmNormal = -palmNormal;
+                    }
+                }
+            }
+
+            palmWorldRot = Quaternion.LookRotation(palmNormal, fingerDir);
+            palmWorldPos += transform.rotation * palmWorldFineOffset;
+            return true;
+        }
+
+        if (castHandTransform != null && !IsUnanimatedControlRigHierarchy(castHandTransform))
+        {
+            palmWorldPos = castHandTransform.position;
+            palmWorldRot = castHandTransform.rotation;
+            return true;
+        }
+
+        palmWorldPos = transform.position + transform.rotation * new Vector3(0.18f, 1.05f, 0.32f);
+        palmWorldRot = transform.rotation;
+        return false;
+    }
+
+    public Vector3 GetSpellOriginWorldPosition()
+    {
+        if (TryGetRightPalmWorldPose(out Vector3 palmPos, out _))
+        {
+            return palmPos;
+        }
+        if (throwPoint != null && !IsUnanimatedControlRigHierarchy(throwPoint))
+        {
+            return throwPoint.position;
+        }
+        return transform.position + (transform.rotation * magicOrbSpawnOffset);
     }
 
     public Transform FindCustomShootPoint(Transform root)
     {
         if (root == null) return null;
 
-        // 1. Ưu tiên kiểm tra trực tiếp cụm xương tay phải (Ctrl_Hand_IK_Right hoặc Ctrl_Hand_IK_Right_end)
-        Transform handEnd = FindBoneRecursive(transform, "Ctrl_Hand_IK_Right_end")
-            ?? FindBoneRecursive(transform, "Ctrl_Hand_IK_Right");
-        if (handEnd != null)
+        // 1. Ưu tiên kiểm tra điểm bắn gắn trên xương bàn tay biến dạng thật (mixamorig:RightHand)
+        ResolveAnimatedRightPalmBones();
+        if (rightHandWristBone != null)
         {
-            for (int i = 0; i < handEnd.childCount; i++)
+            Transform foundInDeformHand = FindShootPointRecursive(rightHandWristBone);
+            if (foundInDeformHand != null)
             {
-                Transform child = handEnd.GetChild(i);
-                if (child != null && IsShootPointName(child.name))
-                {
-                    return child;
-                }
+                return foundInDeformHand;
             }
         }
 
-        // 2. Tìm kiếm đệ quy toàn bộ hierarchy với bộ lọc tên đa dạng (hỗ trợ cả có dấu tiếng Việt lẫn không dấu)
+        // 2. Tìm kiếm đệ quy toàn bộ hierarchy nhưng bỏ qua các điểm gắn nhầm trên xương điều khiển tĩnh (Ctrl_ / _IK_ / _FK_)
         return FindShootPointRecursive(root);
     }
 
     private Transform FindShootPointRecursive(Transform current)
     {
         if (current == null) return null;
+        if (IsUnanimatedControlRigBoneName(current.name)) return null;
         if (current != transform && IsShootPointName(current.name))
         {
             return current;
@@ -616,6 +839,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
     private void OnDestroy()
     {
+        GameLocalizationManager.OnLanguageChanged -= OnLanguageChangedRefreshHUD;
         if (Instance == this) Instance = null;
         if (runtimeFallbackOrbMaterial != null)
         {
@@ -638,7 +862,11 @@ public class ThirdPersonPlayerController : MonoBehaviour
     private bool pendingControllerReactivate;
 
     [Tooltip("Chiều cao bậc thang tối đa nhân vật bước qua (đơn vị world, mét). Tự giới hạn theo kích thước collider đã scale.")]
-    [SerializeField] private float desiredWorldStepHeight = 0.22f;
+    [SerializeField] private float desiredWorldStepHeight = 0.38f;
+    [Tooltip("Chiều cao Capsule tối thiểu theo đơn vị thế giới thực (mét) để nhân vật không bị biến thành capsule siêu nhỏ 27cm gây kẹt khe cửa")]
+    [SerializeField] private float targetWorldCapsuleHeight = 1.65f;
+    [Tooltip("Bán kính Capsule chuẩn theo đơn vị thế giới thực (mét) để di chuyển mượt qua cửa và bậc thềm")]
+    [SerializeField] private float targetWorldCapsuleRadius = 0.30f;
 
 #if UNITY_EDITOR
     // [UnityEditor.InitializeOnLoadMethod]
@@ -681,11 +909,36 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
         bool needsReactivate = false;
 
+        Vector3 ls = transform.lossyScale;
+        float scaleY = Mathf.Max(0.0001f, Mathf.Abs(ls.y));
+        float scaleXZ = Mathf.Max(0.0001f, Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.z)));
+
+        // 0. Tự động quy đổi Height & Radius theo lossyScale thực tế (ví dụ root scale = 0.1) để Capsule thế giới luôn cao ~1.65m, rộng ~0.60m,
+        // tránh lỗi Capsule cao 27cm / bán kính 3cm chui kẹt vào khe tường, bậc cửa hoặc làm StepOffset bị ép xuống 12cm!
+        if (!overrideColliderSettings)
+        {
+            float currentWorldH = characterController.height * scaleY;
+            float currentWorldR = characterController.radius * scaleXZ;
+            float desiredH = Mathf.Clamp(targetWorldCapsuleHeight, 1.4f, 2.1f);
+            float desiredR = Mathf.Clamp(targetWorldCapsuleRadius, 0.22f, 0.45f);
+
+            if (currentWorldH < 1.15f || currentWorldH > 2.6f)
+            {
+                characterController.height = desiredH / scaleY;
+                needsReactivate = true;
+            }
+            if (currentWorldR < 0.18f || currentWorldR > 0.65f)
+            {
+                characterController.radius = desiredR / scaleXZ;
+                needsReactivate = true;
+            }
+        }
+
         // 1. Đảm bảo đáy Capsule luôn nằm đúng tại bàn chân (y = 0): Center.y = Height * 0.5f
         float expectedCenterY = characterController.height * 0.5f;
-        if (Mathf.Abs(characterController.center.y - expectedCenterY) > 0.02f)
+        if (Mathf.Abs(characterController.center.y - expectedCenterY) > 0.02f || Mathf.Abs(characterController.center.x) > 0.05f || Mathf.Abs(characterController.center.z) > 0.05f)
         {
-            characterController.center = new Vector3(characterController.center.x, expectedCenterY, characterController.center.z);
+            characterController.center = new Vector3(0f, expectedCenterY, 0f);
             needsReactivate = true;
         }
 
@@ -698,14 +951,12 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
         // 3. StepOffset của CharacterController KHÔNG bị scale (đơn vị world), còn Height/Radius thì bị scale theo lossyScale.
         // PhysX yêu cầu: stepOffset <= scaledHeight + scaledRadius * 2 — vi phạm sẽ khiến controller "inactive".
-        Vector3 ls = transform.lossyScale;
-        float scaleY = Mathf.Max(0.0001f, Mathf.Abs(ls.y));
-        float scaleXZ = Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.z));
         float scaledHeight = characterController.height * scaleY;
         float scaledRadius = characterController.radius * scaleXZ;
         float hardLimit = scaledHeight + scaledRadius * 2f;
         float maxSafeStep = Mathf.Max(0f, Mathf.Min(scaledHeight * 0.45f, hardLimit * 0.9f));
-        float targetStep = Mathf.Min(desiredWorldStepHeight, maxSafeStep);
+        float effectiveDesiredStep = Mathf.Max(desiredWorldStepHeight, 0.36f);
+        float targetStep = Mathf.Min(effectiveDesiredStep, maxSafeStep);
 
         if (Mathf.Abs(characterController.stepOffset - targetStep) > 0.005f || characterController.stepOffset > maxSafeStep)
         {
@@ -713,9 +964,9 @@ public class ThirdPersonPlayerController : MonoBehaviour
             needsReactivate = true;
         }
 
-        // 4. Đảm bảo skinWidth hợp lý theo bán kính
-        float targetSkin = Mathf.Clamp(characterController.radius * 0.1f, 0.01f, 0.08f);
-        if (characterController.skinWidth > characterController.radius * 0.5f || characterController.skinWidth < 0.01f)
+        // 4. Đảm bảo skinWidth (đơn vị world) hợp lý theo bán kính thế giới thực để trượt tường/cửa mượt mà
+        float targetSkin = Mathf.Clamp(scaledRadius * 0.1f, 0.015f, 0.05f);
+        if (characterController.skinWidth > scaledRadius * 0.45f || characterController.skinWidth < 0.01f)
         {
             characterController.skinWidth = targetSkin;
             needsReactivate = true;
@@ -845,9 +1096,13 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 if (blockPressedDown || isBlocking)
                 {
                     if (!hasPentacleSeal)
-                        ShowTargetNotice("Chưa có Dấu Ấn Pentacle! Hãy tìm nhặt dưới sàn!");
+                        ShowTargetNotice(GameLocalizationManager.T("NOTICE_NEED_SEAL", "Chưa có Dấu Ấn Pentacle! Hãy tìm nhặt dưới sàn!"));
                     else
-                        ShowTargetNotice($"Hết Dây Xích! Tìm nhặt quanh bản đồ ({currentChainCharges}/{maxChainCharges})");
+                        ShowTargetNotice(string.Format(
+                            GameLocalizationManager.T("NOTICE_OUT_OF_SEALS", "Hết Dấu Ấn! Tìm nhặt quanh bản đồ ({0}/{1})"),
+                            currentChainCharges,
+                            maxChainCharges
+                        ));
                 }
                 if (isBlocking)
                 {
@@ -856,10 +1111,24 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 return;
             }
 
-            // Kiểm tra điều kiện: Buộc phải hướng về con ma mới nhấn/giữ E được (toán học hình nón, không cần Collider)
+            // Kiểm tra điều kiện: Buộc phải hướng về con ma mới nhấn/giữ E được (hỗ trợ cả Ma AI và Ma người chơi trong Multiplayer)
             PumpkinGhostAI targetGhost = GetTargetGhostInFacingCone(blockRange, blockFacingAngleThreshold);
+            int remoteGhostActorNr = -1;
+            Transform remoteGhostTransform = null;
+            if (targetGhost == null && PhotonMultiplayerChatVoice.Instance != null)
+            {
+                remoteGhostTransform = PhotonMultiplayerChatVoice.Instance.FindRemoteGhostInFacingCone(
+                    transform.position,
+                    transform.forward,
+                    blockRange,
+                    blockFacingAngleThreshold,
+                    out remoteGhostActorNr
+                );
+            }
 
-            if (targetGhost != null)
+            Transform finalTargetTransform = targetGhost != null ? targetGhost.transform : remoteGhostTransform;
+
+            if (finalTargetTransform != null)
             {
                 if (!isBlocking)
                 {
@@ -884,7 +1153,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
                     pentacleHandSealVFX = GetComponent<PentacleHandSealVFX>() ?? gameObject.AddComponent<PentacleHandSealVFX>();
                 }
                 Transform handAnchor = castHandTransform != null ? castHandTransform : throwPoint;
-                pentacleHandSealVFX.Activate(targetGhost.transform, handAnchor);
+                pentacleHandSealVFX.Activate(finalTargetTransform, handAnchor);
 
                 // Tiêu hao 1 Dây Xích cho mỗi lần phong ấn (kéo dài ghostHoldDuration giây)
                 if (Time.time >= nextChainConsumeTime)
@@ -893,18 +1162,25 @@ public class ThirdPersonPlayerController : MonoBehaviour
                     nextChainConsumeTime = Time.time + ghostHoldDuration;
                     UpdateChainCountUI();
 
-                    cachedGhost = targetGhost;
-                    targetGhost.Freeze(ghostHoldDuration);
-                    GhostChainStunVFX.ApplyChainStun(
-                        targetGhost.gameObject,
-                        ghostHoldDuration,
-                        Vector3.zero,
-                        0f,
-                        targetGhost.GetComponentInChildren<Animator>(true),
-                        true
-                    );
+                    if (targetGhost != null)
+                    {
+                        cachedGhost = targetGhost;
+                        targetGhost.Freeze(ghostHoldDuration, false);
+                        GhostChainStunVFX.ApplyChainStun(
+                            targetGhost.gameObject,
+                            ghostHoldDuration,
+                            Vector3.zero,
+                            0f,
+                            targetGhost.GetComponentInChildren<Animator>(true),
+                            true
+                        );
+                    }
+                    else if (remoteGhostActorNr > 0 && PhotonMultiplayerChatVoice.Instance != null)
+                    {
+                        PhotonMultiplayerChatVoice.Instance.SendSealChainHoldToRemoteGhost(remoteGhostActorNr, ghostHoldDuration);
+                    }
                     lastGhostHoldTime = Time.time;
-                    Debug.Log($"<color=#3498DB>[PrinceGreen - Phím E] Đã dùng 1 Dây Xích trói {targetGhost.name} trong {ghostHoldDuration}s! (Còn {currentChainCharges}/{maxChainCharges})</color>");
+                    Debug.Log($"<color=#3498DB>[PrinceGreen - Phím E] Đã dùng 1 Dây Xích trói {finalTargetTransform.name} trong {ghostHoldDuration}s! (Còn {currentChainCharges}/{maxChainCharges})</color>");
                 }
             }
             else
@@ -912,7 +1188,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
                 // Khi người chơi vừa nhấn phím E mà không có con ma nào ở gần hoặc chưa nhìn thẳng vào ma
                 if (blockPressedDown)
                 {
-                    ShowTargetNotice("Không tìm thấy mục tiêu!");
+                    ShowTargetNotice(GameLocalizationManager.T("NOTICE_NO_GHOST_TARGET", "Không tìm thấy mục tiêu!"));
                 }
 
                 // Nếu không nhìn thẳng vào con ma hoặc con ma ở sau lưng/ngoài tầm: Hủy thế thủ
@@ -954,8 +1230,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
     /// </summary>
     public PumpkinGhostAI GetTargetGhostInFacingCone(float maxDist, float maxAngle)
     {
-        PumpkinGhostAI[] allGhosts = Object.FindObjectsByType<PumpkinGhostAI>();
-        if (allGhosts == null || allGhosts.Length == 0) return null;
+        var allGhosts = PumpkinGhostAI.ActiveGhosts;
+        if (allGhosts == null || allGhosts.Count == 0) return null;
 
         PumpkinGhostAI bestGhost = null;
         float bestDist = maxDist;
@@ -967,7 +1243,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
         Vector3 playerPos = transform.position;
 
-        for (int i = 0; i < allGhosts.Length; i++)
+        for (int i = 0; i < allGhosts.Count; i++)
         {
             PumpkinGhostAI ghost = allGhosts[i];
             if (ghost == null || !ghost.gameObject.activeInHierarchy) continue;
@@ -1125,22 +1401,61 @@ public class ThirdPersonPlayerController : MonoBehaviour
         }
     }
 
-    private void UpdateAimRaycast()
+    private Camera s_CachedMainCam;
+    private static readonly RaycastHit[] s_AimRaycastHits = new RaycastHit[16];
+
+    private Camera GetMainCam()
     {
+        if (s_CachedMainCam == null || !s_CachedMainCam.isActiveAndEnabled)
+            s_CachedMainCam = Camera.main;
+        return s_CachedMainCam;
+    }
+
+    private Vector3 ResolveCrosshairAimPoint()
+    {
+        Camera mainCam = GetMainCam();
         Ray aimRay = cameraTransform != null
             ? new Ray(cameraTransform.position, cameraTransform.forward)
-            : (Camera.main != null ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
-            : new Ray(transform.position + Vector3.up * 1.5f, transform.forward));
+            : (mainCam != null ? mainCam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
+            : new Ray(transform.position + Vector3.up * 1.4f, transform.forward));
 
-        int mask = ~(1 << gameObject.layer);
-        if (Physics.Raycast(aimRay, out RaycastHit hit, 100f, mask, QueryTriggerInteraction.Ignore))
+        // Bỏ qua các vật thể nằm phía sau lưng người chơi (giữa camera góc nhìn thứ 3 và lưng nhân vật)
+        float minDistFromRayOrigin = 0.05f;
+        if (cameraTransform != null || mainCam != null)
         {
-            currentMagicAimPoint = hit.point;
+            Vector3 playerChest = transform.position + Vector3.up * 1.0f;
+            float camToPlayerProj = Vector3.Dot(playerChest - aimRay.origin, aimRay.direction);
+            if (camToPlayerProj > 0.35f)
+            {
+                minDistFromRayOrigin = camToPlayerProj - 0.20f;
+            }
         }
-        else
+
+        // Quét trên TẤT CẢ các Layer (~0) để không bỏ sót mặt đất/cầu/tường thuộc Layer Default (0), chỉ loại trừ chính nhân vật!
+        int hitCount = Physics.RaycastNonAlloc(aimRay, s_AimRaycastHits, 100f, ~0, QueryTriggerInteraction.Ignore);
+        float bestDist = float.MaxValue;
+        Vector3 bestPoint = aimRay.GetPoint(35f);
+
+        for (int i = 0; i < hitCount; i++)
         {
-            currentMagicAimPoint = aimRay.GetPoint(40f);
+            RaycastHit h = s_AimRaycastHits[i];
+            if (h.collider == null || h.distance < minDistFromRayOrigin) continue;
+            Transform ht = h.transform;
+            if (ht == transform || ht.IsChildOf(transform) || ht.root == transform.root) continue;
+
+            if (h.distance < bestDist)
+            {
+                bestDist = h.distance;
+                bestPoint = h.point;
+            }
         }
+
+        return bestPoint;
+    }
+
+    private void UpdateAimRaycast()
+    {
+        currentMagicAimPoint = ResolveCrosshairAimPoint();
     }
 
     private void ExecuteReleaseThrow()
@@ -1225,12 +1540,19 @@ public class ThirdPersonPlayerController : MonoBehaviour
         OnMagicOrbCastEvent();
     }
 
+    private bool hasSearchedCustomShootPoint = false;
+
     private void SpawnMagicWaveOrb()
     {
         hasCastOrbThisAttack = true;
 
-        if (throwPoint == null || throwPoint.name == "ThrowPoint")
+        if (!hasSearchedCustomShootPoint && (throwPoint == null || throwPoint.name == "ThrowPoint" || IsUnanimatedControlRigHierarchy(throwPoint)))
         {
+            hasSearchedCustomShootPoint = true;
+            if (throwPoint != null && IsUnanimatedControlRigHierarchy(throwPoint))
+            {
+                throwPoint = null;
+            }
             Transform customShootPoint = FindCustomShootPoint(transform);
             if (customShootPoint != null)
             {
@@ -1243,29 +1565,16 @@ public class ThirdPersonPlayerController : MonoBehaviour
             audioSource.PlayOneShot(magicCastSound);
         }
 
-        // 1. Xác định vị trí ném: Ưu tiên điểm ném (throwPoint) -> bàn tay -> offset tương đối
-        Vector3 spawnPos = throwPoint != null
-            ? throwPoint.position
-            : (castHandTransform != null
-                ? castHandTransform.position
-                : transform.position + (transform.rotation * magicOrbSpawnOffset));
+        // 1. Xác định vị trí ném: Ngay chính giữa lòng bàn tay phải đang chuyển động (hoặc điểm ném gắn trên xương bàn tay thật)
+        Vector3 spawnPos = GetSpellOriginWorldPosition();
 
         // 2. Tính toán hướng bắn chính xác theo thời gian thực
-        Vector3 shootDir = (throwPoint != null) ? throwPoint.forward : transform.forward;
+        Vector3 shootDir = (throwPoint != null && !IsUnanimatedControlRigHierarchy(throwPoint)) ? throwPoint.forward : transform.forward;
         Vector3? targetPoint = null;
 
         if (aimTowardsCrosshair)
         {
-            Ray aimRay = cameraTransform != null
-                ? new Ray(cameraTransform.position, cameraTransform.forward)
-                : (Camera.main != null ? Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f))
-                : new Ray(transform.position + Vector3.up * 1.5f, transform.forward));
-
-            int mask = ~(1 << gameObject.layer);
-            Vector3 aimTarget = Physics.Raycast(aimRay, out RaycastHit hit, 100f, mask, QueryTriggerInteraction.Ignore)
-                ? hit.point
-                : aimRay.GetPoint(40f);
-
+            Vector3 aimTarget = ResolveCrosshairAimPoint();
             targetPoint = aimTarget;
             currentMagicAimPoint = aimTarget;
             Vector3 toAim = aimTarget - spawnPos;
@@ -1298,22 +1607,20 @@ public class ThirdPersonPlayerController : MonoBehaviour
         orbScript.speed = magicOrbSpeed;
         orbScript.knockbackDistance = magicOrbKnockback;
         orbScript.stunDuration = magicOrbStunDuration;
-        orbScript.EnsureRedVisuals();
         orbScript.gameObject.SetActive(true);
         orbScript.Launch(shootDir, targetPoint, gameObject);
     }
 
     private void OnDrawGizmosSelected()
     {
-        Transform pt = throwPoint != null ? throwPoint : castHandTransform;
-        Vector3 pos = pt != null ? pt.position : transform.position + (transform.rotation * magicOrbSpawnOffset);
+        Vector3 pos = GetSpellOriginWorldPosition();
 
         Gizmos.color = new Color(0f, 1f, 1f, 0.9f);
-        Gizmos.DrawWireSphere(pos, 0.18f);
+        Gizmos.DrawWireSphere(pos, 0.12f);
 
         Gizmos.color = Color.yellow;
-        Vector3 dir = (pt != null) ? pt.forward : transform.forward;
-        Gizmos.DrawRay(pos, dir * 1.2f);
+        Vector3 dir = (throwPoint != null && !IsUnanimatedControlRigHierarchy(throwPoint)) ? throwPoint.forward : transform.forward;
+        Gizmos.DrawRay(pos, dir * 1.0f);
     }
 
     private MagicWaveOrb GetOrCreatePooledOrb()
@@ -1402,7 +1709,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
                     s_TrajectoryLineMaterial.SetColor("_BaseColor", redColor);
             }
 
-            trajectoryLine.material = s_TrajectoryLineMaterial;
+            trajectoryLine.sharedMaterial = s_TrajectoryLineMaterial;
             trajectoryLine.startWidth = 0.038f;
             trajectoryLine.endWidth = 0.012f;
             trajectoryLine.positionCount = 0;
@@ -1443,34 +1750,74 @@ public class ThirdPersonPlayerController : MonoBehaviour
             return;
         }
 
-        Vector3 spawnPos = throwPoint != null ? throwPoint.position : (castHandTransform != null ? castHandTransform.position : transform.position + transform.rotation * magicOrbSpawnOffset);
+        Vector3 spawnPos = GetSpellOriginWorldPosition();
         Vector3 aimTarget = currentMagicAimPoint;
 
-        Vector3 toTarget = aimTarget - spawnPos;
-        Vector3 toTargetHoriz = new Vector3(toTarget.x, 0f, toTarget.z);
-        float distHoriz = Mathf.Clamp(toTargetHoriz.magnitude, 4f, 40f);
-        Vector3 dirHoriz = distHoriz > 0.01f ? toTargetHoriz.normalized : transform.forward;
+        const float previewGravity = 12f;
+        const float previewUpward = 6.0f;
+        Vector3 simVel = MagicWaveOrb.ComputeLaunchVelocity(
+            spawnPos,
+            transform.forward,
+            aimTarget,
+            magicOrbSpeed,
+            previewUpward,
+            previewGravity
+        );
 
-        float horizSpeed = Mathf.Clamp(magicOrbSpeed, 12f, 26f);
-        float flightTime = Mathf.Clamp(distHoriz / horizSpeed, 0.6f, 1.6f);
-        float gravity = 12f;
-        float upwardForce = 6.0f;
-
-        float deltaY = toTarget.y;
-        float requiredVy = (deltaY + 0.5f * gravity * flightTime * flightTime) / flightTime;
-        float initialVy = Mathf.Max(requiredVy, upwardForce);
-
-        Vector3 initialVel = dirHoriz * (distHoriz / flightTime) + Vector3.up * initialVy;
-
-        const int steps = 24;
+        const int steps = 28;
+        const float dt = 0.045f;
         trajectoryLine.positionCount = steps;
         trajectoryLine.enabled = true;
 
-        for (int i = 0; i < steps; i++)
+        Vector3 simPos = spawnPos;
+        bool bouncedInPreview = false;
+        trajectoryLine.SetPosition(0, simPos);
+
+        for (int i = 1; i < steps; i++)
         {
-            float t = (i / (float)(steps - 1)) * flightTime;
-            Vector3 pt = spawnPos + initialVel * t + 0.5f * Vector3.down * gravity * t * t;
-            trajectoryLine.SetPosition(i, pt);
+            float g = bouncedInPreview ? 9.8f : previewGravity;
+            simVel += Vector3.down * g * dt;
+            Vector3 nextPos = simPos + simVel * dt;
+            Vector3 stepVec = nextPos - simPos;
+            float stepLen = stepVec.magnitude;
+
+            if (stepLen > 0.001f)
+            {
+                int hits = Physics.RaycastNonAlloc(simPos, stepVec / stepLen, s_AimRaycastHits, stepLen, ~0, QueryTriggerInteraction.Ignore);
+                float nearest = float.MaxValue;
+                int bestIdx = -1;
+                for (int h = 0; h < hits; h++)
+                {
+                    RaycastHit rh = s_AimRaycastHits[h];
+                    if (rh.collider == null) continue;
+                    Transform ht = rh.transform;
+                    if (ht == transform || ht.IsChildOf(transform) || ht.root == transform.root) continue;
+                    if (rh.distance < nearest) { nearest = rh.distance; bestIdx = h; }
+                }
+
+                if (bestIdx >= 0)
+                {
+                    RaycastHit hit = s_AimRaycastHits[bestIdx];
+                    Vector3 n = hit.normal.sqrMagnitude > 0.001f ? hit.normal.normalized : Vector3.up;
+                    nextPos = hit.point + n * 0.25f;
+                    if (n.y > 0.50f)
+                    {
+                        bouncedInPreview = true;
+                        Vector3 hv = new Vector3(simVel.x, 0f, simVel.z);
+                        float hMag = Mathf.Max(hv.magnitude * 0.92f, Mathf.Max(14f, magicOrbSpeed) * 0.72f);
+                        Vector3 hDir = hv.sqrMagnitude > 0.01f ? hv.normalized : transform.forward;
+                        float vy = Mathf.Max(Mathf.Abs(simVel.y) * 0.82f, 6.0f);
+                        simVel = hDir * hMag + Vector3.up * vy;
+                    }
+                    else
+                    {
+                        simVel = Vector3.Reflect(simVel, n) * 0.82f;
+                    }
+                }
+            }
+
+            simPos = nextPos;
+            trajectoryLine.SetPosition(i, simPos);
         }
     }
 
@@ -1540,6 +1887,10 @@ public class ThirdPersonPlayerController : MonoBehaviour
     /// </summary>
     public void OnTakeDamageInterrupt()
     {
+        if (isAimingThrow)
+        {
+            CancelMagicAim();
+        }
         isJumpAnticipating = false;
         isCastingMagic = false;
         if (playerAnimator != null && playerAnimator.applyRootMotion)
@@ -1609,7 +1960,7 @@ public class ThirdPersonPlayerController : MonoBehaviour
 
             Transform activeCam = cameraTransform != null
                 ? cameraTransform
-                : (ThirdPersonCamera.Instance != null ? ThirdPersonCamera.Instance.transform : (Camera.main != null ? Camera.main.transform : null));
+                : (ThirdPersonCamera.Instance != null ? ThirdPersonCamera.Instance.transform : (GetMainCam() != null ? GetMainCam().transform : null));
 
             if (activeCam != null)
             {
@@ -1877,6 +2228,11 @@ public class ThirdPersonPlayerController : MonoBehaviour
         return true;
     }
 
+    private static bool IsMouseButtonKey(KeyCode code)
+    {
+        return code >= KeyCode.Mouse0 && code <= KeyCode.Mouse6;
+    }
+
     private bool ReadBlockInput()
     {
         if (virtualBlockHeld) return true;
@@ -1891,7 +2247,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKey(blockKey) || (allowMouse && Input.GetKey(KeyCode.Mouse1)) || (allowFForBlock && Input.GetKey(KeyCode.F)) || Input.GetKey(KeyCode.E)) return true;
+        bool blockKeyAllowed = !IsMouseButtonKey(blockKey) || allowMouse;
+        if ((blockKeyAllowed && Input.GetKey(blockKey)) || (allowMouse && Input.GetKey(KeyCode.Mouse1)) || (allowFForBlock && Input.GetKey(KeyCode.F)) || Input.GetKey(KeyCode.E)) return true;
 #endif
 
         return false;
@@ -1911,7 +2268,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(blockKey) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse1)) || (allowFForBlock && Input.GetKeyDown(KeyCode.F)) || Input.GetKeyDown(KeyCode.E)) return true;
+        bool blockKeyAllowed = !IsMouseButtonKey(blockKey) || allowMouse;
+        if ((blockKeyAllowed && Input.GetKeyDown(blockKey)) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse1)) || (allowFForBlock && Input.GetKeyDown(KeyCode.F)) || Input.GetKeyDown(KeyCode.E)) return true;
 #endif
 
         return false;
@@ -1934,7 +2292,8 @@ public class ThirdPersonPlayerController : MonoBehaviour
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(magicAttackKey) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse0)) || Input.GetKeyDown(KeyCode.Q)) return true;
+        bool attackKeyAllowed = !IsMouseButtonKey(magicAttackKey) || allowMouse;
+        if ((attackKeyAllowed && Input.GetKeyDown(magicAttackKey)) || (allowMouse && Input.GetKeyDown(KeyCode.Mouse0)) || Input.GetKeyDown(KeyCode.Q)) return true;
 #endif
 
         return false;
@@ -1948,17 +2307,31 @@ public class ThirdPersonPlayerController : MonoBehaviour
             return true;
         }
 
-        bool allowMouse = AllowDesktopMouseAction();
+        // Không chặn kiểm tra thả phím/chuột bởi AllowDesktopMouseAction để tránh kẹt trạng thái ngắm ném khi mở chuột giữa chừng
 #if ENABLE_INPUT_SYSTEM
         var mouse = Mouse.current;
-        if (allowMouse && mouse != null && mouse.leftButton.wasReleasedThisFrame) return true;
+        if (mouse != null && mouse.leftButton.wasReleasedThisFrame) return true;
         var kb = Keyboard.current;
         if (kb != null && kb.qKey.wasReleasedThisFrame) return true;
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyUp(magicAttackKey) || (allowMouse && Input.GetKeyUp(KeyCode.Mouse0)) || Input.GetKeyUp(KeyCode.Q)) return true;
+        if (Input.GetKeyUp(magicAttackKey) || Input.GetKeyUp(KeyCode.Mouse0) || Input.GetKeyUp(KeyCode.Q)) return true;
 #endif
+
+        // Phòng vệ an toàn: Nếu trên Desktop không còn nút ném nào đang được giữ mà cũng không dùng nút cảm ứng ảo -> giải phóng ngay
+        if (!Application.isMobilePlatform && (VirtualJoystickTouchUI.Instance == null || !VirtualJoystickTouchUI.Instance.IsGameplayTouchHoldingAttack))
+        {
+            bool anyHeld = false;
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null && Mouse.current.leftButton.isPressed) anyHeld = true;
+            if (Keyboard.current != null && Keyboard.current.qKey.isPressed) anyHeld = true;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+            if (Input.GetKey(magicAttackKey) || Input.GetKey(KeyCode.Mouse0) || Input.GetKey(KeyCode.Q)) anyHeld = true;
+#endif
+            if (!anyHeld) return true;
+        }
 
         return false;
     }

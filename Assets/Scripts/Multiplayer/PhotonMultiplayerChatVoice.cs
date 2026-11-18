@@ -115,6 +115,23 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     public static readonly System.Collections.Generic.HashSet<int> ReplayAgreedActorNumbers = new System.Collections.Generic.HashSet<int>();
     public static bool IsLocalReplayAgreed { get; private set; } = false;
     public static bool soloTestAsGhost = false;
+    public static int SelectedBotCount = 0;
+
+    private static readonly string[] s_BotNamePool = new string[]
+    {
+        "Minh Khôi",
+        "Bảo Ngọc",
+        "Tuấn Anh",
+        "Hải Đăng",
+        "Thảo Vy",
+        "Gia Huy"
+    };
+
+    public static string GetBotDisplayName(int botIndex)
+    {
+        if (botIndex < 0) botIndex = 0;
+        return s_BotNamePool[botIndex % s_BotNamePool.Length];
+    }
 
     // Các thuộc tính phòng cho Matchmaking & Trạng thái trận đấu
     public const string ROOM_PROP_MATCH_MODE = "gm_mm";
@@ -197,7 +214,18 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     private const int VOICE_SAMPLE_RATE = 8000;
     private const int VOICE_CHUNK_SAMPLES = 800; // 100ms mỗi gói âm thanh (800 byte)
     private readonly float[] micSampleBuffer = new float[VOICE_CHUNK_SAMPLES];
+    private readonly float[] micWrapScratchBuffer = new float[VOICE_CHUNK_SAMPLES];
+    private readonly byte[] encodedVoiceBuffer = new byte[VOICE_CHUNK_SAMPLES];
+    private readonly float[] decodedVoiceBuffer = new float[VOICE_CHUNK_SAMPLES];
     private readonly float[] clearSilenceBuffer = new float[400];
+    private float[] ringFullSilenceBuffer;
+    private int[] cachedVoiceTargetActors = Array.Empty<int>();
+    private bool cachedIsLobbyScene = false;
+    private static readonly int s_SpeedParamHash = Animator.StringToHash("Speed");
+    private static Material s_FallbackGhostMat;
+    private static Material s_FallbackHumanMat;
+    private Vector3 cachedHumanRootScale = new Vector3(0.1f, 0.1f, 0.1f);
+    private Vector3 cachedGhostRootScale = Vector3.one;
 
     private AudioSource voicePlaybackSource;
     private AudioClip playbackRingClip;
@@ -451,8 +479,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             FusionVietnameseLobbyUI.Instance.HideImmediatelyForMatchStart();
         }
 
-        string curRoomLabel = !string.IsNullOrEmpty(roomName) ? roomName : "Đang mở";
-        AppendChatLine($"<color=#00FF9D><b>🎮 [CHƠI ĐƠN] Bạn đã vào Map trước (Phòng {curRoomLabel})! 3 người khác nhập ID [{curRoomLabel}] & bấm Sẵn Sàng đủ 4/4 sẽ tự ghép trận 4 người!</b></color>");
+        AppendChatLine("<color=#00FF9D><b>🎮 Bắt đầu trận đấu sinh tồn!</b></color>");
 
         string activeSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
         if (activeSceneName == "LobbyScene")
@@ -798,13 +825,37 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     public int CurrentRoomPlayersCount => (client != null && client.InRoom && client.CurrentRoom != null) ? (int)client.CurrentRoom.PlayerCount : (hasUserRequestedRoom ? 1 : 0);
     public float RemainingCountdown => currentMatchState == MatchState.CountingDown ? Mathf.Max(0f, countdownTimer) : -1f;
 
-    public void SetLocalPlayerNickname(string newNick)
+    public const string PREF_PLAYER_NICKNAME = "GhostMaze_PlayerNickname";
+    public const string PREF_HAS_CUSTOM_NICKNAME = "GhostMaze_HasCustomNickname";
+
+    public static bool HasSavedCustomPlayerName()
+    {
+        return PlayerPrefs.GetInt(PREF_HAS_CUSTOM_NICKNAME, 0) == 1
+            && !string.IsNullOrWhiteSpace(PlayerPrefs.GetString(PREF_PLAYER_NICKNAME, ""));
+    }
+
+    public void SetLocalPlayerNickname(string newNick, bool persistToPrefs = true)
     {
         if (string.IsNullOrWhiteSpace(newNick)) return;
-        playerName = newNick.Trim();
+        string trimmed = newNick.Trim();
+        if (trimmed.Length > 20) trimmed = trimmed.Substring(0, 20);
+        playerName = trimmed;
+
+        if (persistToPrefs)
+        {
+            PlayerPrefs.SetString(PREF_PLAYER_NICKNAME, playerName);
+            PlayerPrefs.SetInt(PREF_HAS_CUSTOM_NICKNAME, 1);
+            PlayerPrefs.Save();
+        }
+
         if (client != null && client.LocalPlayer != null)
         {
             client.LocalPlayer.NickName = playerName;
+            if (client.InRoom)
+            {
+                BroadcastLocalReadyState();
+                client.SendOutgoingCommands();
+            }
         }
     }
 
@@ -1001,9 +1052,24 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
     }
 
+    private static readonly Comparison<RoomPlayerEntry> s_RoomPlayerEntryComparison = (a, b) =>
+    {
+        if (a.isLocal != b.isLocal) return a.isLocal ? -1 : 1;
+        if (a.isMaster != b.isMaster) return a.isMaster ? -1 : 1;
+        return a.actorNumber.CompareTo(b.actorNumber);
+    };
+
     public List<RoomPlayerEntry> GetRoomPlayersList()
     {
-        List<RoomPlayerEntry> list = new List<RoomPlayerEntry>();
+        List<RoomPlayerEntry> list = new List<RoomPlayerEntry>(4);
+        FillRoomPlayersList(list);
+        return list;
+    }
+
+    public void FillRoomPlayersList(List<RoomPlayerEntry> list)
+    {
+        if (list == null) return;
+        list.Clear();
         if (client != null && client.InRoom && client.CurrentRoom != null && client.CurrentRoom.Players != null && client.CurrentRoom.Players.Count > 0)
         {
             int localActor = client.LocalPlayer != null ? client.LocalPlayer.ActorNumber : -1;
@@ -1012,7 +1078,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 var p = kvp.Value;
                 if (p == null) continue;
                 bool isMe = (p.ActorNumber == localActor);
-                string pNick = !string.IsNullOrWhiteSpace(p.NickName) ? p.NickName : (isMe ? playerName : $"NgÆ°á»iChÆ¡i_{p.ActorNumber}");
+                string pNick = !string.IsNullOrWhiteSpace(p.NickName) ? p.NickName : (isMe ? playerName : $"NgườiChơi_{p.ActorNumber}");
                 bool pReady = isMe ? IsLocalPlayerReady : (ReadyPlayerDict.TryGetValue(p.ActorNumber, out bool pr) && pr);
                 list.Add(new RoomPlayerEntry
                 {
@@ -1023,26 +1089,20 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                     isReady = pReady
                 });
             }
-            list.Sort((a, b) =>
-            {
-                if (a.isLocal != b.isLocal) return a.isLocal ? -1 : 1;
-                if (a.isMaster != b.isMaster) return a.isMaster ? -1 : 1;
-                return a.actorNumber.CompareTo(b.actorNumber);
-            });
+            list.Sort(s_RoomPlayerEntryComparison);
         }
         else
         {
-            // Hiá»ƒn thá»‹ ngay báº£n thÃ¢n ngÆ°á»i chÆ¡i ("TÃ´i á»Ÿ Ä‘Ã¢y") ngay khi vá»«a nháº¥n Táº¡o phÃ²ng / VÃ o phÃ²ng
+            // Hiển thị ngay bản thân người chơi ("Tôi ở đây") ngay khi vừa nhấn Tạo phòng / Vào phòng
             list.Add(new RoomPlayerEntry
             {
                 actorNumber = 1,
-                nickName = !string.IsNullOrWhiteSpace(playerName) ? playerName : "NgÆ°á»iChÆ¡i_TÃ´i",
+                nickName = !string.IsNullOrWhiteSpace(playerName) ? playerName : "NgườiChơi_Tôi",
                 isLocal = true,
                 isMaster = true,
                 isReady = IsLocalPlayerReady
             });
         }
-        return list;
     }
 
     public struct AlliedSpectateTarget
@@ -1060,10 +1120,41 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         public Quaternion targetRot;
         public float lastUpdateTime;
         public bool isGhostForm;
+        public bool isDisguised;
+        public bool isFallbackPrimitive;
+        public bool hasSpeedParam;
         public Animator animator;
         public float stunEndTime;
         public GameObject disguisePropObj;
         public bool IsStunned => Time.unscaledTime < stunEndTime;
+    }
+
+    /// <summary>
+    /// Điền danh sách vị trí người chơi mạng từ xa cho MiniMap Radar (0 GC mỗi frame).
+    /// </summary>
+    public void FillRemoteRadarPositions(bool wantGhosts, List<Vector3> outPositions)
+    {
+        if (outPositions == null || remotePlayers.Count == 0) return;
+        foreach (var kvp in remotePlayers)
+        {
+            int actorNr = kvp.Key;
+            var av = kvp.Value;
+            if (av == null || av.rootObj == null || !av.rootObj.activeInHierarchy) continue;
+            if (wantGhosts)
+            {
+                if (av.isGhostForm && !av.isDisguised)
+                {
+                    outPositions.Add(av.rootObj.transform.position);
+                }
+            }
+            else
+            {
+                if (!av.isGhostForm && !DeadHumanActorNumbers.Contains(actorNr))
+                {
+                    outPositions.Add(av.rootObj.transform.position);
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -1146,14 +1237,21 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         _instance = this;
         DontDestroyOnLoad(gameObject);
+        cachedIsLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
         UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
 
         // Giữ kết nối Photon khi cửa sổ Game mất focus (tránh cảnh báo "SendOutgoingCommands() was not called for > 5 seconds")
         Application.runInBackground = true;
+        SuppressLegacyFusionPrototypeObjects();
 
-        if (string.IsNullOrWhiteSpace(playerName))
+        string savedNick = PlayerPrefs.GetString(PREF_PLAYER_NICKNAME, "");
+        if (!string.IsNullOrWhiteSpace(savedNick))
         {
-            playerName = "NgườiChơi_" + UnityEngine.Random.Range(100, 999);
+            playerName = savedNick.Trim();
+        }
+        else if (string.IsNullOrWhiteSpace(playerName) || playerName == "NgườiChơi_Tôi")
+        {
+            playerName = "Player_" + UnityEngine.Random.Range(100, 999);
         }
 
         ResetMatchLobbyState();
@@ -1162,6 +1260,25 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         SetupVoicePlayback();
         BuildChatAndVoiceUI();
         ConnectToPhoton();
+    }
+
+    private static void SuppressLegacyFusionPrototypeObjects()
+    {
+        try
+        {
+            Fusion.FusionBootstrapDebugGUI.HideDefaultGUI = true;
+            GameObject protoStart = GameObject.Find("Prototype Network Start");
+            if (protoStart != null && protoStart.activeSelf)
+            {
+                protoStart.SetActive(false);
+            }
+            GameObject protoRunner = GameObject.Find("Prototype Runner");
+            if (protoRunner != null && protoRunner.activeSelf)
+            {
+                protoRunner.SetActive(false);
+            }
+        }
+        catch { }
     }
 
     private void Start()
@@ -1177,8 +1294,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
     private void Update()
     {
-        // [GhostMaze] O LobbyScene: Luon mo chuot tu do (khong khoa chuot) va an toan bo Chat UI
-        bool isLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        // [GhostMaze] Ở LobbyScene: Luôn mở chuột tự do (không khóa chuột) và ẩn toàn bộ Chat UI
+        bool isLobbyScene = cachedIsLobbyScene;
         if (isLobbyScene)
         {
             Cursor.lockState = CursorLockMode.None;
@@ -1310,12 +1427,6 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 bool isVoiceDialog = voiceSettingsDialogObj != null && voiceSettingsDialogObj.activeSelf;
                 bool isLobbyBox = lobbyPanelObj != null && lobbyPanelObj.activeSelf;
                 bool isEditingHUD = VirtualJoystickTouchUI.Instance != null && VirtualJoystickTouchUI.Instance.IsEditingHUDLayout;
-
-                if (ReadF1KeyDown() && !isTyping && !isLobbyTextInput)
-                {
-                    StartOfflineQuickTestWithTwoGhosts();
-                    return;
-                }
 
                 bool matchFinished = SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished;
                 if (!Application.isMobilePlatform)
@@ -1583,7 +1694,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             }
         }
 
-        if (AllowSinglePlayerEarlyStart && IsLocalMaster && client.CurrentRoom != null)
+        if ((AllowSinglePlayerEarlyStart || IsSoloPlayMode) && IsLocalMaster && client.CurrentRoom != null)
         {
             IsRoomInSoloDropInMode = true;
             client.CurrentRoom.SetCustomProperties(new PhotonHashtable { { ROOM_PROP_SOLO_MODE, true } });
@@ -1591,9 +1702,13 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         SyncSoloDropInRoomProperty();
 
         int count = client.CurrentRoom != null ? client.CurrentRoom.PlayerCount : 1;
+        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
         LastLobbyStatus = $"Đã vào phòng [{roomName}] (Toàn Cầu) — {count}/{requiredPlayersToStart} người";
         Debug.Log($"<color=#2ECC71>[Photon] {LastLobbyStatus}</color>");
-        AddSystemMessage($"Đã vào phòng [{roomName}] ({count}/{requiredPlayersToStart} người). Nhấn [Enter] để Chat, [V] để Mic, [H] để ẩn Chat!");
+        if (inLobbyScene && !IsGameStarted)
+        {
+            AddSystemMessage($"Đã vào phòng [{roomName}] ({count}/{requiredPlayersToStart} người).");
+        }
         BroadcastLocalReadyState();
         CheckRoomPropertiesForMatchStart();
         if (!IsGameStarted && !IsOfflineQuickTestMode)
@@ -1602,7 +1717,6 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         CheckAllPlayersConfirmedAndStart();
 
-        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
         bool matchFinished = SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished;
         if (!inLobbyScene && !IsTypingChat() && !matchFinished && !ShouldKeepCursorUnlocked())
         {
@@ -1892,9 +2006,9 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         return false;
     }
 
-    private bool ShouldKeepCursorUnlocked()
+    public bool ShouldKeepCursorUnlocked()
     {
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene") return true;
+        if (cachedIsLobbyScene) return true;
         if (!IsGameStarted && !IsOfflineQuickTestMode)
         {
             if (isLobbyCursorUnlocked) return true;
@@ -2368,7 +2482,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     }
 
     /// <summary>
-    /// Đọc an toàn các mẫu âm thanh từ vòng lặp đệm của Microphone, tự động chia hai nửa nếu vòng qua cuối AudioClip
+    /// Đọc an toàn các mẫu âm thanh từ vòng lặp đệm của Microphone (0 GC Allocation, không cấp phát mảng mỗi gói)
     /// </summary>
     private void SafeGetMicData(AudioClip clip, float[] destBuffer, int offsetSamples, int totalClipSamples)
     {
@@ -2385,16 +2499,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 int part1Len = totalClipSamples - offsetSamples;
                 if (part1Len > 0)
                 {
-                    float[] temp1 = new float[part1Len];
-                    clip.GetData(temp1, offsetSamples);
-                    Array.Copy(temp1, 0, destBuffer, 0, part1Len);
+                    clip.GetData(micWrapScratchBuffer, offsetSamples);
+                    Array.Copy(micWrapScratchBuffer, 0, destBuffer, 0, part1Len);
                 }
                 int part2Len = reqLen - part1Len;
                 if (part2Len > 0)
                 {
-                    float[] temp2 = new float[part2Len];
-                    clip.GetData(temp2, 0);
-                    Array.Copy(temp2, 0, destBuffer, part1Len, part2Len);
+                    clip.GetData(micWrapScratchBuffer, 0);
+                    Array.Copy(micWrapScratchBuffer, 0, destBuffer, part1Len, part2Len);
                 }
             }
         }
@@ -2470,7 +2582,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                             }
                         }
 
-                        byte[] encoded = EncodeMuLaw(micSampleBuffer);
+                        byte[] encoded = EncodeMuLaw(micSampleBuffer, encodedVoiceBuffer);
                         bool localIsGhost = IsLocalPlayerGhostRole();
                         bool teamIsolated = IsVoiceTeamIsolatedNow();
                         object[] voicePayload = new object[] { playerName, encoded, localIsGhost, teamIsolated };
@@ -2493,7 +2605,15 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                             // Sau 20s trốn: Chỉ gửi gói tin Voice cho đồng đội cùng phe (Ma -> Ma, Người -> Người)
                             if (voiceTargetActorBuffer.Count > 0)
                             {
-                                RaiseEventArgs teamArgs = new RaiseEventArgs { TargetActors = voiceTargetActorBuffer.ToArray() };
+                                if (cachedVoiceTargetActors.Length != voiceTargetActorBuffer.Count)
+                                {
+                                    cachedVoiceTargetActors = new int[voiceTargetActorBuffer.Count];
+                                }
+                                for (int i = 0; i < voiceTargetActorBuffer.Count; i++)
+                                {
+                                    cachedVoiceTargetActors[i] = voiceTargetActorBuffer[i];
+                                }
+                                RaiseEventArgs teamArgs = new RaiseEventArgs { TargetActors = cachedVoiceTargetActors };
                                 client.OpRaiseEvent(EVENT_VOICE_PACKET, voicePayload, teamArgs, SendOptions.SendUnreliable);
                             }
                         }
@@ -2552,8 +2672,11 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
 
         if (playbackRingClip != null)
         {
-            float[] silence = new float[PLAYBACK_RING_SAMPLES];
-            playbackRingClip.SetData(silence, 0);
+            if (ringFullSilenceBuffer == null || ringFullSilenceBuffer.Length != PLAYBACK_RING_SAMPLES)
+            {
+                ringFullSilenceBuffer = new float[PLAYBACK_RING_SAMPLES];
+            }
+            playbackRingClip.SetData(ringFullSilenceBuffer, 0);
         }
 
         bool amIGhost = IsLocalPlayerGhostRole();
@@ -2598,7 +2721,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         remoteSpeakerName = speaker;
         remoteSpeakingTimer = Time.unscaledTime + 0.35f;
 
-        float[] decoded = DecodeMuLaw(encodedBytes);
+        float[] decoded = DecodeMuLaw(encodedBytes, decodedVoiceBuffer);
+        int decodedLen = encodedBytes.Length;
         int playhead = voicePlaybackSource.timeSamples;
 
         // Nếu con trỏ ghi bị tụt lại hoặc quá xa con trỏ phát thì căn lại cách 80ms phía trước
@@ -2609,24 +2733,27 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             playbackWritePos = (playhead + 640) % PLAYBACK_RING_SAMPLES;
         }
 
-        if (playbackWritePos + decoded.Length <= PLAYBACK_RING_SAMPLES)
+        if (playbackWritePos + decodedLen <= PLAYBACK_RING_SAMPLES && decoded.Length == decodedLen)
         {
             playbackRingClip.SetData(decoded, playbackWritePos);
         }
         else
         {
-            int firstPart = PLAYBACK_RING_SAMPLES - playbackWritePos;
+            int firstPart = Mathf.Min(decodedLen, PLAYBACK_RING_SAMPLES - playbackWritePos);
             float[] part1 = new float[firstPart];
             Array.Copy(decoded, 0, part1, 0, firstPart);
             playbackRingClip.SetData(part1, playbackWritePos);
 
-            int secondPart = decoded.Length - firstPart;
-            float[] part2 = new float[secondPart];
-            Array.Copy(decoded, firstPart, part2, 0, secondPart);
-            playbackRingClip.SetData(part2, 0);
+            int secondPart = decodedLen - firstPart;
+            if (secondPart > 0)
+            {
+                float[] part2 = new float[secondPart];
+                Array.Copy(decoded, firstPart, part2, 0, secondPart);
+                playbackRingClip.SetData(part2, 0);
+            }
         }
 
-        playbackWritePos = (playbackWritePos + decoded.Length) % PLAYBACK_RING_SAMPLES;
+        playbackWritePos = (playbackWritePos + decodedLen) % PLAYBACK_RING_SAMPLES;
 
         // Xóa sạch vùng đệm nhỏ phía trước để tránh lặp lại tiếng cũ trong vòng tròn (an toàn khi chạm biên)
         int clearPos = playbackWritePos;
@@ -2637,25 +2764,14 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
         else
         {
-            int p1 = PLAYBACK_RING_SAMPLES - clearPos;
-            if (p1 > 0)
-            {
-                float[] s1 = new float[p1];
-                playbackRingClip.SetData(s1, clearPos);
-            }
-            int p2 = clearLen - p1;
-            if (p2 > 0)
-            {
-                float[] s2 = new float[p2];
-                playbackRingClip.SetData(s2, 0);
-            }
+            playbackRingClip.SetData(clearSilenceBuffer, 0);
         }
     }
 
-    // Chuẩn nén âm thanh G.711 μ-law (16-bit float -> 8-bit byte) giúp gói tin Voice siêu nhẹ & rõ nét
-    private static byte[] EncodeMuLaw(float[] samples)
+    // Chuẩn nén âm thanh G.711 μ-law (16-bit float -> 8-bit byte) giúp gói tin Voice siêu nhẹ & 0 GC
+    private static byte[] EncodeMuLaw(float[] samples, byte[] reuseBuffer = null)
     {
-        byte[] outBytes = new byte[samples.Length];
+        byte[] outBytes = (reuseBuffer != null && reuseBuffer.Length == samples.Length) ? reuseBuffer : new byte[samples.Length];
         for (int i = 0; i < samples.Length; i++)
         {
             float s = Mathf.Clamp(samples[i] * 1.4f, -1f, 1f);
@@ -2673,9 +2789,9 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         return outBytes;
     }
 
-    private static float[] DecodeMuLaw(byte[] data)
+    private static float[] DecodeMuLaw(byte[] data, float[] reuseBuffer = null)
     {
-        float[] samples = new float[data.Length];
+        float[] samples = (reuseBuffer != null && reuseBuffer.Length == data.Length) ? reuseBuffer : new float[data.Length];
         for (int i = 0; i < data.Length; i++)
         {
             byte mulaw = (byte)~data[i];
@@ -2755,6 +2871,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 GhostActorNumbers.AddRange(gInts);
             }
             SyncRoleWithSurvivalTimer();
+            DestroyDuplicateChatPanels();
         }
         else if (code == EVENT_PLAYER_READY)
         {
@@ -2862,6 +2979,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 Vector3 pushDir = new Vector3(Convert.ToSingle(orbArr[1]), 0f, Convert.ToSingle(orbArr[2]));
                 float pushDist = Convert.ToSingle(orbArr[3]);
                 float stunDur = Convert.ToSingle(orbArr[4]);
+                bool isCrimsonSeal = Convert.ToInt32(orbArr[5]) == 2;
 
                 if (targetActor == myActor)
                 {
@@ -2870,14 +2988,30 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                         && SurvivalTimerUI.Instance.CachedGhostVessel.isPlayerControlled
                         && SurvivalTimerUI.Instance.CachedGhostVessel.gameObject.activeInHierarchy)
                     {
-                        SurvivalTimerUI.Instance.CachedGhostVessel.ApplyKnockbackAndFreeze(pushDir, pushDist, stunDur);
+                        var vessel = SurvivalTimerUI.Instance.CachedGhostVessel;
+                        if (isCrimsonSeal)
+                        {
+                            vessel.Freeze(stunDur, false);
+                            GhostChainStunVFX.ApplyChainStun(
+                                vessel.gameObject,
+                                stunDur,
+                                Vector3.zero,
+                                0f,
+                                vessel.GetComponentInChildren<Animator>(true),
+                                true
+                            );
+                        }
+                        else
+                        {
+                            vessel.ApplyKnockbackAndFreeze(pushDir, pushDist, stunDur);
+                        }
                     }
-                    // Rung màn hình bên phía người chơi làm Ma khi bị trúng đạn cầu
+                    // Rung màn hình bên phía người chơi làm Ma khi bị trúng đạn cầu / xích phong ấn
                     ThirdPersonCamera.TriggerScreenShake(0.10f, 0.25f);
                 }
 
                 // Đồng bộ hiệu ứng xích trói và đứng yên cho con ma trên màn hình của tất cả người chơi khác
-                ApplyStunEffectToRemoteGhostAvatar(targetActor, pushDir, pushDist, stunDur);
+                ApplyStunEffectToRemoteGhostAvatar(targetActor, pushDir, pushDist, stunDur, isCrimsonSeal);
             }
         }
         else if (code == EVENT_REPLAY_VOTE)
@@ -2967,12 +3101,69 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         return alive;
     }
 
-    public void ApplyStunEffectToRemoteGhostAvatar(int targetActor, Vector3 pushDir, float pushDist, float stunDur)
+    public void ApplyStunEffectToRemoteGhostAvatar(int targetActor, Vector3 pushDir, float pushDist, float stunDur, bool crimsonExorcism = false)
     {
         if (remotePlayers.TryGetValue(targetActor, out var av) && av != null && av.rootObj != null)
         {
             av.stunEndTime = Time.unscaledTime + stunDur;
-            GhostChainStunVFX.ApplyChainStun(av.rootObj, stunDur, pushDir, pushDist, av.animator);
+            GhostChainStunVFX.ApplyChainStun(av.rootObj, stunDur, pushDir, pushDist, av.animator, crimsonExorcism);
+        }
+    }
+
+    public Transform FindRemoteGhostInFacingCone(Vector3 playerPos, Vector3 playerForward, float maxDist, float maxAngle, out int ghostActorNr)
+    {
+        ghostActorNr = -1;
+        if (client == null || !client.InRoom || remotePlayers.Count == 0) return null;
+
+        playerForward.y = 0f;
+        if (playerForward.sqrMagnitude > 0.0001f) playerForward.Normalize();
+        else playerForward = Vector3.forward;
+
+        Transform bestTransform = null;
+        float bestDist = maxDist;
+
+        foreach (var kvp in remotePlayers)
+        {
+            int actorNr = kvp.Key;
+            var av = kvp.Value;
+            if (av == null || av.rootObj == null || !av.isGhostForm || !av.rootObj.activeInHierarchy) continue;
+
+            Vector3 diff = av.rootObj.transform.position - playerPos;
+            diff.y = 0f;
+            float dist = diff.magnitude;
+            if (dist > maxDist) continue;
+
+            if (dist > 0.001f)
+            {
+                Vector3 dirToGhost = diff / dist;
+                float angle = Vector3.Angle(playerForward, dirToGhost);
+                if (angle <= maxAngle && dist < bestDist)
+                {
+                    bestDist = dist;
+                    bestTransform = av.rootObj.transform;
+                    ghostActorNr = actorNr;
+                }
+            }
+            else
+            {
+                ghostActorNr = actorNr;
+                return av.rootObj.transform;
+            }
+        }
+        return bestTransform;
+    }
+
+    public void SendSealChainHoldToRemoteGhost(int targetActorNr, float holdDuration)
+    {
+        if (targetActorNr <= 0) return;
+        ApplyStunEffectToRemoteGhostAvatar(targetActorNr, Vector3.zero, 0f, holdDuration, true);
+
+        if (client != null && client.InRoom)
+        {
+            object[] payload = new object[] { targetActorNr, 0f, 0f, 0f, holdDuration, 2 };
+            RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
+            client.OpRaiseEvent(EVENT_ORB_STUN, payload, args, SendOptions.SendReliable);
+            client.SendOutgoingCommands();
         }
     }
 
@@ -3002,15 +3193,16 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         return hitAny;
     }
 
-    public void TrySendGhostAttackHit(Vector3 originPos, float maxReach, float damage)
+    public bool TrySendGhostAttackHit(Vector3 originPos, float maxReach, float damage)
     {
-        if (client == null || !client.InRoom) return;
+        if (client == null || !client.InRoom) return false;
 
+        bool hitAny = false;
         foreach (var kvp in remotePlayers)
         {
             int actorNr = kvp.Key;
             var av = kvp.Value;
-            if (av == null || av.rootObj == null || av.isGhostForm) continue;
+            if (av == null || av.rootObj == null || av.isGhostForm || DeadHumanActorNumbers.Contains(actorNr)) continue;
 
             float dist = Vector3.Distance(originPos, av.rootObj.transform.position);
             if (dist <= maxReach + 0.6f)
@@ -3018,8 +3210,10 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 object[] payload = new object[] { actorNr, damage, originPos.x, originPos.y, originPos.z };
                 RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
                 client.OpRaiseEvent(EVENT_GHOST_ATTACK, payload, args, SendOptions.SendReliable);
+                hitAny = true;
             }
         }
+        return hitAny;
     }
 
     public void BroadcastGhostDisguise(bool isDisguised, string propName, Vector3 localScale)
@@ -3037,6 +3231,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
     {
         if (remotePlayers.TryGetValue(actorNr, out var av) && av != null && av.rootObj != null)
         {
+            av.isDisguised = isDisguised;
             if (isDisguised)
             {
                 if (av.animator != null) av.animator.gameObject.SetActive(false);
@@ -3052,33 +3247,76 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                     }
                 }
 
+                MeshFilter mf;
+                MeshRenderer mr;
                 if (av.disguisePropObj == null)
                 {
                     av.disguisePropObj = new GameObject("RemoteDisguisePropVisual");
                     av.disguisePropObj.transform.SetParent(av.rootObj.transform, false);
                     av.disguisePropObj.transform.localPosition = new Vector3(0f, 0.05f, 0f);
                     av.disguisePropObj.transform.localRotation = Quaternion.identity;
-                    var mf = av.disguisePropObj.AddComponent<MeshFilter>();
-                    var mr = av.disguisePropObj.AddComponent<MeshRenderer>();
+                    mf = av.disguisePropObj.AddComponent<MeshFilter>();
+                    mr = av.disguisePropObj.AddComponent<MeshRenderer>();
+                }
+                else
+                {
+                    mf = av.disguisePropObj.GetComponent<MeshFilter>();
+                    mr = av.disguisePropObj.GetComponent<MeshRenderer>();
+                }
 
+                // Tìm đúng Mesh vật thể theo tên đồng bộ và lọc bỏ hoàn toàn mặt sàn / đảo khổng lồ (chống lỗi Ma biến to bằng cả hòn đảo)
+                if (mf != null && mr != null)
+                {
                     MeshFilter[] allMf = UnityEngine.Object.FindObjectsByType<MeshFilter>();
+                    MeshFilter bestMatch = null;
+                    float bestScore = float.MaxValue;
+                    Vector3 ghostPos = av.rootObj.transform.position;
+                    string targetLower = (propName ?? "").Trim().ToLowerInvariant();
+
                     for (int i = 0; i < allMf.Length; i++)
                     {
-                        if (allMf[i] == null || allMf[i].sharedMesh == null) continue;
-                        if (allMf[i].transform.IsChildOf(av.rootObj.transform)) continue;
-                        var otherMr = allMf[i].GetComponent<MeshRenderer>();
-                        if (otherMr != null && otherMr.sharedMaterials != null && otherMr.sharedMaterials.Length > 0)
+                        MeshFilter cand = allMf[i];
+                        if (cand == null || cand.sharedMesh == null) continue;
+                        Transform ct = cand.transform;
+                        if (ct.IsChildOf(av.rootObj.transform)) continue;
+                        if (ct.GetComponentInParent<CharacterController>() != null) continue;
+
+                        var otherMr = cand.GetComponent<MeshRenderer>();
+                        if (otherMr == null || otherMr.sharedMaterials == null || otherMr.sharedMaterials.Length == 0) continue;
+
+                        Bounds b = cand.sharedMesh.bounds;
+                        Vector3 worldBounds = Vector3.Scale(b.size, new Vector3(Mathf.Abs(ct.lossyScale.x), Mathf.Abs(ct.lossyScale.y), Mathf.Abs(ct.lossyScale.z)));
+                        if (worldBounds.x > 10f || worldBounds.z > 10f || worldBounds.y > 7.5f) continue;
+
+                        string candLower = ct.name.ToLowerInvariant();
+                        if (candLower.Contains("terrain") || candLower.Contains("ground") || candLower.Contains("floor") || candLower.Contains("island") || candLower.Contains("cloud") || candLower.Contains("ramp") || candLower.Contains("boundary")) continue;
+
+                        float dist = Vector3.Distance(ghostPos, ct.position);
+                        bool exactName = !string.IsNullOrEmpty(targetLower) && (candLower == targetLower || cand.sharedMesh.name.ToLowerInvariant() == targetLower);
+                        bool partialName = !exactName && !string.IsNullOrEmpty(targetLower) && candLower.Contains(targetLower);
+                        float score = exactName ? dist : (partialName ? (dist + 50f) : (dist + 500f));
+                        if (score < bestScore)
                         {
-                            mf.sharedMesh = allMf[i].sharedMesh;
-                            mr.sharedMaterials = otherMr.sharedMaterials;
-                            break;
+                            bestScore = score;
+                            bestMatch = cand;
                         }
+                    }
+
+                    if (bestMatch != null)
+                    {
+                        mf.sharedMesh = bestMatch.sharedMesh;
+                        mr.sharedMaterials = bestMatch.GetComponent<MeshRenderer>().sharedMaterials;
                     }
                 }
 
                 if (av.disguisePropObj != null)
                 {
-                    av.disguisePropObj.transform.localScale = scale;
+                    Vector3 safeScale = new Vector3(
+                        Mathf.Clamp(Mathf.Abs(scale.x), 0.02f, 5.0f),
+                        Mathf.Clamp(Mathf.Abs(scale.y), 0.02f, 5.0f),
+                        Mathf.Clamp(Mathf.Abs(scale.z), 0.02f, 5.0f)
+                    );
+                    av.disguisePropObj.transform.localScale = safeScale;
                     av.disguisePropObj.SetActive(true);
                 }
             }
@@ -3124,10 +3362,36 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         return false;
     }
 
+    private Vector3 ResolveExpectedAvatarRootScale(bool isGhostForm, bool isFallbackPrimitive)
+    {
+        if (isFallbackPrimitive)
+        {
+            return Vector3.one;
+        }
+        if (isGhostForm)
+        {
+            if (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null)
+            {
+                Vector3 gs = SurvivalTimerUI.Instance.CachedGhostVessel.transform.lossyScale;
+                if (gs.sqrMagnitude > 0.0001f) cachedGhostRootScale = gs;
+            }
+            return cachedGhostRootScale;
+        }
+
+        if (ThirdPersonPlayerController.Instance != null)
+        {
+            Vector3 hs = ThirdPersonPlayerController.Instance.transform.lossyScale;
+            if (hs.sqrMagnitude > 0.0001f && hs.y <= 0.5f)
+            {
+                cachedHumanRootScale = hs;
+            }
+        }
+        return cachedHumanRootScale;
+    }
+
     private void UpdateRemotePlayersInterpolation()
     {
-        bool inLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
-        if (!IsGameStarted || inLobbyScene || isTransitioningToMatchScene)
+        if (!IsGameStarted || cachedIsLobbyScene || isTransitioningToMatchScene)
         {
             return;
         }
@@ -3141,10 +3405,15 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             {
                 Vector3 p = pt.position;
                 float ry = pt.eulerAngles.y;
-                object[] syncData = new object[] { playerName, p.x, p.y, p.z, ry, isGhostForm };
+                syncPayloadCache[0] = playerName;
+                syncPayloadCache[1] = p.x;
+                syncPayloadCache[2] = p.y;
+                syncPayloadCache[3] = p.z;
+                syncPayloadCache[4] = ry;
+                syncPayloadCache[5] = isGhostForm;
                 RaiseEventArgs args = new RaiseEventArgs { Receivers = ReceiverGroup.Others };
                 SendOptions opts = needReliableInitialPlayerSync ? SendOptions.SendReliable : SendOptions.SendUnreliable;
-                client.OpRaiseEvent(EVENT_PLAYER_SYNC, syncData, args, opts);
+                client.OpRaiseEvent(EVENT_PLAYER_SYNC, syncPayloadCache, args, opts);
                 if (needReliableInitialPlayerSync)
                 {
                     needReliableInitialPlayerSync = false;
@@ -3162,11 +3431,12 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             av.rootObj.transform.position = Vector3.Lerp(prevPos, av.targetPos, Time.deltaTime * 12f);
             av.rootObj.transform.rotation = Quaternion.Slerp(av.rootObj.transform.rotation, av.targetRot, Time.deltaTime * 12f);
 
-            // Đồng bộ kích thước avatar từ xa khớp 100% với kích thước người chơi thực tế trong Scene
-            Vector3 expectedScale = av.isGhostForm
-                ? ((SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null) ? SurvivalTimerUI.Instance.CachedGhostVessel.transform.lossyScale : Vector3.one)
-                : ((ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.transform.lossyScale.sqrMagnitude > 0.0001f) ? ThirdPersonPlayerController.Instance.transform.lossyScale : new Vector3(0.1f, 0.1f, 0.1f));
-            av.rootObj.transform.localScale = expectedScale;
+            // Đồng bộ kích thước avatar từ xa khớp 100% với kích thước người chơi thực tế trong Scene (không bao giờ bị biến to 10x)
+            Vector3 expectedScale = ResolveExpectedAvatarRootScale(av.isGhostForm, av.isFallbackPrimitive);
+            if ((av.rootObj.transform.localScale - expectedScale).sqrMagnitude > 0.00001f)
+            {
+                av.rootObj.transform.localScale = expectedScale;
+            }
 
             if (av.animator != null)
             {
@@ -3177,20 +3447,47 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 else
                 {
                     if (av.animator.speed < 0.01f) av.animator.speed = 1f;
-                    float moveSpeed = Vector3.Distance(prevPos, av.targetPos) * 5.0f;
-                    try
+                    if (av.hasSpeedParam)
                     {
-                        av.animator.SetFloat("Speed", moveSpeed);
+                        float moveSpeed = Vector3.Distance(prevPos, av.targetPos) * 5.0f;
+                        av.animator.SetFloat(s_SpeedParamHash, moveSpeed);
                     }
-                    catch { }
                 }
             }
         }
     }
 
+    private static bool CheckAnimatorHasSpeedParam(Animator anim)
+    {
+        if (anim == null || anim.runtimeAnimatorController == null) return false;
+        var ps = anim.parameters;
+        for (int i = 0; i < ps.Length; i++)
+        {
+            if (ps[i].nameHash == s_SpeedParamHash && ps[i].type == AnimatorControllerParameterType.Float)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void UpdateOrCreateRemoteAvatar(int actorNr, string nickName, Vector3 pos, Quaternion rot, bool isGhostForm = false)
     {
-        if (!remotePlayers.TryGetValue(actorNr, out var av) || av.rootObj == null || av.isGhostForm != isGhostForm)
+        // Tự động nâng cấp từ hình trụ tạm thời lên mô hình 3D thật ngay khi mẫu nhân vật trong Scene đã sẵn sàng
+        bool canUpgradeFallback = false;
+        if (remotePlayers.TryGetValue(actorNr, out var existingAv) && existingAv != null && existingAv.rootObj != null && existingAv.isFallbackPrimitive && existingAv.isGhostForm == isGhostForm)
+        {
+            if (isGhostForm)
+            {
+                canUpgradeFallback = (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null) || FindAnyObjectByType<PumpkinGhostAI>(FindObjectsInactive.Include) != null;
+            }
+            else
+            {
+                canUpgradeFallback = ThirdPersonPlayerController.Instance != null || FindAnyObjectByType<ThirdPersonPlayerController>(FindObjectsInactive.Include) != null;
+            }
+        }
+
+        if (!remotePlayers.TryGetValue(actorNr, out var av) || av.rootObj == null || av.isGhostForm != isGhostForm || canUpgradeFallback)
         {
             bool isFirstSpawn = (av == null || av.rootObj == null);
             if (av != null && av.rootObj != null)
@@ -3202,51 +3499,73 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             root.transform.position = pos;
             root.transform.rotation = rot;
 
-            Vector3 targetScale = isGhostForm
-                ? ((SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null) ? SurvivalTimerUI.Instance.CachedGhostVessel.transform.lossyScale : Vector3.one)
-                : ((ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.transform.lossyScale.sqrMagnitude > 0.0001f) ? ThirdPersonPlayerController.Instance.transform.lossyScale : new Vector3(0.1f, 0.1f, 0.1f));
-            root.transform.localScale = targetScale;
-
             Animator clonedAnim = null;
             bool modelCloned = false;
 
-            if (isGhostForm && SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null)
+            if (isGhostForm)
             {
-                Animator srcGhostAnim = SurvivalTimerUI.Instance.CachedGhostVessel.GetComponentInChildren<Animator>(true);
-                if (srcGhostAnim != null)
+                PumpkinGhostAI ghostTemplate = (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.CachedGhostVessel != null)
+                    ? SurvivalTimerUI.Instance.CachedGhostVessel
+                    : FindAnyObjectByType<PumpkinGhostAI>(FindObjectsInactive.Include);
+
+                if (ghostTemplate != null)
                 {
-                    GameObject visualClone = Instantiate(srcGhostAnim.gameObject, root.transform);
-                    visualClone.SetActive(true);
-                    visualClone.transform.localPosition = srcGhostAnim.transform.localPosition;
-                    visualClone.transform.localRotation = srcGhostAnim.transform.localRotation;
-                    visualClone.transform.localScale = srcGhostAnim.transform.localScale;
-                    var forwarder = visualClone.GetComponent<GhostAnimationEventForwarder>();
-                    if (forwarder != null) Destroy(forwarder);
-                    StripNonVisualComponentsFromRemoteAvatar(visualClone);
-                    clonedAnim = visualClone.GetComponent<Animator>();
-                    modelCloned = true;
+                    if (ghostTemplate.transform.lossyScale.sqrMagnitude > 0.0001f)
+                    {
+                        cachedGhostRootScale = ghostTemplate.transform.lossyScale;
+                    }
+                    Animator srcGhostAnim = ghostTemplate.GetComponentInChildren<Animator>(true);
+                    if (srcGhostAnim != null && srcGhostAnim.gameObject != ghostTemplate.gameObject)
+                    {
+                        root.transform.localScale = cachedGhostRootScale;
+                        GameObject visualClone = Instantiate(srcGhostAnim.gameObject, root.transform);
+                        visualClone.SetActive(true);
+                        visualClone.transform.localPosition = srcGhostAnim.transform.localPosition;
+                        visualClone.transform.localRotation = srcGhostAnim.transform.localRotation;
+                        visualClone.transform.localScale = srcGhostAnim.transform.localScale;
+                        var forwarder = visualClone.GetComponent<GhostAnimationEventForwarder>();
+                        if (forwarder != null) Destroy(forwarder);
+                        StripNonVisualComponentsFromRemoteAvatar(visualClone);
+                        clonedAnim = visualClone.GetComponent<Animator>();
+                        modelCloned = true;
+                    }
                 }
             }
-            else if (!isGhostForm && ThirdPersonPlayerController.Instance != null && ThirdPersonPlayerController.Instance.playerAnimator != null)
+            else
             {
-                GameObject srcHumanVisual = ThirdPersonPlayerController.Instance.playerAnimator.gameObject;
-                if (srcHumanVisual != ThirdPersonPlayerController.Instance.gameObject)
+                ThirdPersonPlayerController humanTemplate = ThirdPersonPlayerController.Instance != null
+                    ? ThirdPersonPlayerController.Instance
+                    : FindAnyObjectByType<ThirdPersonPlayerController>(FindObjectsInactive.Include);
+
+                if (humanTemplate != null)
                 {
-                    GameObject visualClone = Instantiate(srcHumanVisual, root.transform);
-                    visualClone.SetActive(true);
-                    visualClone.transform.localPosition = srcHumanVisual.transform.localPosition;
-                    visualClone.transform.localRotation = srcHumanVisual.transform.localRotation;
-                    visualClone.transform.localScale = srcHumanVisual.transform.localScale;
-                    var forwarder = visualClone.GetComponent<PlayerAnimationEventForwarder>();
-                    if (forwarder != null) Destroy(forwarder);
-                    StripNonVisualComponentsFromRemoteAvatar(visualClone);
-                    clonedAnim = visualClone.GetComponent<Animator>();
-                    modelCloned = true;
+                    Vector3 hs = humanTemplate.transform.lossyScale;
+                    if (hs.sqrMagnitude > 0.0001f && hs.y <= 0.5f)
+                    {
+                        cachedHumanRootScale = hs;
+                    }
+                    Animator srcAnim = humanTemplate.playerAnimator != null ? humanTemplate.playerAnimator : humanTemplate.GetComponentInChildren<Animator>(true);
+                    if (srcAnim != null && srcAnim.gameObject != humanTemplate.gameObject)
+                    {
+                        root.transform.localScale = cachedHumanRootScale;
+                        GameObject srcHumanVisual = srcAnim.gameObject;
+                        GameObject visualClone = Instantiate(srcHumanVisual, root.transform);
+                        visualClone.SetActive(true);
+                        visualClone.transform.localPosition = srcHumanVisual.transform.localPosition;
+                        visualClone.transform.localRotation = srcHumanVisual.transform.localRotation;
+                        visualClone.transform.localScale = srcHumanVisual.transform.localScale;
+                        var forwarder = visualClone.GetComponent<PlayerAnimationEventForwarder>();
+                        if (forwarder != null) Destroy(forwarder);
+                        StripNonVisualComponentsFromRemoteAvatar(visualClone);
+                        clonedAnim = visualClone.GetComponent<Animator>();
+                        modelCloned = true;
+                    }
                 }
             }
 
             if (!modelCloned)
             {
+                root.transform.localScale = Vector3.one;
                 GameObject cap = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 cap.transform.SetParent(root.transform, false);
                 cap.transform.localPosition = new Vector3(0f, 0.75f, 0f);
@@ -3260,9 +3579,22 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                     Shader sh = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
                     if (sh != null)
                     {
-                        Material mat = new Material(sh);
-                        mat.color = isGhostForm ? new Color(1.0f, 0.38f, 0.08f, 1f) : new Color(0.2f, 0.85f, 0.65f, 1f);
-                        mr.sharedMaterial = mat;
+                        if (isGhostForm)
+                        {
+                            if (s_FallbackGhostMat == null)
+                            {
+                                s_FallbackGhostMat = new Material(sh) { color = new Color(1.0f, 0.38f, 0.08f, 1f) };
+                            }
+                            mr.sharedMaterial = s_FallbackGhostMat;
+                        }
+                        else
+                        {
+                            if (s_FallbackHumanMat == null)
+                            {
+                                s_FallbackHumanMat = new Material(sh) { color = new Color(0.2f, 0.85f, 0.65f, 1f) };
+                            }
+                            mr.sharedMaterial = s_FallbackHumanMat;
+                        }
                     }
                 }
             }
@@ -3275,6 +3607,8 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 targetRot = rot,
                 lastUpdateTime = Time.unscaledTime,
                 isGhostForm = isGhostForm,
+                isFallbackPrimitive = !modelCloned,
+                hasSpeedParam = CheckAnimatorHasSpeedParam(clonedAnim),
                 animator = clonedAnim
             };
             if (!isGhostForm && DeadHumanActorNumbers.Contains(actorNr))
@@ -3292,7 +3626,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             {
                 AppendChatLine($"<color=#00FF9D><b>⚡ [TRẬN ĐẤU] Người chơi [{nickName}] đã vào trận!</b></color>");
             }
-            else if (isGhostForm)
+            else if (isGhostForm && !canUpgradeFallback)
             {
                 AppendChatLine($"<color=#FFA502><b>🎃 [CẢNH BÁO] Người chơi [{nickName}] đã hóa thân thành MA BÍ NGÔ!</b></color>");
             }
@@ -3428,8 +3762,25 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         isTransitioningToMatchScene = false;
     }
 
+    private void DestroyDuplicateChatPanels()
+    {
+        RectTransform[] allRects = FindObjectsByType<RectTransform>(FindObjectsInactive.Include);
+        for (int i = 0; i < allRects.Length; i++)
+        {
+            RectTransform rt = allRects[i];
+            if (rt == null || rt.gameObject.name != "PhotonChatVoicePanel") continue;
+            if (chatPanelRect != null && rt != chatPanelRect)
+            {
+                Destroy(rt.gameObject);
+            }
+        }
+    }
+
     private void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
     {
+        cachedIsLobbyScene = (scene.name == "LobbyScene");
+        SuppressLegacyFusionPrototypeObjects();
+
         if (scene.name == "SampleScene")
         {
             isTransitioningToMatchScene = false;
@@ -3446,7 +3797,12 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
             }
+            if (chatPanelRect == null)
+            {
+                BuildChatAndVoiceUI();
+            }
             SyncRoleWithSurvivalTimer();
+            DestroyDuplicateChatPanels();
         }
         else if (scene.name == "LobbyScene")
         {
@@ -3455,6 +3811,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             IsLocalReplayAgreed = false;
             ReplayAgreedActorNumbers.Clear();
             ClearRemotePlayers();
+            HumanBotTarget.ClearAllBots();
 
             // [GhostMaze] Đảm bảo sạch bóng mọi HUD trận đấu khi ở LobbyScene
             GameObject endBanner = GameObject.Find("EndGameResultBanner");
@@ -3518,6 +3875,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             RaiseEventArgs raiseArgs = new RaiseEventArgs { Receivers = ReceiverGroup.All };
             client.OpRaiseEvent(EVENT_ROLE_ASSIGN, payload, raiseArgs, SendOptions.SendReliable);
             SyncRoleWithSurvivalTimer();
+            DestroyDuplicateChatPanels();
         }
         else
         {
@@ -3588,6 +3946,7 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             GhostActorNumbers.Clear();
             GhostActorNumbers.AddRange(ghostInts);
             SyncRoleWithSurvivalTimer();
+            DestroyDuplicateChatPanels();
         }
 
         StartGameLocally();
@@ -5093,41 +5452,60 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
         }
     }
 
+    private readonly object[] syncPayloadCache = new object[6];
+    private bool cachedHasMicDevice = false;
+    private float nextMicDeviceCheckTime = -10f;
+
     private void UpdateStatusUI()
     {
         if (statusBadgeText != null)
         {
+            string targetText;
+            Color targetColor;
             if (hasUnreadChat)
             {
-                statusBadgeText.color = new Color(1f, 0.75f, 0.15f, 1f);
-                statusBadgeText.text = "Chat [Enter] ● !";
+                targetColor = new Color(1f, 0.75f, 0.15f, 1f);
+                targetText = "Chat [Enter] ● !";
             }
             else
             {
-                statusBadgeText.color = isChatInputFocused ? new Color(0.25f, 0.85f, 1f, 1f) : new Color(0.35f, 0.95f, 0.60f, 1f);
-                statusBadgeText.text = isChatInputFocused ? "Đang nhập..." : "Chat [Enter] ●";
+                targetColor = isChatInputFocused ? new Color(0.25f, 0.85f, 1f, 1f) : new Color(0.35f, 0.95f, 0.60f, 1f);
+                targetText = isChatInputFocused ? "Đang nhập..." : "Chat [Enter] ●";
             }
+            if (statusBadgeText.text != targetText) statusBadgeText.text = targetText;
+            if (statusBadgeText.color != targetColor) statusBadgeText.color = targetColor;
         }
 
         if (micButtonText != null && micButtonBg != null)
         {
-            if (Microphone.devices == null || Microphone.devices.Length == 0)
+            if (Time.unscaledTime >= nextMicDeviceCheckTime)
             {
-                micButtonText.text = "🚫 MIC: TRỐNG";
-                micButtonBg.color = new Color(0.40f, 0.40f, 0.45f, 0.88f);
+                nextMicDeviceCheckTime = Time.unscaledTime + 2.0f;
+                var devs = Microphone.devices;
+                cachedHasMicDevice = devs != null && devs.Length > 0;
+            }
+
+            string targetMicText;
+            Color targetMicBg;
+            if (!cachedHasMicDevice)
+            {
+                targetMicText = "🚫 MIC: TRỐNG";
+                targetMicBg = new Color(0.40f, 0.40f, 0.45f, 0.88f);
             }
             else if (isMicMuted)
             {
-                micButtonText.text = "🎙 MIC: TẮT [V]";
-                micButtonBg.color = new Color(0.65f, 0.22f, 0.22f, 0.92f);
+                targetMicText = "🎙 MIC: TẮT [V]";
+                targetMicBg = new Color(0.65f, 0.22f, 0.22f, 0.92f);
             }
             else
             {
-                micButtonText.text = "🎙 MIC: BẬT [V]";
-                micButtonBg.color = IsLocalSpeaking
+                targetMicText = "🎙 MIC: BẬT [V]";
+                targetMicBg = IsLocalSpeaking
                     ? new Color(0.18f, 0.88f, 0.45f, 1f)
                     : new Color(0.15f, 0.58f, 0.35f, 0.92f);
             }
+            if (micButtonText.text != targetMicText) micButtonText.text = targetMicText;
+            if (micButtonBg.color != targetMicBg) micButtonBg.color = targetMicBg;
         }
 
         if (speakingIndicatorText != null)
@@ -5136,25 +5514,29 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             bool amIGhost = IsLocalPlayerGhostRole();
             string teamTag = teamIsolated ? (amIGhost ? " [Phe MA]" : " [Phe NGƯỜI]") : "";
 
+            string targetSpeakText;
+            Color targetSpeakColor = speakingIndicatorText.color;
             if (Time.unscaledTime < remoteSpeakingTimer && !string.IsNullOrEmpty(remoteSpeakerName))
             {
-                speakingIndicatorText.color = teamIsolated && amIGhost ? new Color(1f, 0.55f, 0.25f, 1f) : new Color(0.3f, 1f, 0.55f, 1f);
-                speakingIndicatorText.text = $"🔊 {remoteSpeakerName}{teamTag} đang nói...";
+                targetSpeakColor = teamIsolated && amIGhost ? new Color(1f, 0.55f, 0.25f, 1f) : new Color(0.3f, 1f, 0.55f, 1f);
+                targetSpeakText = $"🔊 {remoteSpeakerName}{teamTag} đang nói...";
             }
             else if (IsLocalSpeaking)
             {
-                speakingIndicatorText.color = teamIsolated && amIGhost ? new Color(1f, 0.65f, 0.28f, 1f) : new Color(0.3f, 1f, 0.55f, 1f);
-                speakingIndicatorText.text = $"🎙 Bạn đang nói{teamTag}...";
+                targetSpeakColor = teamIsolated && amIGhost ? new Color(1f, 0.65f, 0.28f, 1f) : new Color(0.3f, 1f, 0.55f, 1f);
+                targetSpeakText = $"🎙 Bạn đang nói{teamTag}...";
             }
             else if (teamIsolated)
             {
-                speakingIndicatorText.color = amIGhost ? new Color(1f, 0.58f, 0.25f, 0.9f) : new Color(0.45f, 0.92f, 1f, 0.9f);
-                speakingIndicatorText.text = amIGhost ? "🔒 Kênh Mic: Chỉ Phe MA" : "🔒 Kênh Mic: Chỉ Phe NGƯỜI";
+                targetSpeakColor = amIGhost ? new Color(1f, 0.58f, 0.25f, 0.9f) : new Color(0.45f, 0.92f, 1f, 0.9f);
+                targetSpeakText = amIGhost ? "🔒 Kênh Mic: Chỉ Phe MA" : "🔒 Kênh Mic: Chỉ Phe NGƯỜI";
             }
             else
             {
-                speakingIndicatorText.text = "";
+                targetSpeakText = "";
             }
+            if (speakingIndicatorText.text != targetSpeakText) speakingIndicatorText.text = targetSpeakText;
+            if (speakingIndicatorText.color != targetSpeakColor) speakingIndicatorText.color = targetSpeakColor;
         }
 
         if (voiceSettingsDialogObj != null && voiceSettingsDialogObj.activeSelf)
@@ -5166,23 +5548,10 @@ public class PhotonMultiplayerChatVoice : MonoBehaviour, IConnectionCallbacks, I
             }
         }
 
-        if (soloRoomBadgeObj != null)
+        if (soloRoomBadgeObj != null && soloRoomBadgeObj.activeSelf)
         {
-            bool showSoloBadge = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "LobbyScene"
-                && IsGameStarted
-                && IsSoloPlayMode
-                && !IsFullMultiplayerMatchActive
-                && IsInPhotonRoom;
-            if (soloRoomBadgeObj.activeSelf != showSoloBadge)
-            {
-                soloRoomBadgeObj.SetActive(showSoloBadge);
-            }
-            if (showSoloBadge && soloRoomBadgeText != null)
-            {
-                int inRoomCount = CurrentRoomPlayersCount;
-                int readyCount = GetReadyPlayersCount();
-                soloRoomBadgeText.text = $"🎮 <color=#55E6C1>CHƠI ĐƠN</color>  |  ID PHÒNG: <color=#FFD32A>{roomName}</color> (Click Copy)  |  Bạn SS: <color=#00FF9D>{readyCount}/{requiredPlayersToStart}</color> (Trong phòng: {inRoomCount}/{requiredPlayersToStart})";
-            }
+            // Theo yêu cầu: Khi đã vào trong trận đấu thì ẩn hoàn toàn thanh hiển thị ID Phòng / tiến độ phòng chờ phía trên màn hình
+            soloRoomBadgeObj.SetActive(false);
         }
     }
     private InputField CreateLobbyInputField(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax, string placeholderText, string defaultText, Font font)

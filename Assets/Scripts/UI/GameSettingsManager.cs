@@ -170,6 +170,9 @@ public class GameSettingsManager : MonoBehaviour
     private float mouseSensitivity = 1.0f;
     private bool isInvertY = false;
 
+    // Lưu trữ âm lượng gốc của các AudioSource trong Scene để nhân tỷ lệ Music / SFX không bị dồn tích lũy
+    private readonly System.Collections.Generic.Dictionary<AudioSource, float> baseAudioSourceVolumes = new System.Collections.Generic.Dictionary<AudioSource, float>(32);
+
     // Khóa lưu trữ cấu hình người chơi (PlayerPrefs)
     private const string PREF_GRAPHICS = "GhostMaze_GraphicsLevel";
     private const string PREF_TARGET_FPS = "GhostMaze_TargetFPS";
@@ -195,8 +198,24 @@ public class GameSettingsManager : MonoBehaviour
         }
         else if (_instance != this)
         {
-            Destroy(gameObject);
-            return;
+            // Nếu GameObject này là Canvas_GameSettings đầy đủ của SampleScene (có SurvivalTimerUI & HUD_Container),
+            // giữ lại bản mới của SampleScene và hủy bản cũ để bảo toàn 100% HUD máu và đồng hồ trận đấu!
+            bool thisHasMatchHUD = GetComponent<SurvivalTimerUI>() != null || transform.Find("HUD_Container") != null;
+            if (thisHasMatchHUD)
+            {
+                GameObject oldGo = _instance.gameObject;
+                _instance = this;
+                DontDestroyOnLoad(gameObject);
+                if (oldGo != null && oldGo != gameObject)
+                {
+                    Destroy(oldGo);
+                }
+            }
+            else
+            {
+                Destroy(gameObject);
+                return;
+            }
         }
 
         // Tối ưu hóa Canvas và Font hiển thị siêu sắc nét (ScreenSpaceOverlay + dynamicPixelsPerUnit 2.5)
@@ -294,6 +313,7 @@ public class GameSettingsManager : MonoBehaviour
     private void OnSceneLoadedForHUD(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
     {
         UpdateInGameHUDVisibility(scene.name);
+        ApplyChannelVolumesToSceneAudioSources();
     }
 
     public void SetInMatchHUDVisible(bool visible)
@@ -370,13 +390,13 @@ public class GameSettingsManager : MonoBehaviour
             {
                 CloseDashboard();
             }
-            else if (kb.f1Key.wasPressedThisFrame)
+            else if (!Application.isEditor && kb.f1Key.wasPressedThisFrame)
             {
                 ToggleDashboard();
             }
         }
 #else
-        if (Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.F1))
+        if (Input.GetKeyDown(KeyCode.Tab) || (!Application.isEditor && Input.GetKeyDown(KeyCode.F1)))
         {
             ToggleDashboard();
         }
@@ -464,6 +484,7 @@ public class GameSettingsManager : MonoBehaviour
         isMuted = PlayerPrefs.GetInt(PREF_IS_MUTED, 0) == 1;
 
         AudioListener.volume = isMuted ? 0f : masterVolume;
+        ApplyChannelVolumesToSceneAudioSources();
 
         if (masterVolumeSlider != null) masterVolumeSlider.value = masterVolume;
         if (musicVolumeSlider != null) musicVolumeSlider.value = musicVolume;
@@ -715,8 +736,10 @@ public class GameSettingsManager : MonoBehaviour
         if (foundDash != null && foundDash != dashboardPanel) foundDash.SetActive(false);
         ThirdPersonCamera.isUIPanelOpen = false;
 
-        // Chỉ khóa chuột khi đang thực sự trong trận đấu
-        if (!Application.isMobilePlatform && IsInMatch())
+        // Chỉ khóa chuột khi đang thực sự trong trận đấu, trận chưa kết thúc và không có hội thoại UI nào mở
+        bool keepUnlocked = (SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished)
+            || (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.ShouldKeepCursorUnlocked());
+        if (!Application.isMobilePlatform && IsInMatch() && !keepUnlocked)
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
@@ -927,6 +950,7 @@ public class GameSettingsManager : MonoBehaviour
     public void OnMusicVolumeChanged(float val)
     {
         musicVolume = val;
+        ApplyChannelVolumesToSceneAudioSources();
         UpdateAudioLabels();
         SaveAudioSettings();
     }
@@ -934,8 +958,30 @@ public class GameSettingsManager : MonoBehaviour
     public void OnSFXVolumeChanged(float val)
     {
         sfxVolume = val;
+        ApplyChannelVolumesToSceneAudioSources();
         UpdateAudioLabels();
         SaveAudioSettings();
+    }
+
+    private void ApplyChannelVolumesToSceneAudioSources()
+    {
+        var sources = FindObjectsByType<AudioSource>(FindObjectsInactive.Include);
+        for (int i = 0; i < sources.Length; i++)
+        {
+            AudioSource src = sources[i];
+            if (src == null) continue;
+            // Không can thiệp vào AudioSource phát đàm thoại Voice Chat
+            if (src.gameObject.name.Contains("VoiceChat") || src.GetComponent<PhotonMultiplayerChatVoice>() != null) continue;
+
+            if (!baseAudioSourceVolumes.TryGetValue(src, out float baseVol))
+            {
+                baseVol = src.volume > 0.001f ? src.volume : 1.0f;
+                baseAudioSourceVolumes[src] = baseVol;
+            }
+
+            float channelMultiplier = src.loop ? musicVolume : sfxVolume;
+            src.volume = Mathf.Clamp01(baseVol * channelMultiplier);
+        }
     }
 
     public void ToggleMute()

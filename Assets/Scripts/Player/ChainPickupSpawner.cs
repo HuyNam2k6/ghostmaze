@@ -108,7 +108,7 @@ public class ChainPickupSpawner : MonoBehaviour
             ChainPickupItem item = ChainPickupItem.ActivePickups[i];
             if (item != null)
             {
-                Destroy(item.gameObject);
+                item.RecycleToPool();
             }
         }
         ChainPickupItem.ActivePickups.Clear();

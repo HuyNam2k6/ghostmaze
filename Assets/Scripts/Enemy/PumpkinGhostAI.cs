@@ -122,11 +122,16 @@ public class PumpkinGhostAI : MonoBehaviour
     public string disguisedPropName = "";
     [Tooltip("Thời gian hồi chiêu biến hình (giây)")]
     public float disguiseCooldown = 5.0f;
+    [Tooltip("Bán kính quét vật thể tối đa để ngụy trang (m)")]
+    public float disguiseSearchRadius = 5.0f;
     private float lastDisguiseEndTime = -10f;
     public const float DISGUISE_MAX_DURATION = 15.0f;
     private GameObject disguisePropVisualObj;
     private MeshFilter disguiseMeshFilter;
     private MeshRenderer disguiseMeshRenderer;
+    private bool isVanishedInvisible = false;
+    public bool IsDisguisedOrHidden => isDisguised || isVanishedInvisible || currentState == GhostState.VanishHide;
+    private static readonly Collider[] s_DisguiseOverlapBuffer = new Collider[64];
     private static Text s_GhostNoticeText;
     private static float s_GhostNoticeTimer = 0f;
 
@@ -320,6 +325,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private void SetGhostBodyVisible(bool visible)
     {
+        isVanishedInvisible = !visible && !isDisguised;
         if (cachedBodyRenderers == null || cachedBodyRenderers.Length == 0)
         {
             CacheBodyRenderers();
@@ -573,10 +579,13 @@ public class PumpkinGhostAI : MonoBehaviour
         }
     }
 
+    private float nextTargetReevaluateTime = 0f;
+
     private void UpdateChase()
     {
-        if (targetPlayer == null)
+        if (targetPlayer == null || Time.time >= nextTargetReevaluateTime)
         {
+            nextTargetReevaluateTime = Time.time + 0.45f;
             FindPlayerTarget();
             if (targetPlayer == null) return;
         }
@@ -669,6 +678,31 @@ public class PumpkinGhostAI : MonoBehaviour
         ExecuteAttackDamage();
     }
 
+    private bool ApplyDamageToTargetTransform(Transform target, float dmg, Vector3 originPos)
+    {
+        if (target == null) return false;
+
+        HumanBotTarget bot = target.GetComponent<HumanBotTarget>() ?? target.GetComponentInParent<HumanBotTarget>();
+        if (bot != null)
+        {
+            if (bot.isDead) return false;
+            bot.TakeDamage(dmg, originPos);
+            return true;
+        }
+
+        PlayerHealth pHealth = target.GetComponent<PlayerHealth>() ?? target.GetComponentInChildren<PlayerHealth>();
+        if (pHealth == null && ThirdPersonPlayerController.Instance != null && target == ThirdPersonPlayerController.Instance.transform)
+        {
+            pHealth = PlayerHealth.Instance;
+        }
+        if (pHealth != null && !pHealth.isDead)
+        {
+            pHealth.TakeDamage(dmg, originPos);
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>
     /// Xử lý gây sát thương tại Frame 9 của đòn tấn công
     /// </summary>
@@ -688,13 +722,11 @@ public class PumpkinGhostAI : MonoBehaviour
             {
                 PhotonMultiplayerChatVoice.Instance.TrySendGhostAttackHit(originPos, maxReach, dmg);
             }
+            HumanBotTarget.TryHitNearestBot(originPos, maxReach, dmg);
             return;
         }
 
-        if (targetPlayer == null)
-        {
-            FindPlayerTarget();
-        }
+        FindPlayerTarget();
 
         if (targetPlayer != null)
         {
@@ -706,23 +738,27 @@ public class PumpkinGhostAI : MonoBehaviour
                 hitSuccess = ExecuteRaycastAttackHitCheck();
             }
 
-            // Fallback cự ly cận chiến: Tính từ móng vuốt IKhand.L tới người chơi
+            // Fallback cự ly cận chiến: Tính từ móng vuốt IKhand.L tới mục tiêu
             if (!hitSuccess)
             {
                 Vector3 originPos = clawHandTransform != null ? clawHandTransform.position : transform.position;
                 float dist = Vector3.Distance(originPos, targetPlayer.position);
                 float maxReach = config != null ? Mathf.Max(config.attackRaycastDistance, config.attackRange * 1.6f) : 2.5f;
-                if (dist <= maxReach)
+                float dmg = config != null ? config.attackDamage : 20.0f;
+                if (dist <= maxReach && ApplyDamageToTargetTransform(targetPlayer, dmg, originPos))
                 {
-                    PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
-                    if (pHealth == null) pHealth = targetPlayer.GetComponentInChildren<PlayerHealth>();
-                    if (pHealth == null) pHealth = PlayerHealth.Instance;
-                    if (pHealth != null)
-                    {
-                        float dmg = config != null ? config.attackDamage : 20.0f;
-                        pHealth.TakeDamage(dmg, originPos);
-                        hitSuccess = true;
-                    }
+                    hitSuccess = true;
+                }
+            }
+
+            if (!hitSuccess)
+            {
+                Vector3 originPos = clawHandTransform != null ? clawHandTransform.position : transform.position;
+                float maxReach = config != null ? Mathf.Max(config.attackRaycastDistance, config.attackRange * 1.6f) : 2.5f;
+                float dmg = config != null ? config.attackDamage : 20.0f;
+                if (HumanBotTarget.TryHitNearestBot(originPos, maxReach, dmg))
+                {
+                    hitSuccess = true;
                 }
             }
 
@@ -843,13 +879,7 @@ public class PumpkinGhostAI : MonoBehaviour
                     float dist = Vector3.Distance(transform.position, targetPlayer.position);
                     if (dist <= config.stoppingDistance)
                     {
-                        hitPlayer = true;
-                        PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
-                        if (pHealth == null) pHealth = PlayerHealth.Instance;
-                        if (pHealth != null)
-                        {
-                            pHealth.TakeDamage(config.leapDamage, transform.position);
-                        }
+                        hitPlayer = ApplyDamageToTargetTransform(targetPlayer, config.leapDamage, transform.position);
                     }
                 }
             }
@@ -980,6 +1010,10 @@ public class PumpkinGhostAI : MonoBehaviour
         if (activeActionRoutine != null)
         {
             StopCoroutine(activeActionRoutine);
+            if (animator != null && !isFrozen)
+            {
+                animator.speed = 1f;
+            }
         }
         activeActionRoutine = StartCoroutine(routine);
     }
@@ -1143,14 +1177,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
         if (hitFound)
         {
-            PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
-            if (pHealth == null) pHealth = targetPlayer.GetComponentInChildren<PlayerHealth>();
-            if (pHealth == null) pHealth = PlayerHealth.Instance;
-            if (pHealth != null)
-            {
-                pHealth.TakeDamage(config.attackDamage, transform.position);
-            }
-            return true;
+            return ApplyDamageToTargetTransform(targetPlayer, config.attackDamage, transform.position);
         }
 
         return false;
@@ -1185,13 +1212,10 @@ public class PumpkinGhostAI : MonoBehaviour
 
             if (hit.transform == targetPlayer || hit.transform.IsChildOf(targetPlayer) || hit.collider.CompareTag(config.playerTag))
             {
-                PlayerHealth pHealth = targetPlayer.GetComponent<PlayerHealth>();
-                if (pHealth == null) pHealth = PlayerHealth.Instance;
-                if (pHealth != null)
+                if (ApplyDamageToTargetTransform(targetPlayer, config.leapDamage, transform.position))
                 {
-                    pHealth.TakeDamage(config.leapDamage, transform.position);
+                    return true;
                 }
-                return true;
             }
         }
 
@@ -1419,25 +1443,29 @@ public class PumpkinGhostAI : MonoBehaviour
         }
     }
 
-    private static PumpkinGhostAI[] s_AllGhostsCache;
-    private static float s_LastGhostCacheTime = -10f;
+    private static Camera s_CachedMainCam;
+
+    private static Transform GetMainCamTransform()
+    {
+        if (ThirdPersonCamera.Instance != null) return ThirdPersonCamera.Instance.transform;
+        if (s_CachedMainCam == null || !s_CachedMainCam.isActiveAndEnabled)
+        {
+            s_CachedMainCam = Camera.main;
+        }
+        return s_CachedMainCam != null ? s_CachedMainCam.transform : null;
+    }
 
     /// <summary>
     /// Đẩy lùi mềm bằng code giữa các con ma trong Scene để tránh 2 con ma đè dính vào nhau (Không cần Collider)
     /// </summary>
     private void ApplyGhostSeparation()
     {
-        if (Time.time > s_LastGhostCacheTime + 0.8f || s_AllGhostsCache == null)
-        {
-            s_AllGhostsCache = Object.FindObjectsByType<PumpkinGhostAI>();
-            s_LastGhostCacheTime = Time.time;
-        }
+        var ghosts = ActiveGhosts;
+        if (ghosts == null || ghosts.Count <= 1) return;
 
-        if (s_AllGhostsCache == null || s_AllGhostsCache.Length <= 1) return;
-
-        for (int i = 0; i < s_AllGhostsCache.Length; i++)
+        for (int i = 0; i < ghosts.Count; i++)
         {
-            PumpkinGhostAI other = s_AllGhostsCache[i];
+            PumpkinGhostAI other = ghosts[i];
             if (other == null || other == this || !other.gameObject.activeInHierarchy) continue;
 
             Vector3 diff = transform.position - other.transform.position;
@@ -1469,21 +1497,47 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private void FindPlayerTarget()
     {
-        if (!string.IsNullOrEmpty(config.playerTag))
+        Transform bestTarget = null;
+        float bestDistSqr = float.MaxValue;
+        Vector3 myPos = transform.position;
+
+        // 1. Kiểm tra người chơi cục bộ nếu còn sống và đang là Người
+        ThirdPersonPlayerController localCtrl = ThirdPersonPlayerController.Instance;
+        if (localCtrl == null)
         {
-            GameObject playerGo = GameObject.FindWithTag(config.playerTag);
-            if (playerGo != null)
+            if (!string.IsNullOrEmpty(config.playerTag))
             {
-                targetPlayer = playerGo.transform;
-                return;
+                GameObject playerGo = GameObject.FindWithTag(config.playerTag);
+                if (playerGo != null) localCtrl = playerGo.GetComponent<ThirdPersonPlayerController>();
+            }
+            if (localCtrl == null) localCtrl = FindAnyObjectByType<ThirdPersonPlayerController>();
+        }
+
+        if (localCtrl != null && localCtrl.gameObject.activeInHierarchy)
+        {
+            PlayerHealth ph = localCtrl.GetComponent<PlayerHealth>() ?? PlayerHealth.Instance;
+            if (ph == null || !ph.isDead)
+            {
+                bestTarget = localCtrl.transform;
+                bestDistSqr = (localCtrl.transform.position - myPos).sqrMagnitude;
             }
         }
 
-        ThirdPersonPlayerController fallback = FindAnyObjectByType<ThirdPersonPlayerController>();
-        if (fallback != null)
+        // 2. Kiểm tra các nhân vật Máy (HumanBotTarget) còn sống và chọn mục tiêu gần nhất
+        for (int i = 0; i < HumanBotTarget.ActiveBots.Count; i++)
         {
-            targetPlayer = fallback.transform;
+            HumanBotTarget bot = HumanBotTarget.ActiveBots[i];
+            if (bot == null || bot.isDead || !bot.gameObject.activeInHierarchy) continue;
+
+            float dSqr = (bot.transform.position - myPos).sqrMagnitude;
+            if (dSqr < bestDistSqr)
+            {
+                bestDistSqr = dSqr;
+                bestTarget = bot.transform;
+            }
         }
+
+        targetPlayer = bestTarget;
     }
 
     public void ApplyColliderSettingsFromConfig()
@@ -1541,21 +1595,29 @@ public class PumpkinGhostAI : MonoBehaviour
     /// <summary>
     /// Giữ chân / đóng băng con ma trong số giây chỉ định (từ chiêu Block của Player)
     /// </summary>
-    public void Freeze(float duration)
+    public void Freeze(float duration, bool showRingVFX = true)
     {
         if (activeActionRoutine != null)
         {
             StopCoroutine(activeActionRoutine);
             activeActionRoutine = null;
         }
+        if (animator != null)
+        {
+            animator.speed = 1f;
+        }
         isLeaping = false;
+        if (isDisguised)
+        {
+            CancelDisguise("Bị choáng phong ấn");
+        }
         SetGhostBodyVisible(true);
 
         if (freezeRoutine != null)
         {
             StopCoroutine(freezeRoutine);
         }
-        freezeRoutine = StartCoroutine(RoutineFreeze(duration));
+        freezeRoutine = StartCoroutine(RoutineFreeze(duration, showRingVFX));
     }
 
     /// <summary>
@@ -1568,7 +1630,15 @@ public class PumpkinGhostAI : MonoBehaviour
             StopCoroutine(activeActionRoutine);
             activeActionRoutine = null;
         }
+        if (animator != null)
+        {
+            animator.speed = 1f;
+        }
         isLeaping = false;
+        if (isDisguised)
+        {
+            CancelDisguise("Bị cầu trừ tà đánh văng");
+        }
         SetGhostBodyVisible(true);
 
         GhostChainStunVFX.ApplyChainStun(gameObject, freezeDuration, pushDirection, pushDistance, animator);
@@ -1586,12 +1656,12 @@ public class PumpkinGhostAI : MonoBehaviour
         freezeRoutine = StartCoroutine(RoutineKnockbackAndFreeze(pushDirection, pushDistance, freezeDuration));
     }
 
-    private IEnumerator RoutineFreeze(float duration)
+    private IEnumerator RoutineFreeze(float duration, bool showRingVFX = true)
     {
         isFrozen = true;
         currentMoveSpeed = 0f;
         SetAnimatorSpeed(0f);
-        SetFreezeVFX(true);
+        SetFreezeVFX(showRingVFX);
         SetEyeColor(config != null ? config.stunEyeColor : freezeVFXColor);
         if (config != null) SetEyeIntensity(config.normalEyeIntensity * 0.8f);
 
@@ -1749,6 +1819,13 @@ public class PumpkinGhostAI : MonoBehaviour
         enableSoloBotAI = true;
         isFrozen = false;
         isLeaping = false;
+        if (activeActionRoutine != null)
+        {
+            StopCoroutine(activeActionRoutine);
+            activeActionRoutine = null;
+        }
+        if (animator != null) animator.speed = 1f;
+        if (isDisguised) CancelDisguise();
         SetFreezeVFX(false);
         SetGhostBodyVisible(true);
         gameObject.SetActive(true);
@@ -1785,8 +1862,10 @@ public class PumpkinGhostAI : MonoBehaviour
             StopCoroutine(activeActionRoutine);
             activeActionRoutine = null;
         }
+        if (animator != null) animator.speed = 1f;
 
         isLeaping = false;
+        if (isDisguised) CancelDisguise();
         SetGhostBodyVisible(true);
 
         // Mắt sáng rực màu cam bí ngô linh hồn uy lực
@@ -1822,7 +1901,7 @@ public class PumpkinGhostAI : MonoBehaviour
         Vector2 input = uiBlocksMove ? Vector2.zero : ReadPlayerMoveInput();
         bool isSprinting = !uiBlocksMove && ReadPlayerSprintInput();
 
-        Transform cam = Camera.main != null ? Camera.main.transform : null;
+        Transform cam = GetMainCamTransform();
         Vector3 moveDirection = Vector3.zero;
 
         if (input.sqrMagnitude > 0.01f)
@@ -1995,7 +2074,10 @@ public class PumpkinGhostAI : MonoBehaviour
         float duration = config != null ? Mathf.Min(config.leapDuration, 0.52f) : 0.52f;
         float speed = config != null ? config.leapSpeed : 12f;
         float arcHeight = config != null ? config.leapArcHeight : 1.8f;
+        float leapDmg = config != null ? config.leapDamage : 25f;
+        float leapHitReach = config != null ? Mathf.Max(1.65f, config.leapRaycastRadius * 2.2f) : 1.75f;
         float prevArc = 0f;
+        bool hasDealtLeapHit = false;
 
         while (elapsed < duration)
         {
@@ -2015,6 +2097,20 @@ public class PumpkinGhostAI : MonoBehaviour
 
             Vector3 moveStep = (leapDir * speed) * Time.deltaTime + Vector3.up * deltaArc;
             SafeMove(moveStep);
+
+            // Kiểm tra va chạm vồ trúng mục tiêu trong pha lao tới (mỗi cú vồ chỉ gây sát thương 1 lần)
+            if (!hasDealtLeapHit && t >= 0.15f && t <= 0.92f)
+            {
+                Vector3 hitOrigin = clawHandTransform != null ? clawHandTransform.position : (transform.position + Vector3.up * 0.85f);
+                if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.TrySendGhostAttackHit(hitOrigin, leapHitReach, leapDmg))
+                {
+                    hasDealtLeapHit = true;
+                }
+                else if (HumanBotTarget.TryHitNearestBot(hitOrigin, leapHitReach, leapDmg))
+                {
+                    hasDealtLeapHit = true;
+                }
+            }
             yield return null;
         }
 
@@ -2033,6 +2129,10 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private IEnumerator RoutinePlayerControlledVanish()
     {
+        if (isDisguised)
+        {
+            CancelDisguise("Ẩn thân bóng đêm");
+        }
         lastHideTime = Time.time;
         currentMoveSpeed = 0f;
         SetAnimatorSpeed(0f);
@@ -2060,7 +2160,7 @@ public class PumpkinGhostAI : MonoBehaviour
         while (elapsed < hideDur)
         {
             Vector2 input = ReadPlayerMoveInput();
-            Transform cam = Camera.main != null ? Camera.main.transform : null;
+            Transform cam = GetMainCamTransform();
             Vector3 steerDir = transform.forward;
             if (cam != null && input.sqrMagnitude > 0.01f)
             {
@@ -2219,6 +2319,12 @@ public class PumpkinGhostAI : MonoBehaviour
 
     private bool ReadPlayerVanishInputDown()
     {
+        if (virtualVanishTriggered)
+        {
+            virtualVanishTriggered = false;
+            return true;
+        }
+
         if (ThirdPersonCamera.isUIPanelOpen) return false;
         bool allowMouse = AllowDesktopMouseAction();
 #if ENABLE_INPUT_SYSTEM
@@ -2293,9 +2399,10 @@ public class PumpkinGhostAI : MonoBehaviour
     {
         EnsureDisguiseVisualObj();
 
-        if (!FindNearbyPropForDisguise(5.0f, out Mesh mesh, out Material[] mats, out Vector3 worldScale, out string propName))
+        float searchRadius = Mathf.Max(1.5f, disguiseSearchRadius);
+        if (!FindNearbyPropForDisguise(searchRadius, out Mesh mesh, out Material[] mats, out Vector3 worldScale, out string propName, out string rawObjectName))
         {
-            ShowGhostHUDNotice("⚠️ Không tìm thấy vật thể nào ở gần (dưới 5m) để biến hình!", new Color(1f, 0.4f, 0.4f, 1f));
+            ShowGhostHUDNotice($"⚠️ Không tìm thấy vật thể nào ở gần (dưới {searchRadius:0.#}m) để biến hình!", new Color(1f, 0.4f, 0.4f, 1f));
             return false;
         }
 
@@ -2326,7 +2433,7 @@ public class PumpkinGhostAI : MonoBehaviour
 
         if (PhotonMultiplayerChatVoice.Instance != null)
         {
-            PhotonMultiplayerChatVoice.Instance.BroadcastGhostDisguise(true, propName, disguisePropVisualObj.transform.localScale);
+            PhotonMultiplayerChatVoice.Instance.BroadcastGhostDisguise(true, rawObjectName, disguisePropVisualObj.transform.localScale);
         }
 
         return true;
@@ -2367,22 +2474,28 @@ public class PumpkinGhostAI : MonoBehaviour
 
     public bool FindNearbyPropForDisguise(float maxDistance, out Mesh propMesh, out Material[] propMaterials, out Vector3 worldScale, out string propName)
     {
+        return FindNearbyPropForDisguise(maxDistance, out propMesh, out propMaterials, out worldScale, out propName, out _);
+    }
+
+    public bool FindNearbyPropForDisguise(float maxDistance, out Mesh propMesh, out Material[] propMaterials, out Vector3 worldScale, out string propName, out string rawObjectName)
+    {
         propMesh = null;
         propMaterials = null;
         worldScale = Vector3.one;
         propName = "";
+        rawObjectName = "";
 
         Vector3 myPos = transform.position;
-        Collider[] hits = Physics.OverlapSphere(myPos, maxDistance, ~0, QueryTriggerInteraction.Ignore);
+        int hitCount = Physics.OverlapSphereNonAlloc(myPos, maxDistance, s_DisguiseOverlapBuffer, ~0, QueryTriggerInteraction.Ignore);
 
         Transform bestTransform = null;
-        float bestDist = float.MaxValue;
+        float bestDist = maxDistance;
         Mesh bestMesh = null;
         Material[] bestMats = null;
 
-        for (int i = 0; i < hits.Length; i++)
+        for (int i = 0; i < hitCount; i++)
         {
-            Collider col = hits[i];
+            Collider col = s_DisguiseOverlapBuffer[i];
             if (col == null) continue;
             Transform t = col.transform;
             if (t == transform || t.IsChildOf(transform)) continue;
@@ -2390,20 +2503,24 @@ public class PumpkinGhostAI : MonoBehaviour
             if (col.CompareTag("Player") || col.GetComponentInParent<CharacterController>() != null) continue;
 
             MeshFilter mf = t.GetComponent<MeshFilter>() ?? t.GetComponentInChildren<MeshFilter>() ?? t.GetComponentInParent<MeshFilter>();
-            MeshRenderer mr = t.GetComponent<MeshRenderer>() ?? t.GetComponentInChildren<MeshRenderer>() ?? t.GetComponentInParent<MeshRenderer>();
+            MeshRenderer mr = mf != null ? mf.GetComponent<MeshRenderer>() : null;
+            if (mr == null) mr = t.GetComponent<MeshRenderer>() ?? t.GetComponentInChildren<MeshRenderer>() ?? t.GetComponentInParent<MeshRenderer>();
 
             if (mf != null && mr != null && mf.sharedMesh != null && mr.sharedMaterials != null && mr.sharedMaterials.Length > 0)
             {
+                Transform meshTransform = mf.transform;
                 Bounds b = mf.sharedMesh.bounds;
-                if (b.size.x > 12f || b.size.z > 12f || b.size.y > 8f) continue;
-                string lowerName = t.name.ToLower();
-                if (lowerName.Contains("terrain") || lowerName.Contains("ground") || lowerName.Contains("floor") || lowerName.Contains("boundary")) continue;
+                Vector3 scaledSize = Vector3.Scale(b.size, new Vector3(Mathf.Abs(meshTransform.lossyScale.x), Mathf.Abs(meshTransform.lossyScale.y), Mathf.Abs(meshTransform.lossyScale.z)));
+                if (scaledSize.x > 10f || scaledSize.z > 10f || scaledSize.y > 7.5f) continue;
 
-                float dist = Vector3.Distance(myPos, t.position);
-                if (dist < bestDist)
+                string lowerName = meshTransform.name.ToLowerInvariant();
+                if (lowerName.Contains("terrain") || lowerName.Contains("ground") || lowerName.Contains("floor") || lowerName.Contains("boundary") || lowerName.Contains("sky") || lowerName.Contains("ramp")) continue;
+
+                float dist = Vector3.Distance(myPos, meshTransform.position);
+                if (dist <= bestDist)
                 {
                     bestDist = dist;
-                    bestTransform = t;
+                    bestTransform = meshTransform;
                     bestMesh = mf.sharedMesh;
                     bestMats = mr.sharedMaterials;
                 }
@@ -2421,20 +2538,19 @@ public class PumpkinGhostAI : MonoBehaviour
                 if (t == transform || t.IsChildOf(transform)) continue;
                 if (targetPlayer != null && (t == targetPlayer || t.IsChildOf(targetPlayer))) continue;
 
-                string lower = t.name.ToLower();
-                if (lower.Contains("tombstone") || lower.Contains("grave") || lower.Contains("coffin") || lower.Contains("prop"))
+                float dist = Vector3.Distance(myPos, t.position);
+                if (dist > bestDist) continue;
+
+                string lower = t.name.ToLowerInvariant();
+                if (lower.Contains("tombstone") || lower.Contains("grave") || lower.Contains("coffin") || lower.Contains("prop") || lower.Contains("urn") || lower.Contains("lantern"))
                 {
                     MeshRenderer mr = t.GetComponent<MeshRenderer>();
                     if (mr != null && mr.sharedMaterials != null && mr.sharedMaterials.Length > 0)
                     {
-                        float dist = Vector3.Distance(myPos, t.position);
-                        if (dist < bestDist)
-                        {
-                            bestDist = dist;
-                            bestTransform = t;
-                            bestMesh = mf.sharedMesh;
-                            bestMats = mr.sharedMaterials;
-                        }
+                        bestDist = dist;
+                        bestTransform = t;
+                        bestMesh = mf.sharedMesh;
+                        bestMats = mr.sharedMaterials;
                     }
                 }
             }
@@ -2445,6 +2561,7 @@ public class PumpkinGhostAI : MonoBehaviour
             propMesh = bestMesh;
             propMaterials = bestMats;
             worldScale = bestTransform.lossyScale;
+            rawObjectName = bestTransform.name;
             propName = FormatFriendlyPropName(bestTransform.name);
             return true;
         }
@@ -2455,7 +2572,7 @@ public class PumpkinGhostAI : MonoBehaviour
     private static string FormatFriendlyPropName(string rawName)
     {
         if (string.IsNullOrEmpty(rawName)) return "Bia Mộ Cổ";
-        string lower = rawName.ToLower();
+        string lower = rawName.ToLowerInvariant();
         if (lower.Contains("tombstone_cross") || lower.Contains("cross")) return "Bia Mộ Thánh Giá";
         if (lower.Contains("tombstone") || lower.Contains("grave")) return "Bia Mộ Nghĩa Trang";
         if (lower.Contains("coffin")) return "Quan Tài Cổ";
@@ -2466,7 +2583,26 @@ public class PumpkinGhostAI : MonoBehaviour
         if (lower.Contains("rock") || lower.Contains("stone")) return "Khối Đá Nghĩa Địa";
         if (lower.Contains("bush") || lower.Contains("tree")) return "Bụi Cây Héo";
 
-        string clean = System.Text.RegularExpressions.Regex.Replace(rawName, @"[\._\(\)\d]", " ").Trim();
+        var sb = new System.Text.StringBuilder(rawName.Length);
+        bool prevSpace = true;
+        for (int i = 0; i < rawName.Length; i++)
+        {
+            char c = rawName[i];
+            if (c == '.' || c == '_' || c == '(' || c == ')' || char.IsDigit(c))
+            {
+                if (!prevSpace)
+                {
+                    sb.Append(' ');
+                    prevSpace = true;
+                }
+            }
+            else
+            {
+                sb.Append(c);
+                prevSpace = (c == ' ');
+            }
+        }
+        string clean = sb.ToString().Trim();
         return string.IsNullOrEmpty(clean) ? "Vật Thể Nghĩa Trang" : clean;
     }
 

@@ -72,12 +72,19 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     private Image punchBtnImg;
     private float punchConfiguredScale = 1f;
     private bool isPunchHeld = false;
+    public bool IsGameplayTouchHoldingAttack => isPunchHeld;
 
     // Nút Biến Hình Ma (Ghost Disguise Button)
     private RectTransform disguiseBtnRect;
     private Image disguiseBtnImg;
     private Text disguiseBtnText;
     private float disguiseConfiguredScale = 1f;
+
+    // Nút Tàng Hình / Dịch Chuyển Ma (Ghost Vanish Button)
+    private RectTransform vanishBtnRect;
+    private Image vanishBtnImg;
+    private Text vanishBtnText;
+    private float vanishConfiguredScale = 1f;
 
     // Tâm ngắm Crosshair
     private GameObject crosshairObj;
@@ -133,6 +140,12 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     private bool gameplayControlsHiddenForSpectate = false;
     private readonly HashSet<int> ignoredUiTouchIds = new HashSet<int>();
     private readonly List<ActiveTouchEntry> rawFreeTouches = new List<ActiveTouchEntry>(8);
+    private readonly List<RaycastResult> cachedUiRaycastResults = new List<RaycastResult>(16);
+    private PointerEventData cachedPointerEventData;
+    private EventSystem cachedPointerEventSystem;
+    private int lastFppLabelState = -1;
+    private int lastDisguiseLabelSec = -2;
+    private bool cachedIsLobbyScene = false;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoInitialize()
@@ -159,6 +172,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         // Giữ màn hình điện thoại luôn sáng khi đang chơi game trên Android
         Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
+        cachedIsLobbyScene = SceneManager.GetActiveScene().name == "LobbyScene";
         EnsureAllProceduralSprites();
         BuildDesignerTouchHUD();
         SceneManager.sceneLoaded += OnSceneLoaded;
@@ -171,10 +185,12 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        cachedIsLobbyScene = scene.name == "LobbyScene";
         isAutoRunEnabled = false;
         isPinching = false;
         joystickRawTouchId = -1;
         ignoredUiTouchIds.Clear();
+        ReleasePunchHold();
         SetGameplayHUDControlsVisible(true);
         UpdateAutoRunBtnLabel();
         EnsureEventSystem();
@@ -189,28 +205,6 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
     private void Update()
     {
-        bool isLobbyScene = SceneManager.GetActiveScene().name == "LobbyScene";
-        if (touchCanvas != null && touchCanvas.enabled == isLobbyScene)
-        {
-            touchCanvas.enabled = !isLobbyScene;
-        }
-        if (isLobbyScene)
-        {
-            if (isEditingHUDLayout) ExitHUDCustomizationModeInternal();
-            isDragging = false;
-            isAutoRunEnabled = false;
-            joystickPointerId = -1;
-            joystickRawTouchId = -1;
-            isPunchHeld = false;
-            lookTouchFingerId = -1;
-            isPinching = false;
-            ignoredUiTouchIds.Clear();
-            currentDragVector = Vector2.zero;
-            if (joystickHandleRect != null) joystickHandleRect.anchoredPosition = Vector2.zero;
-            UpdateAutoRunBtnLabel();
-            return;
-        }
-
         if (hudEditNoticeTimer > 0f)
         {
             hudEditNoticeTimer -= Time.unscaledDeltaTime;
@@ -220,16 +214,28 @@ public class VirtualJoystickTouchUI : MonoBehaviour
             }
         }
 
-        // Trong chế độ Tùy chỉnh vị trí nút (Custom HUD Editor): tạm dừng gameplay input & khóa xoay camera
+        // Trong chế độ Tùy chỉnh vị trí nút (Custom HUD Editor): cho phép hoạt động ở cả Sảnh Chờ lẫn Trong Trận
         if (isEditingHUDLayout)
         {
+            if (touchCanvas != null && !touchCanvas.enabled)
+            {
+                touchCanvas.enabled = true;
+            }
             SetGameplayHUDControlsVisible(true);
+            if (disguiseBtnRect != null && !disguiseBtnRect.gameObject.activeSelf)
+            {
+                disguiseBtnRect.gameObject.SetActive(true);
+            }
+            if (vanishBtnRect != null && !vanishBtnRect.gameObject.activeSelf)
+            {
+                vanishBtnRect.gameObject.SetActive(true);
+            }
             ThirdPersonCamera.isUIPanelOpen = true;
             isDragging = false;
             isAutoRunEnabled = false;
             joystickPointerId = -1;
             joystickRawTouchId = -1;
-            isPunchHeld = false;
+            ReleasePunchHold();
             lookTouchFingerId = -1;
             isPinching = false;
             ignoredUiTouchIds.Clear();
@@ -238,6 +244,27 @@ public class VirtualJoystickTouchUI : MonoBehaviour
             if (ThirdPersonPlayerController.Instance != null) ThirdPersonPlayerController.Instance.SetVirtualSprint(false);
             PumpkinGhostAI activeGhostEdit = GetActivePlayerGhost();
             if (activeGhostEdit != null) activeGhostEdit.SetVirtualSprint(false);
+            UpdateAutoRunBtnLabel();
+            return;
+        }
+
+        bool isLobbyScene = cachedIsLobbyScene;
+        if (touchCanvas != null && touchCanvas.enabled == isLobbyScene)
+        {
+            touchCanvas.enabled = !isLobbyScene;
+        }
+        if (isLobbyScene)
+        {
+            isDragging = false;
+            isAutoRunEnabled = false;
+            joystickPointerId = -1;
+            joystickRawTouchId = -1;
+            ReleasePunchHold();
+            lookTouchFingerId = -1;
+            isPinching = false;
+            ignoredUiTouchIds.Clear();
+            currentDragVector = Vector2.zero;
+            if (joystickHandleRect != null) joystickHandleRect.anchoredPosition = Vector2.zero;
             UpdateAutoRunBtnLabel();
             return;
         }
@@ -272,7 +299,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
             isDragging = false;
             joystickPointerId = -1;
             joystickRawTouchId = -1;
-            isPunchHeld = false;
+            ReleasePunchHold();
             isAutoRunEnabled = false;
             currentDragVector = Vector2.zero;
             UpdateAutoRunBtnLabel();
@@ -366,14 +393,30 @@ public class VirtualJoystickTouchUI : MonoBehaviour
                 PumpkinGhostAI ghost = GetActivePlayerGhost();
                 if (ghost != null && ghost.isDisguised)
                 {
-                    disguiseBtnText.text = $"✕\nHỦY ({Mathf.CeilToInt(ghost.disguiseTimeRemaining)}s)";
-                    disguiseBtnImg.color = new Color(1f, 0.35f, 0.25f, 0.9f);
+                    int sec = Mathf.Max(0, Mathf.CeilToInt(ghost.disguiseTimeRemaining));
+                    if (lastDisguiseLabelSec != sec)
+                    {
+                        lastDisguiseLabelSec = sec;
+                        disguiseBtnText.text = $"✕\nHỦY ({sec}s)";
+                        if (disguiseBtnImg != null) disguiseBtnImg.color = new Color(1f, 0.35f, 0.25f, 0.9f);
+                    }
                 }
-                else
+                else if (lastDisguiseLabelSec != -1)
                 {
+                    lastDisguiseLabelSec = -1;
                     disguiseBtnText.text = "🎭\nBIẾN HÌNH";
-                    disguiseBtnImg.color = new Color(0.6f, 0.25f, 0.9f, 0.85f);
+                    if (disguiseBtnImg != null) disguiseBtnImg.color = new Color(0.6f, 0.25f, 0.9f, 0.85f);
                 }
+            }
+        }
+
+        // 7. Cập nhật trạng thái Nút Tàng Hình Ma (Ghost Vanish)
+        if (vanishBtnRect != null)
+        {
+            bool showVanish = isEditingHUDLayout || (isGhost && !isMatchFinished);
+            if (vanishBtnRect.gameObject.activeSelf != showVanish)
+            {
+                vanishBtnRect.gameObject.SetActive(showVanish);
             }
         }
     }
@@ -570,8 +613,31 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         }
     }
 
+    private void ReleasePunchHold()
+    {
+        if (!isPunchHeld) return;
+        isPunchHeld = false;
+        if (punchBtnRect != null)
+        {
+            punchBtnRect.localScale = Vector3.one * punchConfiguredScale;
+        }
+        if (ThirdPersonPlayerController.Instance != null)
+        {
+            ThirdPersonPlayerController.Instance.SetVirtualAttack(false);
+        }
+        PumpkinGhostAI ghost = GetActivePlayerGhost();
+        if (ghost != null)
+        {
+            ghost.SetVirtualAttackHeld(false);
+        }
+    }
+
     private void SetGameplayHUDControlsVisible(bool visible)
     {
+        if (!visible)
+        {
+            ReleasePunchHold();
+        }
         if (gameplayControlsHiddenForSpectate == !visible) return;
         gameplayControlsHiddenForSpectate = !visible;
 
@@ -579,7 +645,9 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         if (autoRunBtnRect != null) autoRunBtnRect.gameObject.SetActive(visible);
         if (jumpBtnRect != null) jumpBtnRect.gameObject.SetActive(visible);
         if (punchBtnRect != null) punchBtnRect.gameObject.SetActive(visible);
-        if (disguiseBtnRect != null) disguiseBtnRect.gameObject.SetActive(visible && (isEditingHUDLayout || IsPlayerControllingGhost()));
+        bool showGhostBtns = visible && (isEditingHUDLayout || IsPlayerControllingGhost());
+        if (disguiseBtnRect != null) disguiseBtnRect.gameObject.SetActive(showGhostBtns);
+        if (vanishBtnRect != null) vanishBtnRect.gameObject.SetActive(showGhostBtns);
         if (fppBtnRect != null) fppBtnRect.gameObject.SetActive(visible);
         if (crosshairObj != null) crosshairObj.SetActive(visible);
     }
@@ -590,16 +658,22 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     /// </summary>
     private bool IsPointerOverInteractiveUI(Vector2 screenPos)
     {
-        if (EventSystem.current == null) return false;
+        EventSystem es = EventSystem.current;
+        if (es == null) return false;
 
-        PointerEventData ped = new PointerEventData(EventSystem.current);
-        ped.position = screenPos;
-        List<RaycastResult> results = new List<RaycastResult>();
-        EventSystem.current.RaycastAll(ped, results);
-
-        for (int i = 0; i < results.Count; i++)
+        if (cachedPointerEventData == null || cachedPointerEventSystem != es)
         {
-            GameObject go = results[i].gameObject;
+            cachedPointerEventSystem = es;
+            cachedPointerEventData = new PointerEventData(es);
+        }
+        cachedPointerEventData.Reset();
+        cachedPointerEventData.position = screenPos;
+        cachedUiRaycastResults.Clear();
+        es.RaycastAll(cachedPointerEventData, cachedUiRaycastResults);
+
+        for (int i = 0; i < cachedUiRaycastResults.Count; i++)
+        {
+            GameObject go = cachedUiRaycastResults[i].gameObject;
             if (go == null) continue;
             string n = go.name;
             if (n == "TouchLookSwipeArea" || n == "CenterCrosshair" || n == "Canvas_VirtualTouchControls") continue;
@@ -684,8 +758,11 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     private void UpdateFPPToggleBtnLabel()
     {
         if (fppToggleText == null) return;
-        bool isFPP = ThirdPersonCamera.IsFirstPerson;
-        if (isFPP)
+        int state = ThirdPersonCamera.IsFirstPerson ? 1 : 0;
+        if (lastFppLabelState == state) return;
+        lastFppLabelState = state;
+
+        if (state == 1)
         {
             fppToggleText.text = "TPP";
             fppToggleText.color = new Color(0.35f, 0.95f, 1.0f, 0.98f);
@@ -842,6 +919,9 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
         // 6.1. Nút Biến Hình Ma [ 🎭 ] (Dành riêng cho Ma Bí Ngô - 15s)
         CreateDisguiseButtonUI(canvasGo.transform);
+
+        // 6.2. Nút Tàng Hình / Dịch Chuyển Ma [ 👻 ] (Dành riêng cho Ma Bí Ngô)
+        CreateVanishButtonUI(canvasGo.transform);
 
         // 7. Proxy kéo thả cho Khung Chat & Voice (hiện khi đang tùy chỉnh nút)
         CreateChatVoiceDragProxy(canvasGo.transform);
@@ -1266,25 +1346,7 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         upEntry.callback.AddListener((data) =>
         {
             if (isEditingHUDLayout) return;
-            punchBtnRect.localScale = Vector3.one * punchConfiguredScale;
-            isPunchHeld = false;
-
-            bool isGhost = IsPlayerControllingGhost();
-            if (isGhost)
-            {
-                PumpkinGhostAI ghost = GetActivePlayerGhost();
-                if (ghost != null)
-                {
-                    ghost.SetVirtualAttackHeld(false);
-                }
-            }
-            else
-            {
-                if (ThirdPersonPlayerController.Instance != null)
-                {
-                    ThirdPersonPlayerController.Instance.SetVirtualAttack(false);
-                }
-            }
+            ReleasePunchHold();
         });
         trigger.triggers.Add(upEntry);
 
@@ -1353,6 +1415,71 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         trigger.triggers.Add(upEntry);
 
         RegisterCustomHUDTarget(btnGo, "Disguise", "Nút Biến Hình Ma", disguiseBtnRect, null, new Vector2(-310f, 215f), 1f);
+        btnGo.SetActive(false);
+    }
+
+    private void CreateVanishButtonUI(Transform parent)
+    {
+        GameObject btnGo = new GameObject("Btn_GhostVanish");
+        btnGo.transform.SetParent(parent, false);
+
+        vanishBtnRect = btnGo.AddComponent<RectTransform>();
+        vanishBtnRect.anchorMin = new Vector2(1f, 0f);
+        vanishBtnRect.anchorMax = new Vector2(1f, 0f);
+        vanishBtnRect.pivot = new Vector2(0.5f, 0.5f);
+        vanishBtnRect.anchoredPosition = new Vector2(-245f, 105f);
+        vanishBtnRect.sizeDelta = new Vector2(88f, 88f);
+
+        vanishBtnImg = btnGo.AddComponent<Image>();
+        vanishBtnImg.sprite = jumpButtonSprite ?? punchButtonSprite;
+        vanishBtnImg.color = new Color(0.18f, 0.78f, 0.95f, 0.88f);
+
+        GameObject textGo = new GameObject("VanishText");
+        textGo.transform.SetParent(btnGo.transform, false);
+        RectTransform textRt = textGo.AddComponent<RectTransform>();
+        textRt.anchorMin = Vector2.zero;
+        textRt.anchorMax = Vector2.one;
+        textRt.offsetMin = Vector2.zero;
+        textRt.offsetMax = Vector2.zero;
+
+        vanishBtnText = textGo.AddComponent<Text>();
+        vanishBtnText.font = UIFontHelper.GetCrispFont(18);
+        vanishBtnText.fontSize = 15;
+        vanishBtnText.fontStyle = FontStyle.Bold;
+        vanishBtnText.alignment = TextAnchor.MiddleCenter;
+        vanishBtnText.color = Color.white;
+        vanishBtnText.text = "👻\nTÀNG HÌNH";
+        vanishBtnText.raycastTarget = false;
+
+        Outline outline = textGo.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        outline.effectDistance = new Vector2(0.8f, -0.8f);
+
+        EventTrigger trigger = btnGo.AddComponent<EventTrigger>();
+        EventTrigger.Entry downEntry = new EventTrigger.Entry();
+        downEntry.eventID = EventTriggerType.PointerDown;
+        downEntry.callback.AddListener((data) =>
+        {
+            if (isEditingHUDLayout) return;
+            vanishBtnRect.localScale = Vector3.one * (vanishConfiguredScale * 0.92f);
+            PumpkinGhostAI ghost = GetActivePlayerGhost();
+            if (ghost != null)
+            {
+                ghost.TriggerVirtualVanish();
+            }
+        });
+        trigger.triggers.Add(downEntry);
+
+        EventTrigger.Entry upEntry = new EventTrigger.Entry();
+        upEntry.eventID = EventTriggerType.PointerUp;
+        upEntry.callback.AddListener((data) =>
+        {
+            if (isEditingHUDLayout) return;
+            vanishBtnRect.localScale = Vector3.one * vanishConfiguredScale;
+        });
+        trigger.triggers.Add(upEntry);
+
+        RegisterCustomHUDTarget(btnGo, "Vanish", "Nút Tàng Hình Ma", vanishBtnRect, null, new Vector2(-245f, 105f), 1f);
         btnGo.SetActive(false);
     }
 
@@ -1453,6 +1580,54 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         proxyGo.SetActive(false);
     }
 
+    public void RegisterExternalHUDTarget(
+        string hudId,
+        string displayName,
+        RectTransform externalRect,
+        Vector2 defaultPos,
+        float defaultScale = 1f)
+    {
+        if (touchCanvas == null || externalRect == null || string.IsNullOrEmpty(hudId)) return;
+
+        // Tránh đăng ký trùng lặp
+        var existing = customHUDTargets.Find(t => t != null && t.hudId == hudId);
+        if (existing != null)
+        {
+            existing.linkedExternalRect = externalRect;
+            ApplySavedRectTransform(hudId, externalRect, defaultPos, defaultScale);
+            if (existing.targetRect != null)
+            {
+                existing.targetRect.anchoredPosition = externalRect.anchoredPosition;
+                existing.targetRect.localScale = externalRect.localScale;
+            }
+            return;
+        }
+
+        // Áp dụng vị trí & kích cỡ đã lưu (nếu có) lên nút thật
+        ApplySavedRectTransform(hudId, externalRect, defaultPos, defaultScale);
+
+        GameObject proxyGo = new GameObject(hudId + "_DragProxy");
+        proxyGo.transform.SetParent(touchCanvas.transform, false);
+        if (hudEditToolbarObj != null)
+        {
+            proxyGo.transform.SetSiblingIndex(hudEditToolbarObj.transform.GetSiblingIndex());
+        }
+
+        RectTransform prt = proxyGo.AddComponent<RectTransform>();
+        prt.anchorMin = externalRect.anchorMin;
+        prt.anchorMax = externalRect.anchorMax;
+        prt.pivot = externalRect.pivot;
+        prt.sizeDelta = externalRect.sizeDelta;
+        prt.anchoredPosition = externalRect.anchoredPosition;
+        prt.localScale = externalRect.localScale;
+
+        Image bg = proxyGo.AddComponent<Image>();
+        bg.color = new Color(0.15f, 0.06f, 0.06f, 0.35f);
+
+        RegisterCustomHUDTarget(proxyGo, hudId, displayName, prt, externalRect, defaultPos, defaultScale);
+        proxyGo.SetActive(isEditingHUDLayout);
+    }
+
     private void CreateHUDCustomizationToolbar(Transform parent)
     {
         hudEditToolbarObj = new GameObject("HUD_CustomizationToolbar");
@@ -1535,12 +1710,23 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     public void EnterHUDCustomizationMode()
     {
         if (touchCanvas == null) return;
-        if (SceneManager.GetActiveScene().name == "LobbyScene") return;
+
+        // Đảm bảo HUD nhặt vật phẩm & nút Dấu Ấn đã được tạo và đăng ký để người chơi tùy chỉnh được ở mọi nơi
+        ChainPickupHUD.EnsureInScene();
 
         isEditingHUDLayout = true;
         ThirdPersonCamera.isUIPanelOpen = true;
         touchCanvas.enabled = true;
         touchCanvas.sortingOrder = 115; // Nổi trên tất cả HUD khác trong lúc kéo chỉnh nút
+        SetGameplayHUDControlsVisible(true);
+        if (disguiseBtnRect != null)
+        {
+            disguiseBtnRect.gameObject.SetActive(true);
+        }
+        if (vanishBtnRect != null)
+        {
+            vanishBtnRect.gameObject.SetActive(true);
+        }
 
         // Liên kết & đồng bộ proxy ChatVoice với PhotonMultiplayerChatVoice thực tế (nếu có)
         var chatProxy = customHUDTargets.Find(t => t != null && t.hudId == "ChatVoice");
@@ -1563,6 +1749,12 @@ public class VirtualJoystickTouchUI : MonoBehaviour
         {
             var t = customHUDTargets[i];
             if (t == null || t.targetRect == null) continue;
+            if (t.linkedExternalRect != null && t.hudId != "ChatVoice")
+            {
+                t.targetRect.anchoredPosition = t.linkedExternalRect.anchoredPosition;
+                t.targetRect.localScale = t.linkedExternalRect.localScale;
+                t.gameObject.SetActive(true);
+            }
             editModeSnapshots[t.hudId] = new Vector3(t.targetRect.anchoredPosition.x, t.targetRect.anchoredPosition.y, t.targetRect.localScale.x);
             t.SetEditModeVisible(true, false);
         }
@@ -1672,6 +1864,8 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
         jumpConfiguredScale = 1f;
         punchConfiguredScale = 1f;
+        disguiseConfiguredScale = 1f;
+        vanishConfiguredScale = 1f;
         ResetAllCustomHUDToDefault();
 
         if (hudEditNoticeText != null)
@@ -1720,6 +1914,8 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
             if (t.hudId == "Jump") jumpConfiguredScale = sc;
             else if (t.hudId == "Punch") punchConfiguredScale = sc;
+            else if (t.hudId == "Disguise") disguiseConfiguredScale = sc;
+            else if (t.hudId == "Vanish") vanishConfiguredScale = sc;
 
             if (t.linkedExternalRect != null)
             {
@@ -1743,22 +1939,50 @@ public class VirtualJoystickTouchUI : MonoBehaviour
     private void ExitHUDCustomizationModeInternal()
     {
         isEditingHUDLayout = false;
-        if (touchCanvas != null) touchCanvas.sortingOrder = 35;
+        bool isLobby = cachedIsLobbyScene;
+        if (touchCanvas != null)
+        {
+            touchCanvas.sortingOrder = 35;
+            if (isLobby) touchCanvas.enabled = false;
+        }
 
         for (int i = 0; i < customHUDTargets.Count; i++)
         {
             var t = customHUDTargets[i];
             if (t == null) continue;
             t.SetEditModeVisible(false, false);
-            if (t.hudId == "ChatVoice") t.gameObject.SetActive(false);
+            if (t.hudId == "ChatVoice" || t.linkedExternalRect != null) t.gameObject.SetActive(false);
+        }
+
+        if (!isLobby)
+        {
+            bool showGhostBtns = IsPlayerControllingGhost() && (SurvivalTimerUI.Instance == null || !SurvivalTimerUI.Instance.IsFinished);
+            if (disguiseBtnRect != null) disguiseBtnRect.gameObject.SetActive(showGhostBtns);
+            if (vanishBtnRect != null) vanishBtnRect.gameObject.SetActive(showGhostBtns);
         }
 
         if (editModeBackdropObj != null) editModeBackdropObj.SetActive(false);
         if (hudEditToolbarObj != null) hudEditToolbarObj.SetActive(false);
-        if (toggleCursorBtn != null && !Application.isMobilePlatform) toggleCursorBtn.gameObject.SetActive(true);
+        if (toggleCursorBtn != null && !Application.isMobilePlatform) toggleCursorBtn.gameObject.SetActive(!isLobby);
 
         bool typing = PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsTypingChat();
         ThirdPersonCamera.isUIPanelOpen = typing;
+
+        if (!Application.isMobilePlatform)
+        {
+            bool matchFinished = SurvivalTimerUI.Instance != null && SurvivalTimerUI.Instance.IsFinished;
+            bool keepUnlocked = PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.ShouldKeepCursorUnlocked();
+            if (!isLobby && !typing && !matchFinished && !keepUnlocked)
+            {
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+            else
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+        }
     }
 
     private void LoadSavedHUDLayout()
@@ -1771,6 +1995,8 @@ public class VirtualJoystickTouchUI : MonoBehaviour
 
             if (t.hudId == "Jump") jumpConfiguredScale = t.targetRect.localScale.x;
             else if (t.hudId == "Punch") punchConfiguredScale = t.targetRect.localScale.x;
+            else if (t.hudId == "Disguise") disguiseConfiguredScale = t.targetRect.localScale.x;
+            else if (t.hudId == "Vanish") vanishConfiguredScale = t.targetRect.localScale.x;
         }
     }
 

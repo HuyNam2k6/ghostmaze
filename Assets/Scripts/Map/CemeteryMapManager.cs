@@ -22,11 +22,19 @@ public class CemeteryMapManager : MonoBehaviour
 
     private Coroutine atmosphereTransitionRoutine;
     private Light cachedMoonlight;
+    private Light[] cachedMapChildLights;
+    private string cachedGroundLayerName;
+    private int cachedGroundLayerMask = 1;
+    private string cachedObstacleLayerName;
+    private int cachedObstacleLayerMask = 1;
 
     private void Awake()
     {
         Instance = this;
-        StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
+        if (Application.isPlaying)
+        {
+            StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f, false);
+        }
     }
 
     private void Start()
@@ -41,7 +49,10 @@ public class CemeteryMapManager : MonoBehaviour
     private void OnEnable()
     {
         if (Instance == null) Instance = this;
-        StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f);
+        if (Application.isPlaying)
+        {
+            StairRampSmoother.SmoothStairsInternal(0.40f, 0.02f, false);
+        }
     }
 
     private void OnDestroy()
@@ -218,10 +229,16 @@ public class CemeteryMapManager : MonoBehaviour
             }
         }
 
-        // Đèn lồng & đài tế lễ trên bản đồ
+        // Đèn lồng & đài tế lễ trên bản đồ (cache danh sách đèn khi chạy game để không quét toàn bộ cây Hierarchy)
         var baseAtm = config.atmosphere;
-        foreach (var l in GetComponentsInChildren<Light>(true))
+        if (cachedMapChildLights == null || !Application.isPlaying)
         {
+            cachedMapChildLights = GetComponentsInChildren<Light>(true);
+        }
+        for (int i = 0; i < cachedMapChildLights.Length; i++)
+        {
+            var l = cachedMapChildLights[i];
+            if (l == null) continue;
             if (l.gameObject.name == "LanternPointLight")
             {
                 l.color = baseAtm.lanternColor;
@@ -320,21 +337,33 @@ public class CemeteryMapManager : MonoBehaviour
     // =========================================================================
 
     /// <summary>
-    /// Bắn Raycast kiểm tra mặt đất bên dưới chân Player
+    /// Bắn Raycast kiểm tra mặt đất bên dưới chân Player (0 GC Allocation mỗi frame)
     /// </summary>
     public bool RaycastGround(Vector3 playerFootPos, out RaycastHit hit, float maxDistance = 2.0f)
     {
-        int layerMask = LayerMask.GetMask(config != null ? config.colliders.groundLayer : "Default");
-        return Physics.Raycast(playerFootPos + Vector3.up * 0.2f, Vector3.down, out hit, maxDistance, layerMask);
+        string targetLayer = (config != null && !string.IsNullOrEmpty(config.colliders.groundLayer)) ? config.colliders.groundLayer : "Default";
+        if (cachedGroundLayerName != targetLayer)
+        {
+            cachedGroundLayerName = targetLayer;
+            int idx = LayerMask.NameToLayer(targetLayer);
+            cachedGroundLayerMask = idx >= 0 ? (1 << idx) : ~0;
+        }
+        return Physics.Raycast(playerFootPos + Vector3.up * 0.2f, Vector3.down, out hit, maxDistance, cachedGroundLayerMask, QueryTriggerInteraction.Ignore);
     }
 
     /// <summary>
-    /// Bắn Raycast kiểm tra chướng ngại vật trước mặt Player
+    /// Bắn Raycast kiểm tra chướng ngại vật trước mặt Player (0 GC Allocation mỗi frame)
     /// </summary>
     public bool RaycastForward(Vector3 origin, Vector3 forwardDir, out RaycastHit hit, float maxDistance = 2.5f)
     {
-        int layerMask = LayerMask.GetMask(config != null ? config.colliders.obstacleLayer : "Default");
-        return Physics.Raycast(origin, forwardDir, out hit, maxDistance, layerMask);
+        string targetLayer = (config != null && !string.IsNullOrEmpty(config.colliders.obstacleLayer)) ? config.colliders.obstacleLayer : "Default";
+        if (cachedObstacleLayerName != targetLayer)
+        {
+            cachedObstacleLayerName = targetLayer;
+            int idx = LayerMask.NameToLayer(targetLayer);
+            cachedObstacleLayerMask = idx >= 0 ? (1 << idx) : ~0;
+        }
+        return Physics.Raycast(origin, forwardDir, out hit, maxDistance, cachedObstacleLayerMask, QueryTriggerInteraction.Ignore);
     }
 }
 

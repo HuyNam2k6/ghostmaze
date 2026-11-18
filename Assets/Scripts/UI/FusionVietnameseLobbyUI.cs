@@ -33,6 +33,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     // UI Sảnh Chính (Main View)
     private InputField roomIdInputField;
+    private InputField mainLobbyPlayerNameInput;
+    private Text mainLobbyPlayerNameLabelText;
 
     // UI Bên Trong Phòng Chờ (Waiting Room View)
     private Text waitingRoomIdText;
@@ -97,6 +99,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     }
 
     private readonly PlayerSlotUI[] playerSlots = new PlayerSlotUI[4];
+    private readonly List<PhotonMultiplayerChatVoice.RoomPlayerEntry> cachedWaitingPlayers = new List<PhotonMultiplayerChatVoice.RoomPlayerEntry>(4);
+    private string temporaryWaitingWarning = "";
+    private float temporaryWaitingWarningUntil = -1f;
 
     // UI HUD nhỏ gọn góc trên phải khi đã vào trận
     private GameObject inGameRoomBannerObj;
@@ -107,7 +112,18 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private readonly Color colConnecting   = new Color(1.00f, 0.78f, 0.22f, 1f);
     private readonly Color colConnected    = new Color(0.18f, 0.95f, 0.52f, 1f);
 
-    // Bộ nhớ đệm Sprite procedural để không phải tạo lại
+    // Bộ nhớ đệm Sprite procedural tĩnh để không phải tạo lại khi quay về Sảnh Chờ
+    private static Sprite s_CachedBackdropSky;
+    private static Sprite s_CachedCardGradient;
+    private static Sprite s_CachedCircleBadge;
+    private static Sprite s_CachedLinkIcon;
+    private static Sprite s_CachedDoorIcon;
+    private static Sprite[] s_CachedCardIcons;
+    private static Sprite s_CachedGraveyardBottom;
+    private static Sprite s_CachedSpinnerArc;
+    private static Sprite s_CachedGearIcon;
+    private static Sprite s_CachedPowerIcon;
+
     private Sprite sprBackdropSky;
     private Sprite sprCardGradient;
     private Sprite sprCircleBadge;
@@ -115,6 +131,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     private Sprite sprDoorIcon;
     private Sprite[] sprCardIcons = new Sprite[6];
     private Sprite sprGraveyardBottom;
+    private Sprite sprGearIcon;
+    private Sprite sprPowerIcon;
 
     private static bool hasRegisteredLobbySceneHook = false;
 
@@ -139,7 +157,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public static void EnsureLobbyUIIfInLobbyScene()
     {
-        // CHá»ˆ KHá»žI Táº O á»ž Sáº¢NH CHá»œ (LobbyScene) â€” HOÃ€N TOÃ€N KHÃ”NG HIá»†N á»ž TRANG GAME (SampleScene) TRÃNH Bá»Š LáºªN!
+        // CHỈ KHỞI TẠO Ở SẢNH CHỜ (LobbyScene) — HOÀN TOÀN KHÔNG HIỆN Ở TRANG GAME (SampleScene) TRÁNH BỊ LẪN!
         string curScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
         if (curScene != "LobbyScene") return;
 
@@ -152,7 +170,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     private void Awake()
     {
-        // Náº¿u khÃ´ng pháº£i LobbyScene (vÃ­ dá»¥ Ä‘ang á»Ÿ SampleScene) thÃ¬ tá»± há»§y ngay Ä‘á»ƒ khÃ´ng bao giá» che mÃ n hÃ¬nh trong game
+        // Nếu không phải LobbyScene (ví dụ đang ở SampleScene) thì tự hủy ngay để không bao giờ che màn hình trong game
         if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "LobbyScene")
         {
             Destroy(gameObject);
@@ -263,18 +281,123 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     // =========================================================================
     private void GenerateProceduralSprites()
     {
-        sprBackdropSky = CreateGothicNightSkySprite(1920, 1080);
-        sprCardGradient = CreateVerticalCardGradientSprite(256, 512);
-        sprCircleBadge = CreateGlowingCircleSprite(256);
-        sprLinkIcon = CreateChainLinkIconSprite(256);
-        sprDoorIcon = CreatePortalDoorIconSprite(256);
-        sprGraveyardBottom = CreateGraveyardSilhouetteSprite(1920, 160);
-
-        for (int i = 0; i < 6; i++)
+        if (s_CachedBackdropSky == null) s_CachedBackdropSky = CreateGothicNightSkySprite(960, 540);
+        if (s_CachedCardGradient == null) s_CachedCardGradient = CreateVerticalCardGradientSprite(64, 256);
+        if (s_CachedCircleBadge == null) s_CachedCircleBadge = CreateGlowingCircleSprite(192);
+        if (s_CachedLinkIcon == null) s_CachedLinkIcon = CreateChainLinkIconSprite(192);
+        if (s_CachedDoorIcon == null) s_CachedDoorIcon = CreatePortalDoorIconSprite(192);
+        if (s_CachedGraveyardBottom == null) s_CachedGraveyardBottom = CreateGraveyardSilhouetteSprite(960, 120);
+        if (s_CachedCardIcons == null)
         {
-            sprCardIcons[i] = CreateModeIconSprite(i, 384);
+            s_CachedCardIcons = new Sprite[6];
+            for (int i = 0; i < 6; i++)
+            {
+                s_CachedCardIcons[i] = CreateModeIconSprite(i, 256);
+            }
         }
-        sprSpinnerArc = CreateSpinnerArcSprite(384);
+        if (s_CachedSpinnerArc == null) s_CachedSpinnerArc = CreateSpinnerArcSprite(256);
+        if (s_CachedGearIcon == null) s_CachedGearIcon = CreateCenteredGearIconSprite(128);
+        if (s_CachedPowerIcon == null) s_CachedPowerIcon = CreateCenteredPowerIconSprite(128);
+
+        sprBackdropSky = s_CachedBackdropSky;
+        sprCardGradient = s_CachedCardGradient;
+        sprCircleBadge = s_CachedCircleBadge;
+        sprLinkIcon = s_CachedLinkIcon;
+        sprDoorIcon = s_CachedDoorIcon;
+        sprGraveyardBottom = s_CachedGraveyardBottom;
+        for (int i = 0; i < 6; i++) sprCardIcons[i] = s_CachedCardIcons[i];
+        sprSpinnerArc = s_CachedSpinnerArc;
+        sprGearIcon = s_CachedGearIcon;
+        sprPowerIcon = s_CachedPowerIcon;
+    }
+
+    private static Sprite CreateCenteredGearIconSprite(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        float c = (size - 1) * 0.5f;
+        float outerBodyR = size * 0.28f;
+        float toothOuterR = size * 0.40f;
+        float innerHoleR = size * 0.135f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - c;
+                float dy = y - c;
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float ang = Mathf.Atan2(dy, dx);
+
+                // 8 răng bánh răng đối xứng tuyệt đối qua tâm
+                float toothWave = Mathf.Cos(ang * 8f);
+                float maxR = toothWave > 0.25f ? toothOuterR : outerBodyR;
+                if (toothWave > -0.15f && toothWave <= 0.25f)
+                {
+                    float t = (toothWave + 0.15f) / 0.40f;
+                    maxR = Mathf.Lerp(outerBodyR, toothOuterR, t);
+                }
+
+                float outerAlpha = Mathf.Clamp01(maxR - r + 0.85f);
+                float holeAlpha = Mathf.Clamp01(r - innerHoleR + 0.85f);
+                float alpha = outerAlpha * holeAlpha;
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private static Sprite CreateCenteredPowerIconSprite(int size)
+    {
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.wrapMode = TextureWrapMode.Clamp;
+        tex.filterMode = FilterMode.Bilinear;
+
+        float c = (size - 1) * 0.5f;
+        float ringR = size * 0.30f;
+        float thick = size * 0.085f;
+        float barHalfW = thick * 0.52f;
+        float barMinY = c - size * 0.02f;
+        float barMaxY = c + size * 0.38f;
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - c;
+                float dy = y - (c - size * 0.03f);
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float ringDist = Mathf.Abs(r - ringR);
+
+                // Góc tính từ đỉnh trên cùng (0 rad là hướng 12h)
+                float angleFromTop = Mathf.Abs(Mathf.Atan2(dx, dy));
+                float ringAlpha = 0f;
+                if (angleFromTop > 0.55f)
+                {
+                    float edge = Mathf.Clamp01((angleFromTop - 0.55f) * 8f);
+                    ringAlpha = Mathf.Clamp01((thick * 0.5f - ringDist) + 0.85f) * edge;
+                }
+
+                // Vạch đứng chính giữa phía trên
+                float bx = Mathf.Abs(x - c);
+                float barAlpha = 0f;
+                if (y >= barMinY - 1f && y <= barMaxY + 1f)
+                {
+                    float ax = Mathf.Clamp01(barHalfW - bx + 0.85f);
+                    float ayBot = Mathf.Clamp01(y - barMinY + 0.85f);
+                    float ayTop = Mathf.Clamp01(barMaxY - y + 0.85f);
+                    barAlpha = ax * Mathf.Min(ayBot, ayTop);
+                }
+
+                float alpha = Mathf.Max(ringAlpha, barAlpha);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
     }
 
     private Sprite CreateSpinnerArcSprite(int size)
@@ -893,6 +1016,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         // Khởi tạo text ngôn ngữ đồng bộ
         UpdateAllLobbyLocalizedTexts();
+        SyncAllNicknameInputsFromPhoton();
 
         // Tối ưu độ nét vector toàn diện cho UI sảnh
         UIFontHelper.ApplyCrispnessRecursively(lobbyRootObj, 15);
@@ -1150,6 +1274,9 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         tabSettingsText.alignment = TextAnchor.MiddleCenter;
         tabSettingsText.color = new Color(0.72f, 0.80f, 0.92f);
         tabSettingsText.text = GameLocalizationManager.T("LOBBY_TAB_SETTINGS", "⚙️ Cài Đặt");
+
+        // Ẩn 3 nút tab chữ nhật ở giữa trên sảnh chờ (chỉ giữ lại nút icon ⚙️ Cài Đặt ở góc trên phải)
+        tabsObj.SetActive(false);
     }
 
     private void BuildTopRightPlayerBadge(Transform parent, Font font)
@@ -1160,8 +1287,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         rrt.anchorMin = new Vector2(1f, 1f);
         rrt.anchorMax = new Vector2(1f, 1f);
         rrt.pivot = new Vector2(1f, 1f);
-        rrt.anchoredPosition = new Vector2(-45f, -24f);
-        rrt.sizeDelta = new Vector2(550f, 48f);
+        rrt.anchoredPosition = new Vector2(-50f, -24f);
+        rrt.sizeDelta = new Vector2(504f, 48f);
 
         // 0. Nút Chuyển Đổi Ngôn Ngữ Nhanh: 🌐 [VI] 🇻🇳 Tiếng Việt (Click để đổi Tiếng Việt / English / Español / 中文)
         GameObject langPill = new GameObject("HeaderLanguagePill");
@@ -1220,9 +1347,15 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Button pbtn = profilePill.AddComponent<Button>();
         pbtn.onClick.AddListener(() =>
         {
-            if (waitingRoomViewObj != null && !waitingRoomViewObj.activeSelf)
+            if (isInsideWaitingRoom && waitingPlayerNameInput != null)
             {
-                EnterWaitingRoomWithId("SOLO_EDIT", true);
+                waitingPlayerNameInput.ActivateInputField();
+                waitingPlayerNameInput.Select();
+            }
+            else if (mainLobbyPlayerNameInput != null)
+            {
+                mainLobbyPlayerNameInput.ActivateInputField();
+                mainLobbyPlayerNameInput.Select();
             }
         });
 
@@ -1254,14 +1387,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         Image dimg = divObj.AddComponent<Image>();
         dimg.color = new Color(0.35f, 0.48f, 0.75f, 0.60f);
 
-        // 3. Settings Gear Button ⚙️
+        // 3. Settings Gear Button ⚙️ (Căn giữa hoàn hảo cả vị trí nút lẫn icon bánh răng bên trong)
         GameObject setBtn = new GameObject("QuickSettingsIconBtn");
         setBtn.transform.SetParent(rightBar.transform, false);
         RectTransform srt = setBtn.AddComponent<RectTransform>();
         srt.anchorMin = new Vector2(0f, 0.5f);
         srt.anchorMax = new Vector2(0f, 0.5f);
         srt.pivot = new Vector2(0.5f, 0.5f);
-        srt.anchoredPosition = new Vector2(420f, 0f);
+        srt.anchoredPosition = new Vector2(426f, 0f);
         srt.sizeDelta = new Vector2(44f, 44f);
 
         Image sbg = setBtn.AddComponent<Image>();
@@ -1271,31 +1404,31 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         sol.effectDistance = new Vector2(1.5f, 1.5f);
 
         Button sButton = setBtn.AddComponent<Button>();
+        sButton.targetGraphic = sbg;
         sButton.onClick.AddListener(() => GameSettingsManager.EnsureInstance().OpenDashboard(GameSettingsManager.SettingsMode.LobbyFull));
 
-        GameObject stxt = new GameObject("Text");
-        stxt.transform.SetParent(setBtn.transform, false);
-        RectTransform strt = stxt.AddComponent<RectTransform>();
-        strt.anchorMin = Vector2.zero;
-        strt.anchorMax = Vector2.one;
-        strt.offsetMin = Vector2.zero;
-        strt.offsetMax = Vector2.zero;
-        Text stxtC = stxt.AddComponent<Text>();
-        stxtC.font = font;
-        stxtC.fontSize = 20;
-        stxtC.alignment = TextAnchor.MiddleCenter;
-        stxtC.color = new Color(1f, 0.92f, 0.40f);
-        stxtC.text = "⚙️";
-        lobbySettingsBtnText = stxtC;
+        GameObject sIconObj = new GameObject("GearIcon");
+        sIconObj.transform.SetParent(setBtn.transform, false);
+        RectTransform sIconRt = sIconObj.AddComponent<RectTransform>();
+        sIconRt.anchorMin = new Vector2(0.5f, 0.5f);
+        sIconRt.anchorMax = new Vector2(0.5f, 0.5f);
+        sIconRt.pivot = new Vector2(0.5f, 0.5f);
+        sIconRt.anchoredPosition = Vector2.zero;
+        sIconRt.sizeDelta = new Vector2(26f, 26f);
+        Image sIconImg = sIconObj.AddComponent<Image>();
+        sIconImg.sprite = sprGearIcon != null ? sprGearIcon : CreateCenteredGearIconSprite(128);
+        sIconImg.color = new Color(1f, 0.92f, 0.40f, 1f);
+        sIconImg.raycastTarget = false;
+        lobbySettingsBtnText = null;
 
-        // 4. Power/Quit Button ⏻
+        // 4. Power/Quit Button ⏻ (Căn giữa hoàn hảo bằng Vector Sprite)
         GameObject quitBtn = new GameObject("QuickQuitIconBtn");
         quitBtn.transform.SetParent(rightBar.transform, false);
         RectTransform qrt = quitBtn.AddComponent<RectTransform>();
         qrt.anchorMin = new Vector2(0f, 0.5f);
         qrt.anchorMax = new Vector2(0f, 0.5f);
         qrt.pivot = new Vector2(0.5f, 0.5f);
-        qrt.anchoredPosition = new Vector2(476f, 0f);
+        qrt.anchoredPosition = new Vector2(482f, 0f);
         qrt.sizeDelta = new Vector2(44f, 44f);
 
         Image qbg = quitBtn.AddComponent<Image>();
@@ -1305,6 +1438,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         qol.effectDistance = new Vector2(1.5f, 1.5f);
 
         Button qButton = quitBtn.AddComponent<Button>();
+        qButton.targetGraphic = qbg;
         qButton.onClick.AddListener(() =>
         {
 #if UNITY_EDITOR
@@ -1314,19 +1448,18 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 #endif
         });
 
-        GameObject qtxt = new GameObject("Text");
-        qtxt.transform.SetParent(quitBtn.transform, false);
-        RectTransform qtrt = qtxt.AddComponent<RectTransform>();
-        qtrt.anchorMin = Vector2.zero;
-        qtrt.anchorMax = Vector2.one;
-        qtrt.offsetMin = Vector2.zero;
-        qtrt.offsetMax = Vector2.zero;
-        Text qtxtC = qtxt.AddComponent<Text>();
-        qtxtC.font = font;
-        qtxtC.fontSize = 20;
-        qtxtC.alignment = TextAnchor.MiddleCenter;
-        qtxtC.color = new Color(1f, 0.45f, 0.45f);
-        qtxtC.text = "⏻";
+        GameObject qIconObj = new GameObject("PowerIcon");
+        qIconObj.transform.SetParent(quitBtn.transform, false);
+        RectTransform qIconRt = qIconObj.AddComponent<RectTransform>();
+        qIconRt.anchorMin = new Vector2(0.5f, 0.5f);
+        qIconRt.anchorMax = new Vector2(0.5f, 0.5f);
+        qIconRt.pivot = new Vector2(0.5f, 0.5f);
+        qIconRt.anchoredPosition = Vector2.zero;
+        qIconRt.sizeDelta = new Vector2(24f, 24f);
+        Image qIconImg = qIconObj.AddComponent<Image>();
+        qIconImg.sprite = sprPowerIcon != null ? sprPowerIcon : CreateCenteredPowerIconSprite(128);
+        qIconImg.color = new Color(1f, 0.45f, 0.45f, 1f);
+        qIconImg.raycastTarget = false;
     }
 
     // =========================================================================
@@ -1341,7 +1474,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         barRect.anchorMax = new Vector2(0.5f, 1f);
         barRect.pivot = new Vector2(0.5f, 1f);
         barRect.anchoredPosition = new Vector2(0f, -95f);
-        barRect.sizeDelta = new Vector2(1100f, 68f);
+        barRect.sizeDelta = new Vector2(1220f, 68f);
 
         Image barBg = barObj.AddComponent<Image>();
         barBg.color = new Color(0.04f, 0.07f, 0.14f, 0.94f);
@@ -1349,15 +1482,103 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         barOut.effectColor = new Color(0.25f, 0.45f, 0.85f, 0.85f);
         barOut.effectDistance = new Vector2(2f, 2f);
 
-        // 1. Icon Cánh Cửa + Chữ "ID Phòng:"
+        // =====================================================================
+        // NỬA TRÁI: Ô ĐẶT TÊN NHÂN VẬT (PLAYER) TRỰC TIẾP TRƯỚC KHI VÀO GAME
+        // =====================================================================
+        GameObject pLabelObj = new GameObject("PlayerNameLabel");
+        pLabelObj.transform.SetParent(barObj.transform, false);
+        RectTransform plRect = pLabelObj.AddComponent<RectTransform>();
+        plRect.anchorMin = new Vector2(0f, 0.5f);
+        plRect.anchorMax = new Vector2(0f, 0.5f);
+        plRect.pivot = new Vector2(0f, 0.5f);
+        plRect.anchoredPosition = new Vector2(20f, 0f);
+        plRect.sizeDelta = new Vector2(150f, 50f);
+
+        Text plTxt = pLabelObj.AddComponent<Text>();
+        plTxt.font = font;
+        plTxt.fontSize = 18;
+        plTxt.fontStyle = FontStyle.Bold;
+        plTxt.alignment = TextAnchor.MiddleLeft;
+        plTxt.color = new Color(0.55f, 0.98f, 0.82f);
+        plTxt.text = "👤 Tên Player:";
+        mainLobbyPlayerNameLabelText = plTxt;
+
+        GameObject pInputObj = new GameObject("MainLobbyPlayerNameInput");
+        pInputObj.transform.SetParent(barObj.transform, false);
+        RectTransform piRect = pInputObj.AddComponent<RectTransform>();
+        piRect.anchorMin = new Vector2(0f, 0.5f);
+        piRect.anchorMax = new Vector2(0f, 0.5f);
+        piRect.pivot = new Vector2(0f, 0.5f);
+        piRect.anchoredPosition = new Vector2(170f, 0f);
+        piRect.sizeDelta = new Vector2(305f, 48f);
+
+        Image piBg = pInputObj.AddComponent<Image>();
+        piBg.color = new Color(0.02f, 0.06f, 0.10f, 0.96f);
+        Outline piOut = pInputObj.AddComponent<Outline>();
+        piOut.effectColor = new Color(0.22f, 0.88f, 0.65f, 0.88f);
+        piOut.effectDistance = new Vector2(1.5f, 1.5f);
+
+        GameObject piTextObj = new GameObject("Text");
+        piTextObj.transform.SetParent(pInputObj.transform, false);
+        RectTransform pitRect = piTextObj.AddComponent<RectTransform>();
+        pitRect.anchorMin = Vector2.zero;
+        pitRect.anchorMax = Vector2.one;
+        pitRect.offsetMin = new Vector2(14f, 0f);
+        pitRect.offsetMax = new Vector2(-14f, 0f);
+
+        Text piText = piTextObj.AddComponent<Text>();
+        piText.font = font;
+        piText.fontSize = 18;
+        piText.fontStyle = FontStyle.Bold;
+        piText.alignment = TextAnchor.MiddleLeft;
+        piText.color = new Color(0.32f, 1.0f, 0.75f);
+        piText.supportRichText = false;
+
+        GameObject piPhObj = new GameObject("Placeholder");
+        piPhObj.transform.SetParent(pInputObj.transform, false);
+        RectTransform piphRect = piPhObj.AddComponent<RectTransform>();
+        piphRect.anchorMin = Vector2.zero;
+        piphRect.anchorMax = Vector2.one;
+        piphRect.offsetMin = new Vector2(14f, 0f);
+        piphRect.offsetMax = new Vector2(-14f, 0f);
+
+        Text piPhText = piPhObj.AddComponent<Text>();
+        piPhText.font = font;
+        piPhText.fontSize = 16;
+        piPhText.fontStyle = FontStyle.Italic;
+        piPhText.alignment = TextAnchor.MiddleLeft;
+        piPhText.color = new Color(0.42f, 0.60f, 0.68f, 0.78f);
+        piPhText.text = "Nhập tên nhân vật...";
+
+        mainLobbyPlayerNameInput = pInputObj.AddComponent<InputField>();
+        mainLobbyPlayerNameInput.textComponent = piText;
+        mainLobbyPlayerNameInput.placeholder = piPhText;
+        mainLobbyPlayerNameInput.characterLimit = 20;
+        mainLobbyPlayerNameInput.onEndEdit.AddListener(OnMainLobbyNicknameSubmitted);
+
+        // Vạch ngăn giữa Tên Player và ID Phòng
+        GameObject midDiv = new GameObject("MidBarDivider");
+        midDiv.transform.SetParent(barObj.transform, false);
+        RectTransform mdRect = midDiv.AddComponent<RectTransform>();
+        mdRect.anchorMin = new Vector2(0f, 0.5f);
+        mdRect.anchorMax = new Vector2(0f, 0.5f);
+        mdRect.pivot = new Vector2(0.5f, 0.5f);
+        mdRect.anchoredPosition = new Vector2(495f, 0f);
+        mdRect.sizeDelta = new Vector2(2f, 40f);
+        Image mdImg = midDiv.AddComponent<Image>();
+        mdImg.color = new Color(0.30f, 0.48f, 0.78f, 0.65f);
+
+        // =====================================================================
+        // NỬA PHẢI: ID PHÒNG & NÚT THAM GIA
+        // =====================================================================
         GameObject doorIconObj = new GameObject("DoorIcon");
         doorIconObj.transform.SetParent(barObj.transform, false);
         RectTransform diRect = doorIconObj.AddComponent<RectTransform>();
         diRect.anchorMin = new Vector2(0f, 0.5f);
         diRect.anchorMax = new Vector2(0f, 0.5f);
         diRect.pivot = new Vector2(0.5f, 0.5f);
-        diRect.anchoredPosition = new Vector2(40f, 0f);
-        diRect.sizeDelta = new Vector2(34f, 34f);
+        diRect.anchoredPosition = new Vector2(528f, 0f);
+        diRect.sizeDelta = new Vector2(30f, 30f);
         Image diImg = doorIconObj.AddComponent<Image>();
         diImg.sprite = sprDoorIcon;
         diImg.color = new Color(0.75f, 0.88f, 1.0f, 0.95f);
@@ -1368,27 +1589,27 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         lRect.anchorMin = new Vector2(0f, 0.5f);
         lRect.anchorMax = new Vector2(0f, 0.5f);
         lRect.pivot = new Vector2(0f, 0.5f);
-        lRect.anchoredPosition = new Vector2(72f, 0f);
-        lRect.sizeDelta = new Vector2(140f, 50f);
+        lRect.anchoredPosition = new Vector2(552f, 0f);
+        lRect.sizeDelta = new Vector2(120f, 50f);
 
         Text lTxt = labelObj.AddComponent<Text>();
         lTxt.font = font;
-        lTxt.fontSize = 20;
+        lTxt.fontSize = 18;
         lTxt.fontStyle = FontStyle.Bold;
         lTxt.alignment = TextAnchor.MiddleLeft;
         lTxt.color = new Color(0.95f, 0.97f, 1.0f);
         lTxt.text = GameLocalizationManager.T("LOBBY_ROOM_ID_LABEL", "ID Phòng:");
         roomIdLabelText = lTxt;
 
-        // 2. Ô Nhập ID Phòng (InputField) kèm Nút Copy/Paste ❐
+        // Ô Nhập ID Phòng (InputField) kèm Nút Copy/Paste ❐
         GameObject inputObj = new GameObject("RoomInputField");
         inputObj.transform.SetParent(barObj.transform, false);
         RectTransform inRect = inputObj.AddComponent<RectTransform>();
         inRect.anchorMin = new Vector2(0f, 0.5f);
         inRect.anchorMax = new Vector2(0f, 0.5f);
         inRect.pivot = new Vector2(0f, 0.5f);
-        inRect.anchoredPosition = new Vector2(220f, 0f);
-        inRect.sizeDelta = new Vector2(580f, 48f);
+        inRect.anchoredPosition = new Vector2(675f, 0f);
+        inRect.sizeDelta = new Vector2(290f, 48f);
 
         Image inBg = inputObj.AddComponent<Image>();
         inBg.color = new Color(0.02f, 0.04f, 0.08f, 0.96f);
@@ -1401,8 +1622,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform itRect = inTextObj.AddComponent<RectTransform>();
         itRect.anchorMin = Vector2.zero;
         itRect.anchorMax = Vector2.one;
-        itRect.offsetMin = new Vector2(18f, 0f);
-        itRect.offsetMax = new Vector2(-54f, 0f);
+        itRect.offsetMin = new Vector2(14f, 0f);
+        itRect.offsetMax = new Vector2(-46f, 0f);
 
         Text inText = inTextObj.AddComponent<Text>();
         inText.font = font;
@@ -1417,12 +1638,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         RectTransform phRect = phObj.AddComponent<RectTransform>();
         phRect.anchorMin = Vector2.zero;
         phRect.anchorMax = Vector2.one;
-        phRect.offsetMin = new Vector2(18f, 0f);
-        phRect.offsetMax = new Vector2(-54f, 0f);
+        phRect.offsetMin = new Vector2(14f, 0f);
+        phRect.offsetMax = new Vector2(-46f, 0f);
 
         Text phText = phObj.AddComponent<Text>();
         phText.font = font;
-        phText.fontSize = 17;
+        phText.fontSize = 16;
         phText.fontStyle = FontStyle.Italic;
         phText.alignment = TextAnchor.MiddleLeft;
         phText.color = new Color(0.40f, 0.50f, 0.70f, 0.75f);
@@ -1442,8 +1663,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         cprt.anchorMin = new Vector2(1f, 0.5f);
         cprt.anchorMax = new Vector2(1f, 0.5f);
         cprt.pivot = new Vector2(1f, 0.5f);
-        cprt.anchoredPosition = new Vector2(-8f, 0f);
-        cprt.sizeDelta = new Vector2(36f, 36f);
+        cprt.anchoredPosition = new Vector2(-6f, 0f);
+        cprt.sizeDelta = new Vector2(34f, 34f);
 
         Button cpBtn = copyBtnObj.AddComponent<Button>();
         GameObject cpTxtObj = new GameObject("Text");
@@ -1455,7 +1676,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         cptrt.offsetMax = Vector2.zero;
         Text cpTxt = cpTxtObj.AddComponent<Text>();
         cpTxt.font = font;
-        cpTxt.fontSize = 20;
+        cpTxt.fontSize = 19;
         cpTxt.alignment = TextAnchor.MiddleCenter;
         cpTxt.color = new Color(0.65f, 0.78f, 1.0f);
         cpTxt.text = "❐";
@@ -1476,19 +1697,19 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             }
         });
 
-        // 3. Nút Orange Gradient Glowing: [ ➔ Tham gia ]
+        // Nút Orange Gradient Glowing: [ ➔ Tham gia ]
         Button joinBtn = CreateStyledActionButton(
             barObj.transform,
             "JoinRoomButton",
             new Vector2(1f, 0.5f),
             new Vector2(1f, 0.5f),
             new Vector2(-16f, 0f),
-            new Vector2(250f, 50f),
+            new Vector2(220f, 50f),
             new Color(0.95f, 0.52f, 0.05f, 0.98f),
             new Color(1.00f, 0.82f, 0.28f, 1.00f),
             GameLocalizationManager.T("BTN_JOIN_ROOM", "➔  Tham gia"),
             font,
-            20,
+            19,
             OnJoinRoomClicked
         );
         joinRoomBtnText = joinBtn != null ? joinBtn.GetComponentInChildren<Text>() : null;
@@ -1560,7 +1781,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         cRect.anchoredPosition = new Vector2(0f, -55f);
         cRect.sizeDelta = new Vector2(1740f, 460f);
 
-        float[] cardX = new float[] { -625f, -375f, -125f, 125f, 375f, 625f };
+        float[] cardX = new float[] { -405f, -135f, 135f, 405f };
 
         Color[] cardThemeColors = new Color[]
         {
@@ -1612,7 +1833,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             OnCard6_StartAutoClient
         };
 
-        for (int i = 0; i < 6; i++)
+        // Chỉ hiển thị 4 thẻ chính (ẩn bỏ "Làm khách" và "Tự động" cho sảnh chờ gọn gàng)
+        for (int i = 0; i < 4; i++)
         {
             bool isRoyalHostCard = (i == 3);
             Vector2 cardSize = isRoyalHostCard ? new Vector2(246f, 415f) : new Vector2(236f, 395f);
@@ -2170,17 +2392,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         );
         waitingLeaveBtnText = leaveBtn != null ? leaveBtn.GetComponentInChildren<Text>() : null;
 
-        // Nút lớn trung tâm: Bấm để xác nhận sẵn sàng (Toggle Ready)
+        // Nút lớn trung tâm: Bấm để xác nhận sẵn sàng / Vào Game
         Button readyBtn = CreateStyledActionButton(
             mainBox.transform,
             "ReadyConfirmBtn",
             new Vector2(0.5f, 0f),
             new Vector2(0.5f, 0f),
             new Vector2(0f, 26f),
-            new Vector2(380f, 60f),
-            new Color(0.18f, 0.45f, 0.85f, 0.95f),
-            new Color(0.35f, 0.70f, 1.00f, 1f),
-            "✔ BẤM ĐỂ XÁC NHẬN SẴN SÀNG",
+            new Vector2(360f, 60f),
+            new Color(0.16f, 0.62f, 0.36f, 0.95f),
+            new Color(0.35f, 0.98f, 0.62f, 1f),
+            "✔ SẴN SÀNG",
             font,
             20,
             OnToggleReadyClicked
@@ -2189,22 +2411,22 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         waitingReadyBtnOutline = readyBtn.GetComponent<Outline>();
         waitingReadyBtnText = readyBtn.GetComponentInChildren<Text>();
 
-        // Nút Bắt Đầu Ngay (Cho phép Chủ phòng vào trận bất cứ lúc nào, hỗ trợ cả 1, 2, 3 và 4 người)
-        Button forceBtn = CreateStyledActionButton(
+        // Nút Thêm Máy (Bot) bên phải: thêm Bot vào phòng (ngẫu nhiên Ma / Người khi vào trận)
+        Button addBotBtn = CreateStyledActionButton(
             mainBox.transform,
-            "ForceStartTestBtn",
+            "AddBotBtn",
             new Vector2(1f, 0f),
             new Vector2(1f, 0f),
             new Vector2(-50f, 26f),
-            new Vector2(460f, 60f),
-            new Color(0.16f, 0.62f, 0.36f, 0.95f),
-            new Color(0.35f, 0.98f, 0.62f, 1f),
-            "⚡ Chủ Phòng: Bắt Đầu Vào Trận Ngay ➔",
+            new Vector2(360f, 60f),
+            new Color(0.18f, 0.45f, 0.85f, 0.95f),
+            new Color(0.35f, 0.70f, 1.00f, 1f),
+            "🤖 Thêm Máy",
             font,
             19,
-            OnHostForceStartClicked
+            OnAddBotClicked
         );
-        waitingForceStartBtnObj = forceBtn.gameObject;
+        waitingForceStartBtnObj = addBotBtn.gameObject;
         waitingForceStartBtnObj.SetActive(true);
     }
 
@@ -2463,17 +2685,17 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         matchmakingSpinnerCancelBtn = cancelBtn;
         matchmakingSpinnerCancelBtnText = cancelBtn != null ? cancelBtn.GetComponentInChildren<Text>() : null;
 
-        // 2. Nút VÀO CHƠI SOLO NGAY (Bên phải - Không cần chờ ai!)
+        // 2. Nút GHÉP MÁY ĐỦ 4 NGƯỜI NGAY (Bên phải - Không cần chờ 12s!)
         Button instantSoloBtn = CreateStyledActionButton(
             matchmakingSpinnerOverlayObj.transform,
             "InstantSoloFromSpinnerBtn",
             new Vector2(0.5f, 0f),
             new Vector2(0.5f, 0f),
             new Vector2(140f, 20f),
-            new Vector2(270f, 46f),
+            new Vector2(280f, 46f),
             new Color(0.16f, 0.62f, 0.36f, 0.95f),
             new Color(0.35f, 0.98f, 0.62f, 1f),
-            "⚡ Vào Chơi Solo Ngay ➔",
+            GameLocalizationManager.T("MATCH_BTN_FILL_BOTS", "⚡ Ghép Máy Đủ 4/4 Ngay ➔"),
             font,
             16,
             OnInstantSoloFromMatchmakingClicked
@@ -2598,7 +2820,67 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             PhotonMultiplayerChatVoice.Instance.SetLocalPlayerNickname(newNick.Trim());
         }
+        SyncAllNicknameInputsFromPhoton();
         UpdateWaitingRoomUI();
+    }
+
+    private void OnMainLobbyNicknameSubmitted(string newNick)
+    {
+        if (string.IsNullOrWhiteSpace(newNick))
+        {
+            SyncAllNicknameInputsFromPhoton();
+            return;
+        }
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.SetLocalPlayerNickname(newNick.Trim());
+        }
+        else
+        {
+            PlayerPrefs.SetString(PhotonMultiplayerChatVoice.PREF_PLAYER_NICKNAME, newNick.Trim());
+            PlayerPrefs.SetInt(PhotonMultiplayerChatVoice.PREF_HAS_CUSTOM_NICKNAME, 1);
+            PlayerPrefs.Save();
+        }
+        SyncAllNicknameInputsFromPhoton();
+    }
+
+    public void SyncAllNicknameInputsFromPhoton()
+    {
+        string curName = PhotonMultiplayerChatVoice.Instance != null && !string.IsNullOrWhiteSpace(PhotonMultiplayerChatVoice.Instance.playerName)
+            ? PhotonMultiplayerChatVoice.Instance.playerName
+            : PlayerPrefs.GetString(PhotonMultiplayerChatVoice.PREF_PLAYER_NICKNAME, "");
+
+        if (mainLobbyPlayerNameInput != null && !mainLobbyPlayerNameInput.isFocused && mainLobbyPlayerNameInput.text != curName)
+        {
+            mainLobbyPlayerNameInput.text = curName;
+        }
+        if (waitingPlayerNameInput != null && !waitingPlayerNameInput.isFocused && !string.IsNullOrWhiteSpace(curName) && waitingPlayerNameInput.text != curName)
+        {
+            waitingPlayerNameInput.text = curName;
+        }
+        if (topRightPlayerNameText != null && !string.IsNullOrWhiteSpace(curName))
+        {
+            SetTextIfChanged(topRightPlayerNameText, $"👤 <color=#00E5FF>{curName}</color> ✎");
+        }
+    }
+
+    /// <summary>
+    /// Đồng bộ tên Player đang nhập ở thanh Sảnh Chính trước khi vào phòng / vào trận (không bật popup che màn hình).
+    /// </summary>
+    private void CommitMainLobbyNicknameIfAny()
+    {
+        if (mainLobbyPlayerNameInput != null && !string.IsNullOrWhiteSpace(mainLobbyPlayerNameInput.text))
+        {
+            string barTyped = mainLobbyPlayerNameInput.text.Trim();
+            if (barTyped.Length >= 2)
+            {
+                if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.playerName != barTyped)
+                {
+                    PhotonMultiplayerChatVoice.Instance.SetLocalPlayerNickname(barTyped, true);
+                }
+            }
+        }
+        SyncAllNicknameInputsFromPhoton();
     }
 
     private string GetOrGenerateRoomId(bool forceNewIfEmpty = true)
@@ -2615,6 +2897,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     // Các nút bấm ở Sảnh Chính
     public void OnCreateRoomClicked()
     {
+        CommitMainLobbyNicknameIfAny();
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         // Khi nhấn Tạo phòng: Nếu chưa nhập ID thì tự sinh ID 5 chữ số mới và đưa ngay vào Phòng Chờ!
         string rid = roomIdInputField != null ? roomIdInputField.text.Trim() : "";
@@ -2628,6 +2911,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnJoinRoomClicked()
     {
+        CommitMainLobbyNicknameIfAny();
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         string rid = GetOrGenerateRoomId(false);
         Debug.Log($"<color=#A29BFE>[Lobby] THAM GIA PHÒNG - ID Phòng: {(string.IsNullOrEmpty(rid) ? "Tự động tìm phòng đang mở" : rid)}</color>");
@@ -2636,6 +2920,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnSoloTabClicked()
     {
+        CommitMainLobbyNicknameIfAny();
         Debug.Log("<color=#2EE87A>[Lobby] Người chơi bấm Tab 'Chơi Đơn' -> Tự động khởi động màn chơi Solo với Ma AI Pumpkin!</color>");
         CancelDirectMatchmaking();
         if (PhotonMultiplayerChatVoice.Instance != null)
@@ -2646,16 +2931,19 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnInstantSoloFromMatchmakingClicked()
     {
-        Debug.Log("<color=#2EE87A>[Lobby] Người chơi bấm 'Vào Chơi Solo Ngay' từ bảng tìm trận!</color>");
+        Debug.Log("<color=#2EE87A>[Lobby] Người chơi bấm Ghép Máy Đủ 4/4 Ngay từ bảng tìm trận!</color>");
         CancelDirectMatchmaking();
         if (PhotonMultiplayerChatVoice.Instance != null)
         {
+            int cur = Mathf.Max(1, PhotonMultiplayerChatVoice.Instance.CurrentRoomPlayersCount);
+            PhotonMultiplayerChatVoice.SelectedBotCount = Mathf.Max(0, 4 - cur);
             PhotonMultiplayerChatVoice.Instance.StartSoloDropInLocally();
         }
     }
 
     public void OnCard1_StartSinglePlayer()
     {
+        CommitMainLobbyNicknameIfAny();
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         Debug.Log("<color=#3498DB>[Lobby] Chế độ Đấu Đơn / Ghép Trận: Bắt đầu tìm trận xoay xoay trực tiếp (không cần vào phòng chờ!)</color>");
         StartDirectMatchmaking();
@@ -2663,6 +2951,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnCard2_StartSharedClient()
     {
+        CommitMainLobbyNicknameIfAny();
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         string rid = GetOrGenerateRoomId(true);
         Debug.Log($"<color=#1ABC9C>[Lobby] Chế độ Đấu Tổ Đội - Phòng Chờ ID: {rid}</color>");
@@ -2671,6 +2960,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnCard3_StartServer()
     {
+        CommitMainLobbyNicknameIfAny();
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         string rid = GetOrGenerateRoomId(true);
         Debug.Log($"<color=#9B59B6>[Lobby] Bắt đầu máy chủ - Phòng Chờ ID: {rid}</color>");
@@ -2690,6 +2980,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnCard6_StartAutoClient()
     {
+        CommitMainLobbyNicknameIfAny();
         PhotonMultiplayerChatVoice.AllowSinglePlayerEarlyStart = false;
         Debug.Log("<color=#E056FD>[Lobby] Tự động tìm trận trực tiếp</color>");
         StartDirectMatchmaking();
@@ -2720,6 +3011,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
     public void OnLeaveWaitingRoomClicked()
     {
+        PhotonMultiplayerChatVoice.SelectedBotCount = 0;
         Debug.Log("<color=yellow>[Lobby] Rời phòng chờ, quay lại sảnh chọn chế độ.</color>");
         currentRoomId = "";
         if (roomIdInputField != null)
@@ -2742,6 +3034,12 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         var photonMgr = PhotonMultiplayerChatVoice.Instance;
         if (photonMgr == null) return;
 
+        // Khi đang đếm ngược vào trận (5s cuối) thì khóa nút để tránh bấm nhầm làm hủy trạng thái Sẵn Sàng
+        if (photonMgr.RemainingCountdown >= 0f)
+        {
+            return;
+        }
+
         int currentCount = photonMgr.CurrentRoomPlayersCount;
 
         // 1. Nếu đang trong trạng thái tìm trận -> Bấm nút là HỦY TÌM TRẬN
@@ -2760,10 +3058,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             return;
         }
 
-        // 3. Nếu là người đi đơn 1 mình (Solo) -> Bắt đầu chơi Solo với Ma AI ngay lập tức!
+        // 3. Nếu là người đi đơn 1 mình -> Tự động bù đủ 3 Máy (4/4) rồi vào trận ngay!
         if (currentCount <= 1)
         {
-            Debug.Log("<color=#2EE87A>[Lobby] Người chơi đơn bấm Sẵn Sàng -> Vào trận Solo với Ma AI ngay lập tức!</color>");
+            if (PhotonMultiplayerChatVoice.SelectedBotCount < 3)
+            {
+                PhotonMultiplayerChatVoice.SelectedBotCount = 3;
+            }
+            Debug.Log($"<color=#2EE87A>[Lobby] Người chơi bấm Sẵn Sàng -> Ghép đủ {PhotonMultiplayerChatVoice.SelectedBotCount} Máy (4/4) và vào trận!</color>");
             photonMgr.StartSoloDropInLocally();
             return;
         }
@@ -2777,7 +3079,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         else
         {
             // Chủ phòng tổ đội:
-            // Nếu tất cả thành viên khác đã sẵn sàng -> Vào trận ngay! (Hỗ trợ 2 hoặc 3 người mượt mà)
+            // Nếu tất cả thành viên khác đã sẵn sàng -> Vào trận ngay! (Hỗ trợ 2 hoặc 3 người + Bot mượt mà)
             if (photonMgr.AreAllOtherPlayersReady())
             {
                 Debug.Log($"<color=#2EE87A>[Lobby] Chủ phòng bấm Sẵn Sàng khi cả tổ đội ({currentCount} người) đã sẵn sàng -> Bắt đầu trận đấu ngay!</color>");
@@ -2785,9 +3087,34 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             }
             else
             {
+                temporaryWaitingWarning = "⚠️ CHƯA THỂ BẮT ĐẦU: Đang chờ đồng đội trong phòng bấm nút [✔ SẴN SÀNG]!";
+                temporaryWaitingWarningUntil = Time.unscaledTime + 3.0f;
                 photonMgr.AddSystemMessage("⚠️ Hãy nhắc đồng đội trong tổ đội bấm [Sẵn Sàng] trước khi Bắt Đầu!");
             }
         }
+        UpdateWaitingRoomUI();
+    }
+
+    public void OnAddBotClicked()
+    {
+        var photonMgr = PhotonMultiplayerChatVoice.Instance;
+        int realPlayers = photonMgr != null ? Mathf.Max(1, photonMgr.CurrentRoomPlayersCount) : 1;
+        int maxBots = Mathf.Max(0, 4 - realPlayers);
+
+        if (maxBots <= 0)
+        {
+            PhotonMultiplayerChatVoice.SelectedBotCount = 0;
+        }
+        else if (PhotonMultiplayerChatVoice.SelectedBotCount < maxBots)
+        {
+            // Thêm đủ số Máy còn thiếu để đạt 4/4 người ngay lập tức
+            PhotonMultiplayerChatVoice.SelectedBotCount = maxBots;
+        }
+        else
+        {
+            PhotonMultiplayerChatVoice.SelectedBotCount = 0;
+        }
+
         UpdateWaitingRoomUI();
     }
 
@@ -2823,6 +3150,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
     // =========================================================================
     // 9. CẬP NHẬT TRẠNG THÁI MỖI FRAME (ĐẢM BẢO GAME KHÔNG CHẠY TRƯỚC KHI ĐỦ 4 NGƯỜI)
     // =========================================================================
+    private static void SetTextIfChanged(Text t, string val)
+    {
+        if (t != null && t.text != val) t.text = val;
+    }
+
     private void UpdateLobbyAndWaitingState()
     {
         var photonMgr = PhotonMultiplayerChatVoice.Instance;
@@ -2834,20 +3166,27 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         {
             if (isPhotonConnected)
             {
-                bottomConnectionStatusText.text = $"<color=#00FF9D>●</color> {GameLocalizationManager.T("LOBBY_STATUS_GOOD", "Trạng thái kết nối: Đã kết nối Toàn Cầu")}";
+                SetTextIfChanged(bottomConnectionStatusText, $"<color=#00FF9D>●</color> {GameLocalizationManager.T("LOBBY_STATUS_GOOD", "Trạng thái kết nối: Đã kết nối Toàn Cầu")}");
             }
             else
             {
                 string st = (photonMgr != null && !string.IsNullOrEmpty(photonMgr.LastLobbyStatus))
                     ? photonMgr.LastLobbyStatus
                     : GameLocalizationManager.T("LOBBY_CONN_CONNECTING", "Đang kết nối...");
-                bottomConnectionStatusText.text = $"<color=#FFB300>●</color> {st}";
+                SetTextIfChanged(bottomConnectionStatusText, $"<color=#FFB300>●</color> {st}");
             }
         }
 
         if (topRightPlayerNameText != null && photonMgr != null && !string.IsNullOrEmpty(photonMgr.playerName))
         {
-            topRightPlayerNameText.text = $"👤 <color=#00E5FF>{photonMgr.playerName}</color>";
+            SetTextIfChanged(topRightPlayerNameText, $"👤 <color=#00E5FF>{photonMgr.playerName}</color> ✎");
+        }
+        if (mainLobbyPlayerNameInput != null && !mainLobbyPlayerNameInput.isFocused && photonMgr != null && !string.IsNullOrEmpty(photonMgr.playerName))
+        {
+            if (mainLobbyPlayerNameInput.text != photonMgr.playerName)
+            {
+                mainLobbyPlayerNameInput.text = photonMgr.playerName;
+            }
         }
 
         // 2. Nếu trận đấu ĐÃ BẮT ĐẦU (sau khi đủ 4 người vào phòng hoặc bấm Test):
@@ -2873,8 +3212,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             inGameRoomBannerObj.SetActive(false);
         }
 
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
+        if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
+        if (!Cursor.visible) Cursor.visible = true;
         ThirdPersonCamera.isUIPanelOpen = true;
 
         if (isDirectMatchmakingActive)
@@ -2933,14 +3272,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
         }
         else
         {
-            // TỰ ĐỘNG BẢO VỆ: Nếu tìm trận quá 12 giây mà chưa đủ 4 người, tự động chuyển vào màn Solo với Ma AI Pumpkin (hoàn toàn không lo bị treo)
+            // TỰ ĐỘNG BẢO VỆ: Nếu tìm trận quá 12 giây mà chưa đủ 4 người, tự động ghép thêm Bot cho đủ 4/4 người chơi
             if (searchDur >= 12f && count < 4)
             {
-                Debug.Log("<color=#F39C12>[Lobby] Đã tìm trận 12s không có thêm người chơi, tự động khởi động Solo với Ma AI Pumpkin!</color>");
+                int botsNeeded = Mathf.Max(0, 4 - Mathf.Max(1, count));
+                PhotonMultiplayerChatVoice.SelectedBotCount = botsNeeded;
+                Debug.Log($"<color=#F39C12>[Lobby] Đã tìm trận 12s không có thêm người chơi, tự động ghép {botsNeeded} Bot đủ 4/4 người!</color>");
                 CancelDirectMatchmaking();
                 if (photonMgr != null)
                 {
-                    photonMgr.AddSystemMessage("⚡ Tự động bắt đầu chế độ Solo với Ma AI Pumpkin...");
+                    photonMgr.AddSystemMessage($"⚡ Đã ghép thêm {botsNeeded} Máy (Bot) đủ 4/4 người — Đang vào trận!");
                     photonMgr.StartSoloDropInLocally();
                 }
                 return;
@@ -2953,7 +3294,14 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             }
             if (matchmakingSpinnerCountText != null)
             {
-                matchmakingSpinnerCountText.text = $"👥 Đã tìm thấy: <color=#2EE87A>{count} / 4</color> người chơi (Bấm nút xanh để vào Solo ngay)";
+                matchmakingSpinnerCountText.text = string.Format(
+                    GameLocalizationManager.T("MATCH_COUNT_SEARCHING", "👥 Đã tìm thấy: <color=#2EE87A>{0} / 4</color> người chơi (Tự ghép Máy đủ 4/4 sau 12s)"),
+                    count
+                );
+            }
+            if (matchmakingSpinnerInstantSoloBtnText != null)
+            {
+                matchmakingSpinnerInstantSoloBtnText.text = GameLocalizationManager.T("MATCH_BTN_FILL_BOTS", "⚡ Ghép Máy Đủ 4/4 Ngay ➔");
             }
             if (matchmakingSpinnerCancelBtn != null && !matchmakingSpinnerCancelBtn.gameObject.activeSelf)
             {
@@ -2993,18 +3341,22 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             }
         }
 
-        List<PhotonMultiplayerChatVoice.RoomPlayerEntry> players = photonMgr != null
-            ? photonMgr.GetRoomPlayersList()
-            : new List<PhotonMultiplayerChatVoice.RoomPlayerEntry>
+        if (photonMgr != null)
+        {
+            photonMgr.FillRoomPlayersList(cachedWaitingPlayers);
+        }
+        else
+        {
+            cachedWaitingPlayers.Clear();
+            cachedWaitingPlayers.Add(new PhotonMultiplayerChatVoice.RoomPlayerEntry
             {
-                new PhotonMultiplayerChatVoice.RoomPlayerEntry
-                {
-                    actorNumber = 1,
-                    nickName = "NgườiChơi_Tôi",
-                    isLocal = true,
-                    isMaster = true
-                }
-            };
+                actorNumber = 1,
+                nickName = "NgườiChơi_Tôi",
+                isLocal = true,
+                isMaster = true
+            });
+        }
+        List<PhotonMultiplayerChatVoice.RoomPlayerEntry> players = cachedWaitingPlayers;
 
         int required = photonMgr != null ? Mathf.Max(1, photonMgr.requiredPlayersToStart) : 4;
         int currentCount = Mathf.Max(1, players.Count);
@@ -3088,6 +3440,28 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                         : new Color(0.75f, 0.88f, 1.0f, 0.95f);
                 }
             }
+            else if (i < players.Count + PhotonMultiplayerChatVoice.SelectedBotCount)
+            {
+                // Ô đã thêm Máy (Bot): hiển thị như một người chơi sẵn sàng, random Ma hoặc Người
+                int botNumber = (i - players.Count) + 1;
+                slot.bgImage.color = new Color(0.08f, 0.14f, 0.28f, 0.94f);
+                slot.cardOutline.effectColor = new Color(0.35f, 0.72f, 1.0f, 0.90f);
+                slot.avatarBg.color = new Color(0.14f, 0.25f, 0.45f, 0.95f);
+                slot.avatarIcon.sprite = sprCardIcons[1];
+                slot.avatarIcon.color = new Color(0.55f, 0.90f, 1.0f, 1f);
+
+                slot.slotBadgeText.text = string.Format(
+                    GameLocalizationManager.T("WAITING_SLOT_BOT_BADGE", "VỊ TRÍ #{0} (MÁY / BOT)"),
+                    i + 1
+                );
+                slot.slotBadgeText.color = new Color(0.55f, 0.88f, 1.0f, 1f);
+
+                slot.playerNameText.text = $"🤖 {PhotonMultiplayerChatVoice.GetBotDisplayName(botNumber - 1)} [Bot]";
+                slot.playerNameText.color = Color.white;
+
+                slot.playerRoleStatusText.text = GameLocalizationManager.T("WAITING_SLOT_BOT_READY", "✔ Sẵn sàng  ●  Random Ma / Người");
+                slot.playerRoleStatusText.color = new Color(0.25f, 0.98f, 0.62f, 1f);
+            }
             else
             {
                 // Vị trí còn trống đang chờ người vào
@@ -3127,6 +3501,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 waitingStatusBannerText.text = $"🔥 ĐÃ GHÉP ĐỦ {required}/{required} NGƯỜI CHƠI! TRẬN ĐẤU BẮT ĐẦU TRONG: {sec} GIÂY! 🔥";
                 waitingStatusBannerText.color = new Color(0.25f, 1.0f, 0.58f, 1f);
             }
+            else if (Time.unscaledTime < temporaryWaitingWarningUntil && !string.IsNullOrEmpty(temporaryWaitingWarning))
+            {
+                waitingStatusBannerText.text = temporaryWaitingWarning;
+                waitingStatusBannerText.color = new Color(1.0f, 0.48f, 0.32f, 1f);
+            }
             else if (isSearching)
             {
                 if (currentCount <= 1)
@@ -3144,7 +3523,10 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             {
                 if (currentCount <= 1)
                 {
-                    waitingStatusBannerText.text = "🎮 PHÒNG CHƠI ĐƠN: Bấm [🎮 VÀO CHƠI SOLO VỚI MA AI NGAY ➔] để khám phá mê cung ngay lập tức!";
+                    int botCount = PhotonMultiplayerChatVoice.SelectedBotCount;
+                    waitingStatusBannerText.text = botCount > 0
+                        ? string.Format(GameLocalizationManager.T("WAITING_BANNER_BOTS_READY"), botCount, 1 + botCount)
+                        : GameLocalizationManager.T("WAITING_BANNER_EMPTY_ROOM");
                     waitingStatusBannerText.color = new Color(0.25f, 0.95f, 0.65f, 1f);
                 }
                 else
@@ -3173,14 +3555,16 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         if (waitingForceStartBtnObj != null)
         {
-            bool canForce = photonMgr == null || photonMgr.IsLocalMaster;
-            waitingForceStartBtnObj.SetActive(canForce);
-            Text fsText = waitingForceStartBtnObj.GetComponentInChildren<Text>();
-            if (fsText != null)
+            bool canAddBot = (photonMgr == null || photonMgr.IsLocalMaster) && currentCount < 4;
+            waitingForceStartBtnObj.SetActive(canAddBot);
+            Text addBotTxt = waitingForceStartBtnObj.GetComponentInChildren<Text>();
+            if (addBotTxt != null)
             {
-                fsText.text = currentCount <= 1
-                    ? "⚡ Bắt Đầu Solo Với Ma AI ➔"
-                    : $"⚡ Chủ Phòng: Vào Trận Ngay ({currentCount} Người) ➔";
+                int maxBots = Mathf.Max(0, 4 - Mathf.Max(1, currentCount));
+                int curBots = Mathf.Clamp(PhotonMultiplayerChatVoice.SelectedBotCount, 0, maxBots);
+                addBotTxt.text = curBots < maxBots
+                    ? string.Format(GameLocalizationManager.T("WAITING_BTN_ADD_BOT", "🤖 Thêm Máy ({0}/{1})"), curBots, maxBots)
+                    : string.Format(GameLocalizationManager.T("WAITING_BTN_BOT_FULL", "🤖 Đủ Máy ({0}/{1}) - Xóa"), curBots, maxBots);
             }
         }
 
@@ -3233,8 +3617,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
                 // Chưa đủ 4 người
                 if (currentCount <= 1)
                 {
-                    // Người chơi đơn 1 mình: Cho vào chơi ngay lập tức với Ma Bí Ngô AI
-                    waitingReadyBtnText.text = "🎮 VÀO CHƠI SOLO VỚI MA AI NGAY ➔";
+                    waitingReadyBtnText.text = GameLocalizationManager.T("WAITING_BTN_READY_ENTER", "✔ SẴN SÀNG VÀO GAME ➔");
                     if (waitingReadyBtnBg != null) waitingReadyBtnBg.color = new Color(0.16f, 0.62f, 0.36f, 0.95f);
                     if (waitingReadyBtnOutline != null) waitingReadyBtnOutline.effectColor = new Color(0.35f, 0.98f, 0.62f, 1f);
                 }
@@ -3304,7 +3687,8 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             else
             {
                 bool lobbyInputFocused = (roomIdInputField != null && roomIdInputField.isFocused)
-                    || (waitingPlayerNameInput != null && waitingPlayerNameInput.isFocused);
+                    || (waitingPlayerNameInput != null && waitingPlayerNameInput.isFocused)
+                    || (mainLobbyPlayerNameInput != null && mainLobbyPlayerNameInput.isFocused);
                 if (!lobbyInputFocused)
                 {
                     if (net == null)
@@ -3369,7 +3753,7 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
 
         if (lobbySettingsBtnText != null)
         {
-            lobbySettingsBtnText.text = GameLocalizationManager.T("BTN_LOBBY_SETTINGS", "⚙️ CÀI ĐẶT");
+            lobbySettingsBtnText.text = "⚙️";
         }
 
         if (headerSubtitleText != null)
@@ -3402,10 +3786,11 @@ public class FusionVietnameseLobbyUI : MonoBehaviour
             joinRoomBtnText.text = GameLocalizationManager.T("BTN_JOIN_ROOM", "➔  Tham gia");
         }
 
-        if (topRightPlayerNameText != null)
+        if (mainLobbyPlayerNameLabelText != null)
         {
-            topRightPlayerNameText.text = GameLocalizationManager.T("LOBBY_ME_PROFILE", "👤 Tôi");
+            mainLobbyPlayerNameLabelText.text = GameLocalizationManager.T("WAITING_MY_NAME_LABEL", "👤 Tên Player:");
         }
+        SyncAllNicknameInputsFromPhoton();
 
         if (waitingHeaderTitleText != null)
         {

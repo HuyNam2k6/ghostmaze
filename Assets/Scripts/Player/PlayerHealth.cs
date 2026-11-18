@@ -284,14 +284,15 @@ public class PlayerHealth : MonoBehaviour
                 PhotonMultiplayerChatVoice.Instance.NotifyLocalHumanDied();
             }
 
-            // Nếu đang trong phòng Multiplayer: chuyển sang Camera Quan Sát Đồng Đội cùng phe (không cướp Ma Bí Ngô)
-            if (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom)
+            // Nếu đang trong phòng Multiplayer hoặc có Bot đồng đội: chuyển sang Camera Quan Sát Đồng Đội cùng phe
+            if ((PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom)
+                || HumanBotTarget.ActiveBots.Count > 0)
             {
                 EnterAlliedSpectateMode();
             }
             else
             {
-                // Chế độ Offline đơn thuần: giữ fallback chuyển sang Ma Bí Ngô
+                // Chế độ Offline đơn thuần không có Bot: giữ fallback chuyển sang Ma Bí Ngô
                 TransferControlToPumpkinGhost();
             }
 
@@ -304,7 +305,7 @@ public class PlayerHealth : MonoBehaviour
     }
 
     /// <summary>
-    /// Äáº·t láº¡i mÃ¡u vÃ  tráº¡ng thÃ¡i ngÆ°á»i chÆ¡i khi báº¯t Ä‘áº§u hiá»‡p/tráº­n Ä‘áº¥u má»›i
+    /// Đặt lại máu và trạng thái người chơi khi bắt đầu hiệp/trận đấu mới
     /// </summary>
     public void ResetHealth()
     {
@@ -349,7 +350,7 @@ public class PlayerHealth : MonoBehaviour
             characterController.enabled = true;
         }
 
-        // Chuyá»ƒn láº¡i Camera vá» ngÆ°á»i chÆ¡i náº¿u Ä‘ang bÃ¡m theo Ma
+        // Chuyển lại Camera về người chơi nếu đang bám theo Ma
         if (ThirdPersonCamera.Instance != null)
         {
             ThirdPersonCamera.Instance.SetTarget(transform, new Vector3(0f, 1.45f, 0f));
@@ -384,14 +385,12 @@ public class PlayerHealth : MonoBehaviour
     public void OnSpectateRosterChanged()
     {
         if (!isDead) return;
-        if (PhotonMultiplayerChatVoice.Instance == null || !PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom) return;
         RefreshSpectateTargetListAndUI();
     }
 
     public void EnsureValidSpectateTarget()
     {
         if (!isDead) return;
-        if (PhotonMultiplayerChatVoice.Instance == null || !PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom) return;
         RefreshSpectateTargetListAndUI();
     }
 
@@ -404,12 +403,31 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    private void AppendAliveHumanBotsToSpectateList()
+    {
+        for (int i = 0; i < HumanBotTarget.ActiveBots.Count; i++)
+        {
+            HumanBotTarget bot = HumanBotTarget.ActiveBots[i];
+            if (bot == null || bot.isDead || !bot.gameObject.activeInHierarchy) continue;
+            spectateTargets.Add(new PhotonMultiplayerChatVoice.AlliedSpectateTarget
+            {
+                actorNumber = -100 - i,
+                nickName = bot.botDisplayName,
+                targetTransform = bot.transform
+            });
+        }
+    }
+
     public void SwitchSpectateTarget(int step)
     {
         if (!isDead || !IsSpectatingAllies) return;
-        if (PhotonMultiplayerChatVoice.Instance == null) return;
 
-        PhotonMultiplayerChatVoice.Instance.GetAlliedAliveSpectateTargets(spectateTargets);
+        spectateTargets.Clear();
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.GetAlliedAliveSpectateTargets(spectateTargets);
+        }
+        AppendAliveHumanBotsToSpectateList();
         if (spectateTargets.Count == 0)
         {
             UpdateSpectateHUDDisplay();
@@ -426,8 +444,12 @@ public class PlayerHealth : MonoBehaviour
 
     private void RefreshSpectateTargetListAndUI()
     {
-        if (PhotonMultiplayerChatVoice.Instance == null) return;
-        PhotonMultiplayerChatVoice.Instance.GetAlliedAliveSpectateTargets(spectateTargets);
+        spectateTargets.Clear();
+        if (PhotonMultiplayerChatVoice.Instance != null)
+        {
+            PhotonMultiplayerChatVoice.Instance.GetAlliedAliveSpectateTargets(spectateTargets);
+        }
+        AppendAliveHumanBotsToSpectateList();
 
         if (spectateTargets.Count == 0)
         {
@@ -437,7 +459,7 @@ public class PlayerHealth : MonoBehaviour
             return;
         }
 
-        int existingIdx = spectatedActorNumber > 0
+        int existingIdx = spectatedActorNumber != -1
             ? spectateTargets.FindIndex(t => t.actorNumber == spectatedActorNumber)
             : -1;
 
@@ -532,8 +554,8 @@ public class PlayerHealth : MonoBehaviour
         outline.effectColor = new Color(0.20f, 0.85f, 1.0f, 0.88f);
         outline.effectDistance = new Vector2(2f, -2f);
 
-        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (font == null) font = Font.CreateDynamicFontFromOSFont("Arial", 16);
+        Font font = UIFontHelper.GetCrispFont(18);
+        if (font == null) font = Font.CreateDynamicFontFromOSFont("Arial", 18);
 
         spectatePrevBtn = CreateSpectateNavButton(
             spectateHudObj.transform, "Btn_SpectatePrev", "◀ TRƯỚC",

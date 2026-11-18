@@ -55,6 +55,9 @@ namespace GhostMaze.UI
         [Tooltip("Bán kính tối đa hiển thị quái ma quanh người chơi (mét)")]
         [Range(15f, 120f)] public float radarRange = 60f;
 
+        [Tooltip("Tốc độ làm tươi Camera Mini Map khi thu nhỏ (FPS) giúp tăng mạnh FPS tổng thể của game")]
+        [Range(10, 60)] public int miniMapTargetFPS = 30;
+
         [Header("4. Phím Tắt Tiện Ích")]
         [Tooltip("Phím mở rộng toàn màn hình / thu nhỏ Mini Map")]
         public KeyCode toggleFullscreenKey = KeyCode.M;
@@ -81,7 +84,10 @@ namespace GhostMaze.UI
         // Object Pool cho Radar Quái Ma (Zero GC allocation)
         private const int MAX_RADAR_BLIPS = 16;
         private readonly List<RectTransform> ghostBlipPool = new List<RectTransform>(MAX_RADAR_BLIPS);
+        private readonly List<Vector3> tempRemoteRadarPositions = new List<Vector3>(16);
         private Transform blipContainer;
+        private float miniMapRenderTimer = 0f;
+        private bool cachedIsLobbyScene = false;
         private Button settingsGearBtn;
         public Button SettingsGearButton => settingsGearBtn;
         private static Sprite gearIconSprite;
@@ -148,11 +154,12 @@ namespace GhostMaze.UI
 
         private void UpdateSceneVisibilityAndLinks()
         {
-            bool isLobby = SceneManager.GetActiveScene().name == "LobbyScene";
-            if (miniMapRoot != null) miniMapRoot.SetActive(!isLobby && isMapVisible);
-            if (miniMapCamera != null) miniMapCamera.enabled = !isLobby && isMapVisible;
+            cachedIsLobbyScene = SceneManager.GetActiveScene().name == "LobbyScene";
+            if (miniMapRoot != null) miniMapRoot.SetActive(!cachedIsLobbyScene && isMapVisible);
+            if (miniMapCamera != null) miniMapCamera.enabled = !cachedIsLobbyScene && isMapVisible;
+            miniMapRenderTimer = 0f;
 
-            if (!isLobby)
+            if (!cachedIsLobbyScene)
             {
                 var gsm = GameSettingsManager.Instance != null ? GameSettingsManager.Instance : FindAnyObjectByType<GameSettingsManager>();
                 if (gsm != null && gsm.gearCornerButton != null)
@@ -246,7 +253,7 @@ namespace GhostMaze.UI
 
         private void LateUpdate()
         {
-            if (miniMapCamera == null || mapContainerRect == null) return;
+            if (miniMapCamera == null || mapContainerRect == null || cachedIsLobbyScene || !isMapVisible) return;
 
             if (targetPlayer == null)
             {
@@ -254,8 +261,32 @@ namespace GhostMaze.UI
                 if (targetPlayer == null) return;
             }
 
+            // Duty-cycle camera Mini Map khi thu nhỏ để tiết kiệm chi phí Render Pass thứ 2 của URP (khi phóng to Full Map thì render full FPS)
+            if (isFullscreen || miniMapTargetFPS >= 60)
+            {
+                if (!miniMapCamera.enabled) miniMapCamera.enabled = true;
+            }
+            else
+            {
+                miniMapRenderTimer += Time.unscaledDeltaTime;
+                float interval = 1f / Mathf.Max(10, miniMapTargetFPS);
+                if (miniMapRenderTimer >= interval)
+                {
+                    miniMapRenderTimer = 0f;
+                    miniMapCamera.enabled = true;
+                }
+                else
+                {
+                    miniMapCamera.enabled = false;
+                }
+            }
+
             Transform activeMiniMapFocus = targetPlayer;
-            if (PlayerHealth.Instance != null && PlayerHealth.Instance.isDead
+            if (PumpkinGhostAI.PlayerControlledGhost != null && PumpkinGhostAI.PlayerControlledGhost.gameObject.activeInHierarchy)
+            {
+                activeMiniMapFocus = PumpkinGhostAI.PlayerControlledGhost.transform;
+            }
+            else if (PlayerHealth.Instance != null && PlayerHealth.Instance.isDead
                 && ThirdPersonCamera.Instance != null
                 && ThirdPersonCamera.Instance.IsSpectatingTarget
                 && ThirdPersonCamera.Instance.target != null)
@@ -427,50 +458,36 @@ namespace GhostMaze.UI
 
             float mapRadiusPixels = (mapContainerRect.sizeDelta.x * 0.5f) - 18f;
             float worldRadius = currentZoom;
+            bool localIsGhost = PumpkinGhostAI.PlayerControlledGhost != null
+                || (PhotonMultiplayerChatVoice.Instance != null && PhotonMultiplayerChatVoice.Instance.IsLocalPlayerGhostRole());
 
             for (int i = 0; i < count; i++)
             {
                 var ghost = ghosts[i];
                 if (ghost == null || !ghost.gameObject.activeInHierarchy) continue;
+                if (ghost == PumpkinGhostAI.PlayerControlledGhost) continue;
+                if (ghost.IsDisguisedOrHidden) continue;
 
-                Vector3 ghostPos = ghost.transform.position;
-                Vector3 diff = ghostPos - playerPos;
-                float dist = Mathf.Sqrt(diff.x * diff.x + diff.z * diff.z);
+                TryPlaceRadarBlip(ghost.transform.position, playerPos, playerYaw, worldRadius, mapRadiusPixels, ref blipIndex);
+            }
 
-                if (dist > radarRange && dist > worldRadius * 1.25f) continue;
-
-                Vector2 offset;
-                if (rotateMapWithPlayer)
+            if (localIsGhost && HumanBotTarget.ActiveBots.Count > 0)
+            {
+                for (int i = 0; i < HumanBotTarget.ActiveBots.Count; i++)
                 {
-                    float rad = -playerYaw * Mathf.Deg2Rad;
-                    float cos = Mathf.Cos(rad);
-                    float sin = Mathf.Sin(rad);
-                    float rx = diff.x * cos - diff.z * sin;
-                    float rz = diff.x * sin + diff.z * cos;
-                    offset = new Vector2(rx, rz);
+                    var bot = HumanBotTarget.ActiveBots[i];
+                    if (bot == null || bot.isDead || !bot.gameObject.activeInHierarchy) continue;
+
+                    TryPlaceRadarBlip(bot.transform.position, playerPos, playerYaw, worldRadius, mapRadiusPixels, ref blipIndex);
                 }
-                else
-                {
-                    offset = new Vector2(diff.x, diff.z);
-                }
+            }
 
-                float uiX = (offset.x / worldRadius) * mapRadiusPixels;
-                float uiY = (offset.y / worldRadius) * mapRadiusPixels;
-
-                Vector2 uiPos = new Vector2(uiX, uiY);
-                if (uiPos.sqrMagnitude > mapRadiusPixels * mapRadiusPixels)
+            if (PhotonMultiplayerChatVoice.Instance != null)
+            {
+                PhotonMultiplayerChatVoice.Instance.FillRemoteRadarPositions(!localIsGhost, tempRemoteRadarPositions);
+                for (int i = 0; i < tempRemoteRadarPositions.Count; i++)
                 {
-                    uiPos = uiPos.normalized * mapRadiusPixels;
-                }
-
-                if (blipIndex < ghostBlipPool.Count)
-                {
-                    RectTransform blip = ghostBlipPool[blipIndex++];
-                    if (blip != null && blip.gameObject != null)
-                    {
-                        blip.anchoredPosition = uiPos;
-                        if (!blip.gameObject.activeSelf) blip.gameObject.SetActive(true);
-                    }
+                    TryPlaceRadarBlip(tempRemoteRadarPositions[i], playerPos, playerYaw, worldRadius, mapRadiusPixels, ref blipIndex);
                 }
             }
 
@@ -480,6 +497,41 @@ namespace GhostMaze.UI
                 {
                     ghostBlipPool[i].gameObject.SetActive(false);
                 }
+            }
+        }
+
+        private void TryPlaceRadarBlip(Vector3 worldPos, Vector3 playerPos, float playerYaw, float worldRadius, float mapRadiusPixels, ref int blipIndex)
+        {
+            if (blipIndex >= ghostBlipPool.Count) return;
+
+            Vector3 diff = worldPos - playerPos;
+            float dist = Mathf.Sqrt(diff.x * diff.x + diff.z * diff.z);
+            if (dist > radarRange && dist > worldRadius * 1.25f) return;
+
+            Vector2 offset;
+            if (rotateMapWithPlayer)
+            {
+                float rad = -playerYaw * Mathf.Deg2Rad;
+                float cos = Mathf.Cos(rad);
+                float sin = Mathf.Sin(rad);
+                offset = new Vector2(diff.x * cos - diff.z * sin, diff.x * sin + diff.z * cos);
+            }
+            else
+            {
+                offset = new Vector2(diff.x, diff.z);
+            }
+
+            Vector2 uiPos = new Vector2((offset.x / worldRadius) * mapRadiusPixels, (offset.y / worldRadius) * mapRadiusPixels);
+            if (uiPos.sqrMagnitude > mapRadiusPixels * mapRadiusPixels)
+            {
+                uiPos = uiPos.normalized * mapRadiusPixels;
+            }
+
+            RectTransform blip = ghostBlipPool[blipIndex++];
+            if (blip != null && blip.gameObject != null)
+            {
+                blip.anchoredPosition = uiPos;
+                if (!blip.gameObject.activeSelf) blip.gameObject.SetActive(true);
             }
         }
 

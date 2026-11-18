@@ -197,15 +197,29 @@ public class ThirdPersonCamera : MonoBehaviour
     private float targetZoomScale = 1f;
     private float currentZoomScale = 1f;
     public bool IsSpectatingTarget { get; private set; }
+    private bool isLobbyScene = false;
     private static readonly RaycastHit[] s_CameraHitBuffer = new RaycastHit[8];
 
     private void Awake()
     {
         Instance = this;
         _manualUIPanelOpen = false;
+        isLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += HandleCameraSceneLoaded;
         baseDefaultDistance = Mathf.Max(0.5f, distance);
         targetZoomScale = 1f;
         currentZoomScale = 1f;
+    }
+
+    private void OnDestroy()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= HandleCameraSceneLoaded;
+        if (Instance == this) Instance = null;
+    }
+
+    private void HandleCameraSceneLoaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        isLobbyScene = (scene.name == "LobbyScene");
     }
 
     /// <summary>
@@ -290,7 +304,8 @@ public class ThirdPersonCamera : MonoBehaviour
         }
 
         // Tự động ẩn và khóa con trỏ chuột vào giữa màn hình
-                if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
+        isLobbyScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene";
+        if (isLobbyScene)
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -335,6 +350,15 @@ public class ThirdPersonCamera : MonoBehaviour
     private void HandleViewToggle()
     {
         if (isUIPanelOpen || IsSpectatingTarget) return; // Đang gõ chat / mở cài đặt / xem đồng đội thì không đổi góc nhìn
+
+        // Khi đang điều khiển Ma Bí Ngô, phím R dùng cho kỹ năng Biến Hình Vật Thể (tránh xung đột mất hiển thị prop ở góc nhìn thứ nhất)
+        if (toggleViewKey == KeyCode.R
+            && PumpkinGhostAI.PlayerControlledGhost != null
+            && PumpkinGhostAI.PlayerControlledGhost.gameObject.activeInHierarchy
+            && PumpkinGhostAI.PlayerControlledGhost.isPlayerControlled)
+        {
+            return;
+        }
 
         if (ReadToggleViewPressed())
         {
@@ -400,7 +424,7 @@ public class ThirdPersonCamera : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene") return;
+        if (isLobbyScene) return;
         if (target == null)
         {
             if (PlayerHealth.Instance != null && PlayerHealth.Instance.isDead)
@@ -432,7 +456,7 @@ public class ThirdPersonCamera : MonoBehaviour
         // Trên thiết bị di động (Android / iOS): Không dùng cơ chế khóa chuột của PC
         if (Application.isMobilePlatform) return;
 
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "LobbyScene")
+        if (isLobbyScene)
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;

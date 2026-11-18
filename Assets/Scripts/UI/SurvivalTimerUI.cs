@@ -108,6 +108,9 @@ public class SurvivalTimerUI : MonoBehaviour
     // Hiệu ứng vòng tròn rào chắn giữa map
     private GameObject startCircleVFXRoot;
     private LineRenderer circleLineRenderer;
+    private Material runtimeCircleLineMat;
+    private Material runtimeCircleBarrierMat;
+    private static readonly RaycastHit[] s_CenterRayHits = new RaycastHit[8];
 
     private readonly Color normalColor     = new Color(0.95f, 0.98f, 1.00f, 1f);
     private readonly Color warningColor    = new Color(1.00f, 0.78f, 0.22f, 1f);
@@ -182,16 +185,30 @@ public class SurvivalTimerUI : MonoBehaviour
         if (timerDigitsText != null) timerDigitsText.gameObject.SetActive(false);
         if (timerLabelText != null) timerLabelText.gameObject.SetActive(false);
         if (timerProgressFill != null) timerProgressFill.gameObject.SetActive(false);
-        if (GameSettingsManager.Instance != null)
+        if (SceneManager.GetActiveScene().name == "LobbyScene")
         {
-            GameSettingsManager.Instance.CloseDashboard();
-            GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+            HumanBotTarget.ClearAllBots();
+            if (GameSettingsManager.Instance != null)
+            {
+                GameSettingsManager.Instance.CloseDashboard();
+                GameSettingsManager.Instance.SetInMatchHUDVisible(false);
+            }
         }
     }
 
     private void OnDestroy()
     {
         CleanUpAllInGameUI();
+        if (runtimeCircleLineMat != null)
+        {
+            Destroy(runtimeCircleLineMat);
+            runtimeCircleLineMat = null;
+        }
+        if (runtimeCircleBarrierMat != null)
+        {
+            Destroy(runtimeCircleBarrierMat);
+            runtimeCircleBarrierMat = null;
+        }
         SceneManager.sceneLoaded -= OnSceneLoadedForSurvivalTimer;
         GameLocalizationManager.OnLanguageChanged -= HandleLanguageChanged;
         if (Instance == this) Instance = null;
@@ -303,6 +320,10 @@ public class SurvivalTimerUI : MonoBehaviour
     private void Start()
     {
         AutoBindReferencesIfNeeded();
+        if (Mathf.Approximately(startCircleRadius, 5f))
+        {
+            startCircleRadius = 15.5f;
+        }
         CacheAndHideSceneGhostVessel();
         EnsureQuickTestF1Button();
         autoStart = false;
@@ -494,14 +515,31 @@ public class SurvivalTimerUI : MonoBehaviour
 
                 if (IsSoloBotMatch)
                 {
-                    localRole = PlayerRole.Human;
-                    KeepLocalPlayerAsHuman();
-                    if (cachedGhostVessel != null)
+                    int botCount = PhotonMultiplayerChatVoice.SelectedBotCount;
+                    if (localRole == PlayerRole.Ghost)
                     {
-                        Vector3 botSpawn = ResolveMapCenter() + new Vector3(0f, 0f, -20f);
-                        cachedGhostVessel.ActivateAsSoloAIBot(botSpawn);
+                        if (HumanBotTarget.ActiveBots.Count == 0 && botCount > 0)
+                        {
+                            Transform templateRoot = ResolvePlayerModelTemplateTransform();
+                            HumanBotTarget.SpawnBots(botCount, templateRoot, ResolveMapCenter());
+                        }
+                        TransformLocalPlayerToGhost(0);
                     }
-                    ShowFloatingBanner(GameLocalizationManager.T("HUD_HUNTING_STARTED"), new Color(1f, 0.55f, 0.15f), 5.0f);
+                    else
+                    {
+                        KeepLocalPlayerAsHuman();
+                        if (HumanBotTarget.ActiveBots.Count == 0 && botCount > 1)
+                        {
+                            Transform templateRoot = ResolvePlayerModelTemplateTransform();
+                            HumanBotTarget.SpawnBots(botCount - 1, templateRoot, ResolveMapCenter());
+                        }
+                        if (cachedGhostVessel != null)
+                        {
+                            Vector3 botSpawn = ResolveMapCenter() + new Vector3(0f, 0f, -20f);
+                            cachedGhostVessel.ActivateAsSoloAIBot(botSpawn);
+                        }
+                        ShowFloatingBanner(GameLocalizationManager.T("HUD_HUNTING_STARTED"), new Color(1f, 0.55f, 0.15f), 5.0f);
+                    }
                 }
                 else
                 {
@@ -635,6 +673,17 @@ public class SurvivalTimerUI : MonoBehaviour
             Destroy(endResultBannerObj);
         }
 
+        if (GameSettingsManager.Instance != null)
+        {
+            GameSettingsManager.Instance.SetInMatchHUDVisible(true);
+        }
+        if (timerDigitsText != null) timerDigitsText.gameObject.SetActive(true);
+        if (timerLabelText != null) timerLabelText.gameObject.SetActive(true);
+        if (timerProgressFill != null) timerProgressFill.gameObject.SetActive(true);
+
+        // Xóa sạch Bot cũ trước khi khởi tạo ván mới
+        HumanBotTarget.ClearAllBots();
+
         // Ẩn thân xác Ma chờ đến khi hết pha trốn mới hóa Ma hoặc kích hoạt AI Chơi Đơn
         CacheAndHideSceneGhostVessel();
         PumpkinGhostAI.IsGhostHunting = false;
@@ -648,13 +697,28 @@ public class SurvivalTimerUI : MonoBehaviour
 
         if (IsSoloBotMatch)
         {
-            localRole = PlayerRole.Human;
+            int botCount = PhotonMultiplayerChatVoice.SelectedBotCount;
+            if (PhotonMultiplayerChatVoice.soloTestAsGhost)
+            {
+                localRole = PlayerRole.Ghost;
+            }
+            else if (botCount > 0)
+            {
+                int totalParticipants = 1 + botCount;
+                bool pickedAsGhost = UnityEngine.Random.Range(0, totalParticipants) == 0;
+                localRole = pickedAsGhost ? PlayerRole.Ghost : PlayerRole.Human;
+            }
+            else
+            {
+                localRole = PlayerRole.Human;
+            }
         }
 
-        // Đảm bảo nhân vật người hiển thị lúc đầu trận
+        // Đảm bảo nhân vật người hiển thị lúc đầu trận và reset Dấu Ấn / rải lại vật phẩm Pentacle
         if (ThirdPersonPlayerController.Instance != null)
         {
             ThirdPersonPlayerController.Instance.gameObject.SetActive(true);
+            ThirdPersonPlayerController.Instance.ResetForNewMatch();
             if (ThirdPersonCamera.Instance != null)
             {
                 ThirdPersonCamera.Instance.SetTarget(ThirdPersonPlayerController.Instance.transform, new Vector3(0f, 1.45f, 0f));
@@ -669,12 +733,34 @@ public class SurvivalTimerUI : MonoBehaviour
             ph.ResetHealth();
         }
 
-        // Dịch chuyển người chơi về đảo quảng trường trung tâm (Central Plaza)
+        // Dịch chuyển người chơi về vành đai an toàn trên đảo quảng trường trung tâm (tránh hoàn toàn đài tế lễ & cột đá giữa tâm 0,0)
         Vector3 center = ResolveMapCenter();
         if (ThirdPersonPlayerController.Instance != null)
         {
-            Vector3 randomOffset = new Vector3(Random.Range(-3.5f, 3.5f), 0f, Random.Range(-3.5f, 3.5f));
-            SafeTeleport(ThirdPersonPlayerController.Instance.gameObject, center + randomOffset, Quaternion.identity);
+            Vector3 safeSpawnPos = FindSafePlazaRingSpawnPoint(center);
+            SafeTeleport(ThirdPersonPlayerController.Instance.gameObject, safeSpawnPos, Quaternion.Euler(0f, 180f, 0f));
+        }
+
+        // Nếu đang ở chế độ Chơi Đơn hoặc Tổ Đội có thêm Máy (Bot), tạo luôn các Bot Con Người ngay từ đầu trận để cùng xuất phát và chạy trốn!
+        if (!IsOfflineQuickTestMatch && PhotonMultiplayerChatVoice.SelectedBotCount > 0)
+        {
+            int botCount = PhotonMultiplayerChatVoice.SelectedBotCount;
+            int humanBotsToSpawn = 0;
+            if (IsSoloBotMatch)
+            {
+                humanBotsToSpawn = (localRole == PlayerRole.Ghost) ? botCount : Mathf.Max(0, botCount - 1);
+            }
+            else if (PhotonMultiplayerChatVoice.Instance == null || PhotonMultiplayerChatVoice.Instance.IsLocalMaster)
+            {
+                int realPlayers = PhotonMultiplayerChatVoice.Instance != null ? Mathf.Max(1, PhotonMultiplayerChatVoice.Instance.CurrentRoomPlayersCount) : 1;
+                humanBotsToSpawn = Mathf.Clamp(botCount, 0, Mathf.Max(0, 4 - realPlayers));
+            }
+
+            if (humanBotsToSpawn > 0)
+            {
+                Transform templateRoot = ResolvePlayerModelTemplateTransform();
+                HumanBotTarget.SpawnBots(humanBotsToSpawn, templateRoot, center);
+            }
         }
 
         EnsureQuickTestF1Button();
@@ -733,14 +819,13 @@ public class SurvivalTimerUI : MonoBehaviour
             ? PhotonMultiplayerChatVoice.Instance.playerName
             : "Bạn";
 
-        if (IsSoloBotMatch)
+        if (IsSoloBotMatch && localRole == PlayerRole.Human)
         {
-            string rId = PhotonMultiplayerChatVoice.Instance != null ? PhotonMultiplayerChatVoice.Instance.roomName : "";
-            ShowFloatingBanner($"<color=#00FF9D>🎮 [CHƠI ĐƠN] Người chơi [{pName}] đã vào Map (ID Phòng: {rId})!</color>\n<color=#7BED9F>(Đấu với AI Ma Bí Ngô sau 10s — chờ 3 bạn khác nhập ID & SS để vào trận 4 người)</color>", new Color(0f, 1f, 0.62f), 5.5f);
+            ShowFloatingBanner($"<color=#00FF9D>🎮 Người chơi [{pName}] đã vào trận!</color>\n<color=#7BED9F>(BẠN LÀ NGƯỜI SỐNG SÓT — Đấu với Ma Bí Ngô sau 10s!)</color>", new Color(0f, 1f, 0.62f), 5.5f);
         }
         else if (localRole == PlayerRole.Ghost)
         {
-            ShowFloatingBanner($"<color=#00FF9D>🎮 Người chơi [{pName}] đã vào trận!</color>\n<color=#FFA502>(BẠN ĐƯỢC RANDOM LÀM MA BÍ NGÔ - Hóa Ma đi săn sau 30s)</color>", new Color(0f, 1f, 0.62f), 5.0f);
+            ShowFloatingBanner($"<color=#00FF9D>🎮 Người chơi [{pName}] đã vào trận!</color>\n<color=#FFA502>(BẠN ĐƯỢC RANDOM LÀM MA BÍ NGÔ - Hóa Ma đi săn khi hết đếm ngược!)</color>", new Color(0f, 1f, 0.62f), 5.0f);
         }
         else
         {
@@ -885,10 +970,10 @@ public class SurvivalTimerUI : MonoBehaviour
 
         if (shader != null)
         {
-            Material lineMat = new Material(shader);
-            lineMat.color = circleLineColor;
-            if (lineMat.HasProperty("_BaseColor")) lineMat.SetColor("_BaseColor", circleLineColor);
-            circleLineRenderer.sharedMaterial = lineMat;
+            runtimeCircleLineMat = new Material(shader);
+            runtimeCircleLineMat.color = circleLineColor;
+            if (runtimeCircleLineMat.HasProperty("_BaseColor")) runtimeCircleLineMat.SetColor("_BaseColor", circleLineColor);
+            circleLineRenderer.sharedMaterial = runtimeCircleLineMat;
         }
 
         int segments = 64;
@@ -909,16 +994,20 @@ public class SurvivalTimerUI : MonoBehaviour
         cyl.transform.localScale = new Vector3(startCircleRadius * 2f, 3.5f, startCircleRadius * 2f);
 
         Collider cylCol = cyl.GetComponent<Collider>();
-        if (cylCol != null) DestroyImmediate(cylCol);
+        if (cylCol != null)
+        {
+            cylCol.enabled = false;
+            Destroy(cylCol);
+        }
 
         var mr = cyl.GetComponent<MeshRenderer>();
         if (mr != null && shader != null)
         {
-            Material cylMat = new Material(shader);
+            runtimeCircleBarrierMat = new Material(shader);
             Color barrierCol = new Color(0.12f, 0.75f, 1.0f, 0.18f);
-            cylMat.color = barrierCol;
-            if (cylMat.HasProperty("_BaseColor")) cylMat.SetColor("_BaseColor", barrierCol);
-            mr.sharedMaterial = cylMat;
+            runtimeCircleBarrierMat.color = barrierCol;
+            if (runtimeCircleBarrierMat.HasProperty("_BaseColor")) runtimeCircleBarrierMat.SetColor("_BaseColor", barrierCol);
+            mr.sharedMaterial = runtimeCircleBarrierMat;
         }
 
         // 3. Đèn sáng tâm ma thuật (Point Light)
@@ -1102,6 +1191,18 @@ public class SurvivalTimerUI : MonoBehaviour
             }
         }
 
+        for (int i = 0; i < HumanBotTarget.ActiveBots.Count; i++)
+        {
+            HumanBotTarget bot = HumanBotTarget.ActiveBots[i];
+            if (bot != null && !bot.isDead && bot.gameObject.activeInHierarchy)
+            {
+                float xOffset = (idx - (totalAlive - 1) * 0.5f) * 2.2f;
+                Vector3 targetPos = center + new Vector3(xOffset, 0f, 2.5f);
+                SafeTeleport(bot.gameObject, targetPos, Quaternion.Euler(0f, 180f, 0f));
+                idx++;
+            }
+        }
+
         // 2. Vô hiệu hóa / phong ấn toàn bộ Ma Bí Ngô
         PumpkinGhostAI[] allGhosts = Object.FindObjectsByType<PumpkinGhostAI>();
         for (int i = 0; i < allGhosts.Length; i++)
@@ -1189,19 +1290,28 @@ public class SurvivalTimerUI : MonoBehaviour
     }
 
     /// <summary>
-    /// Đếm số người chơi con người đang còn sống
+    /// Đếm số người chơi con người đang còn sống (bao gồm cả đồng đội Máy / Bot còn sống)
     /// </summary>
     public int GetAliveHumanPlayerCount()
     {
+        int botAlive = 0;
+        for (int i = 0; i < HumanBotTarget.ActiveBots.Count; i++)
+        {
+            if (HumanBotTarget.ActiveBots[i] != null && !HumanBotTarget.ActiveBots[i].isDead)
+            {
+                botAlive++;
+            }
+        }
+
         if (PhotonMultiplayerChatVoice.Instance != null
             && PhotonMultiplayerChatVoice.Instance.IsInPhotonRoom
             && PhotonMultiplayerChatVoice.GhostActorNumbers.Count > 0)
         {
-            return PhotonMultiplayerChatVoice.Instance.GetAliveRoomHumanCount();
+            return PhotonMultiplayerChatVoice.Instance.GetAliveRoomHumanCount() + botAlive;
         }
 
         PlayerHealth[] allHealth = Object.FindObjectsByType<PlayerHealth>();
-        int alive = 0;
+        int alive = botAlive;
         for (int i = 0; i < allHealth.Length; i++)
         {
             if (allHealth[i] != null && !allHealth[i].isDead && allHealth[i].gameObject.activeInHierarchy)
@@ -1212,16 +1322,74 @@ public class SurvivalTimerUI : MonoBehaviour
         return alive;
     }
 
+    private static Transform ResolvePlayerModelTemplateTransform()
+    {
+        if (ThirdPersonPlayerController.Instance != null)
+        {
+            return ThirdPersonPlayerController.Instance.transform;
+        }
+        ThirdPersonPlayerController found = Object.FindAnyObjectByType<ThirdPersonPlayerController>(FindObjectsInactive.Include);
+        return found != null ? found.transform : null;
+    }
+
+    private static Vector3 FindSafePlazaRingSpawnPoint(Vector3 center)
+    {
+        for (int attempt = 0; attempt < 16; attempt++)
+        {
+            float angle = Random.Range(0f, Mathf.PI * 2f);
+            float radius = Random.Range(3.4f, 6.2f); // Nằm ngoài đài tế lễ (R=2.5m) và trong hàng rào quảng trường (R=15.3m)
+            Vector3 candidate = center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+            if (!Physics.CheckSphere(candidate + Vector3.up * 0.95f, 0.45f, ~0, QueryTriggerInteraction.Ignore))
+            {
+                return candidate;
+            }
+        }
+        return center + new Vector3(2.5f, 0f, 5.8f);
+    }
+
     /// <summary>
-    /// Tính toán điểm giữa map (Central Plaza) đảm bảo sát mặt sàn paver (Y ~ 0.45m)
+    /// Tính toán điểm giữa map (Central Plaza) đảm bảo sát mặt sàn đá phẳng (Y ~ 0.45m),
+    /// tuyệt đối không bắn trúng đỉnh cột đá CentralObeliskCollider (cao 3.9m) ngay tại tọa độ (0, 0)!
     /// </summary>
     public Vector3 ResolveMapCenter()
     {
-        Vector3 testPos = new Vector3(0f, 15f, 0f);
-        if (Physics.Raycast(testPos, Vector3.down, out RaycastHit hit, 30f, ~0, QueryTriggerInteraction.Ignore))
+        Vector2[] sampleOffsets = new Vector2[]
         {
-            return hit.point + Vector3.up * 0.15f;
+            new Vector2(0f, 5.5f),
+            new Vector2(5.5f, 0f),
+            new Vector2(-5.5f, 0f),
+            new Vector2(0f, -5.5f)
+        };
+
+        for (int s = 0; s < sampleOffsets.Length; s++)
+        {
+            Vector3 rayOrigin = new Vector3(sampleOffsets[s].x, 10f, sampleOffsets[s].y);
+            int hitCount = Physics.RaycastNonAlloc(rayOrigin, Vector3.down, s_CenterRayHits, 20f, ~0, QueryTriggerInteraction.Ignore);
+            float bestFloorY = float.MinValue;
+            bool found = false;
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                RaycastHit h = s_CenterRayHits[i];
+                if (h.collider == null || h.normal.y < 0.85f) continue;
+                if (h.point.y > 1.8f || h.point.y < -1.5f) continue;
+                string colName = h.collider.name;
+                if (colName.Contains("Obelisk") || colName.Contains("Tombstone") || colName.Contains("Player") || colName.Contains("Ghost")) continue;
+                if (h.collider is CharacterController) continue;
+
+                if (h.point.y > bestFloorY)
+                {
+                    bestFloorY = h.point.y;
+                    found = true;
+                }
+            }
+
+            if (found)
+            {
+                return new Vector3(0f, bestFloorY + 0.12f, 0f);
+            }
         }
+
         return mapCenterPosition;
     }
 

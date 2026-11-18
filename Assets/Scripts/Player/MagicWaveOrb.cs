@@ -47,6 +47,8 @@ public class MagicWaveOrb : MonoBehaviour
     [HideInInspector] public GameObject shooter;
 
     [Header("3. Hiệu Ứng Vệt Đỏ (Red Trail FX)")]
+    [Tooltip("Tỷ lệ kích thước hiển thị của quả cầu phép")]
+    [Range(0.1f, 1.0f)] public float orbVisualScale = 0.256f;
     public Light orbLight;
     public TrailRenderer trailRenderer;
 
@@ -54,12 +56,15 @@ public class MagicWaveOrb : MonoBehaviour
     private float aliveTimer = 0f;
     private bool hasHitWall = false;
     private float wallTimer = 0f;
+    private bool visualsInitialized = false;
     private Action<MagicWaveOrb> returnToPool;
 
     private static Material s_RedTrailMaterial;
+    private static Gradient s_CachedTrailGradient;
     private static readonly RaycastHit[] s_HitBuffer = new RaycastHit[16];
     private static readonly Collider[] s_OverlapBuffer = new Collider[12];
     private int groundBounceCount = 0;
+    private bool hasBouncedOnGround = false;
 
     public void SetPoolCallback(Action<MagicWaveOrb> onReturnToPool)
     {
@@ -67,7 +72,69 @@ public class MagicWaveOrb : MonoBehaviour
     }
 
     /// <summary>
-    /// Phóng quả cầu theo đường vòng cung từ dưới lên tới mục tiêu
+    /// Tính toán vận tốc phóng ban đầu đồng bộ giữa Quả Cầu thật và Vệt Ngắm Đỏ (Trajectory Preview):
+    /// - Ném xuống mặt đất cự ly gần/trung: Phóng căng đúng tốc độ cầu bay (không bị ghìm chậm 6m/s) để đập đất nảy vọt cao liên hoàn.
+    /// - Ném xa / ngang tầm: Bay vòng cung mượt mà tới đúng tâm ngắm.
+    /// </summary>
+    public static Vector3 ComputeLaunchVelocity(
+        Vector3 spawnPos,
+        Vector3 fallbackDirection,
+        Vector3? targetPoint,
+        float orbSpeed,
+        float orbUpwardForce,
+        float orbGravity)
+    {
+        float baseSpeed = Mathf.Max(15f, orbSpeed);
+        Vector3 forwardFlat = new Vector3(fallbackDirection.x, 0f, fallbackDirection.z);
+        if (forwardFlat.sqrMagnitude < 0.0001f) forwardFlat = Vector3.forward;
+        else forwardFlat.Normalize();
+
+        if (!targetPoint.HasValue)
+        {
+            float freeVy = orbUpwardForce + Mathf.Max(-baseSpeed * 0.45f, fallbackDirection.y * baseSpeed * 0.55f);
+            return forwardFlat * baseSpeed + Vector3.up * freeVy;
+        }
+
+        Vector3 toTarget = targetPoint.Value - spawnPos;
+        Vector3 toTargetHoriz = new Vector3(toTarget.x, 0f, toTarget.z);
+        float rawDistHoriz = toTargetHoriz.magnitude;
+
+        // Tránh trường hợp tâm ngắm quá sát dưới chân (gần hơn cánh tay vươn ra) làm đảo ngược hướng bay về sau
+        Vector3 dirHoriz;
+        if (rawDistHoriz > 0.25f && Vector3.Dot(toTargetHoriz / rawDistHoriz, forwardFlat) >= 0.15f)
+        {
+            dirHoriz = toTargetHoriz / rawDistHoriz;
+        }
+        else
+        {
+            dirHoriz = forwardFlat;
+            rawDistHoriz = Mathf.Max(1.8f, rawDistHoriz);
+        }
+
+        // Trường hợp 1: Ném chúc xuống đất ở cự ly gần/trung (< 9.5m) -> Phóng nhanh căng vào điểm chạm đất để bật nảy vọt lên!
+        if (toTarget.y < -0.15f && rawDistHoriz < 9.5f)
+        {
+            float clampedHorizDist = Mathf.Max(1.4f, rawDistHoriz);
+            float fastHorizSpeed = Mathf.Clamp(baseSpeed * 0.94f, 13.5f, 24f);
+            float directTime = Mathf.Clamp(clampedHorizDist / fastHorizSpeed, 0.10f, 0.65f);
+            float directVy = (toTarget.y + 0.5f * orbGravity * directTime * directTime) / directTime;
+            directVy = Mathf.Clamp(directVy, -baseSpeed * 0.80f, orbUpwardForce);
+            return dirHoriz * fastHorizSpeed + Vector3.up * directVy;
+        }
+
+        // Trường hợp 2: Ném tầm trung & xa -> Đường vòng cung parabol bay tới mục tiêu
+        float distHoriz = Mathf.Clamp(rawDistHoriz, 4.5f, 42f);
+        float horizSpeed = Mathf.Clamp(baseSpeed, 14f, 26f);
+        float flightTime = Mathf.Clamp(distHoriz / horizSpeed, 0.32f, 1.55f);
+
+        float requiredVy = (toTarget.y + 0.5f * orbGravity * flightTime * flightTime) / flightTime;
+        float initialVy = Mathf.Max(requiredVy, orbUpwardForce * 0.80f);
+
+        return dirHoriz * (distHoriz / flightTime) + Vector3.up * initialVy;
+    }
+
+    /// <summary>
+    /// Phóng quả cầu theo đường vòng cung hoặc đập đất bật nảy căng mượt tới mục tiêu
     /// </summary>
     public void Launch(Vector3 direction, Vector3? targetPoint = null, GameObject caster = null)
     {
@@ -76,6 +143,7 @@ public class MagicWaveOrb : MonoBehaviour
         hasHitWall = false;
         wallTimer = 0f;
         groundBounceCount = 0;
+        hasBouncedOnGround = false;
         EnsureRedVisuals();
 
         if (trailRenderer != null)
@@ -84,41 +152,7 @@ public class MagicWaveOrb : MonoBehaviour
             trailRenderer.emitting = true;
         }
 
-        Vector3 spawnPos = transform.position;
-
-        if (targetPoint.HasValue)
-        {
-            Vector3 target = targetPoint.Value;
-            Vector3 toTarget = target - spawnPos;
-            Vector3 toTargetHoriz = new Vector3(toTarget.x, 0f, toTarget.z);
-            float distHoriz = toTargetHoriz.magnitude;
-
-            // Giới hạn khoảng cách ném khả dụng
-            distHoriz = Mathf.Clamp(distHoriz, 4f, 40f);
-            Vector3 dirHoriz = distHoriz > 0.01f ? toTargetHoriz.normalized : transform.forward;
-
-            // Tính toán thời gian bay để đường parabol cong vút đẹp mắt từ dưới lên
-            float horizSpeed = Mathf.Clamp(speed, 12f, 26f);
-            float flightTime = Mathf.Clamp(distHoriz / horizSpeed, 0.6f, 1.6f);
-
-            // Công thức vật lý: Vy = (DeltaY + 0.5 * g * t^2) / t
-            float deltaY = toTarget.y;
-            float requiredVy = (deltaY + 0.5f * gravity * flightTime * flightTime) / flightTime;
-            float initialVy = Mathf.Max(requiredVy, upwardForce);
-
-            currentVelocity = dirHoriz * (distHoriz / flightTime) + Vector3.up * initialVy;
-        }
-        else
-        {
-            // Ném tự do theo hướng mặt: Lực tới + xung lực ném từ dưới lên
-            Vector3 dirHoriz = direction;
-            dirHoriz.y = 0f;
-            if (dirHoriz.sqrMagnitude < 0.001f) dirHoriz = transform.forward;
-            dirHoriz.Normalize();
-
-            float initialVy = upwardForce + Mathf.Max(0f, direction.y * speed * 0.45f);
-            currentVelocity = dirHoriz * speed + Vector3.up * initialVy;
-        }
+        currentVelocity = ComputeLaunchVelocity(transform.position, direction, targetPoint, speed, upwardForce, gravity);
 
         if (currentVelocity.sqrMagnitude > 0.001f)
         {
@@ -128,8 +162,8 @@ public class MagicWaveOrb : MonoBehaviour
 
     public void EnsureRedVisuals()
     {
-        // Thu nhỏ kích thước viên đạn 20%
-        transform.localScale = Vector3.one * 0.256f;
+        transform.localScale = Vector3.one * orbVisualScale;
+        if (visualsInitialized && trailRenderer != null) return;
 
         if (trailRenderer == null)
         {
@@ -142,7 +176,7 @@ public class MagicWaveOrb : MonoBehaviour
 
         if (trailRenderer != null)
         {
-            trailRenderer.material = GetOrCreateRedTrailMaterial();
+            trailRenderer.sharedMaterial = GetOrCreateRedTrailMaterial();
             trailRenderer.time = 0.55f;
             trailRenderer.startWidth = 0.176f; // Thu nhỏ 20% (gốc 0.22f)
             trailRenderer.endWidth = 0.016f;   // Thu nhỏ 20% (gốc 0.02f)
@@ -150,23 +184,26 @@ public class MagicWaveOrb : MonoBehaviour
             trailRenderer.autodestruct = false;
             trailRenderer.alignment = LineAlignment.View;
 
-            // Làm mờ vệt đỏ bán trong suốt, dịu nhẹ và thanh thoát
-            Gradient grad = new Gradient();
-            grad.SetKeys(
-                new GradientColorKey[]
-                {
-                    new GradientColorKey(new Color(1.0f, 0.25f, 0.16f), 0.0f),  // Đầu: Đỏ cam dịu
-                    new GradientColorKey(new Color(0.90f, 0.08f, 0.06f), 0.6f), // Thân: Đỏ thẫm
-                    new GradientColorKey(new Color(0.60f, 0.04f, 0.04f), 1.0f)  // Đuôi: Đỏ đậm mờ
-                },
-                new GradientAlphaKey[]
-                {
-                    new GradientAlphaKey(0.55f, 0.0f),
-                    new GradientAlphaKey(0.28f, 0.5f),
-                    new GradientAlphaKey(0.0f, 1.0f)
-                }
-            );
-            trailRenderer.colorGradient = grad;
+            if (s_CachedTrailGradient == null)
+            {
+                // Làm mờ vệt đỏ bán trong suốt, dịu nhẹ và thanh thoát (cache tĩnh 1 lần, 0 GC)
+                s_CachedTrailGradient = new Gradient();
+                s_CachedTrailGradient.SetKeys(
+                    new GradientColorKey[]
+                    {
+                        new GradientColorKey(new Color(1.0f, 0.25f, 0.16f), 0.0f),  // Đầu: Đỏ cam dịu
+                        new GradientColorKey(new Color(0.90f, 0.08f, 0.06f), 0.6f), // Thân: Đỏ thẫm
+                        new GradientColorKey(new Color(0.60f, 0.04f, 0.04f), 1.0f)  // Đuôi: Đỏ đậm mờ
+                    },
+                    new GradientAlphaKey[]
+                    {
+                        new GradientAlphaKey(0.55f, 0.0f),
+                        new GradientAlphaKey(0.28f, 0.5f),
+                        new GradientAlphaKey(0.0f, 1.0f)
+                    }
+                );
+            }
+            trailRenderer.colorGradient = s_CachedTrailGradient;
         }
 
         if (orbLight == null)
@@ -189,6 +226,8 @@ public class MagicWaveOrb : MonoBehaviour
                 mr.sharedMaterial = GetOrCreateRedTrailMaterial();
             }
         }
+
+        visualsInitialized = true;
     }
 
     private static Material GetOrCreateRedTrailMaterial()
@@ -219,13 +258,14 @@ public class MagicWaveOrb : MonoBehaviour
 
     private void Update()
     {
-        // 1. Quản lý thời gian tồn tại của quả cầu
+        // 1. Quản lý thời gian tồn tại của quả cầu (đảm bảo tối thiểu 4.5s sau khi chạm đất để bay nảy hết chu kỳ mượt mà)
+        float effectiveStickDuration = Mathf.Max(wallStickDuration, 4.5f);
+        float effectiveMaxLifetime = Mathf.Max(maxLifetime, 5.5f);
         if (hasHitWall)
         {
             wallTimer += Time.deltaTime;
 
-            // Hết đúng 3 giây sau khi chạm/nảy vào tường lần đầu tiên -> Tự thu hồi biến mất
-            if (wallTimer >= wallStickDuration)
+            if (wallTimer >= effectiveStickDuration)
             {
                 RecycleOrb();
                 return;
@@ -234,7 +274,7 @@ public class MagicWaveOrb : MonoBehaviour
         else
         {
             aliveTimer += Time.deltaTime;
-            if (aliveTimer >= maxLifetime)
+            if (aliveTimer >= effectiveMaxLifetime)
             {
                 RecycleOrb();
                 return;
@@ -247,8 +287,9 @@ public class MagicWaveOrb : MonoBehaviour
             return;
         }
 
-        // 2. Tác dụng trọng lực liên tục: Kéo quả cầu rơi tự nhiên theo quỹ đạo
-        currentVelocity += Vector3.down * gravity * Time.deltaTime;
+        // 2. Tác dụng trọng lực liên tục (khi đã bật nảy trên mặt đất dùng trọng lực lơ lửng nhẹ 9.8 m/s^2 để cầu bay vọt thanh thoát như cầu phép)
+        float activeGravity = hasBouncedOnGround ? Mathf.Min(gravity, 9.8f) : gravity;
+        currentVelocity += Vector3.down * activeGravity * Time.deltaTime;
 
         Vector3 moveStep = currentVelocity * Time.deltaTime;
         float stepDist = moveStep.magnitude;
@@ -357,43 +398,75 @@ public class MagicWaveOrb : MonoBehaviour
     /// </summary>
     private void BounceOffSurface(RaycastHit hit, Vector3 moveDir)
     {
-        hasHitWall = true; // Bắt đầu tính thời gian 3s sau va chạm để biến mất
+        hasHitWall = true;
 
         Vector3 hitNorm = hit.normal.sqrMagnitude > 0.001f ? hit.normal.normalized : -moveDir;
         Vector3 hitPt = hit.point;
-        if (hitPt.sqrMagnitude < 0.0001f)
+
+        // Xử lý triệt để trường hợp SphereCast bắt đầu khi mặt cầu đã chạm sát sàn/bậc dốc (Unity trả về distance=0, point=(0,0,0), normal=-moveDir)
+        if (hit.distance <= 0.001f || hitPt.sqrMagnitude < 0.0001f)
         {
-            hitPt = transform.position + moveDir * hit.distance;
+            if (Physics.Raycast(transform.position + Vector3.up * 0.45f, Vector3.down, out RaycastHit groundFix, 1.1f, hitLayers, QueryTriggerInteraction.Ignore)
+                && !IsHumanPlayer(groundFix.collider))
+            {
+                hitNorm = groundFix.normal.sqrMagnitude > 0.001f ? groundFix.normal.normalized : Vector3.up;
+                hitPt = groundFix.point;
+            }
+            else
+            {
+                hitPt = hit.collider != null ? hit.collider.ClosestPoint(transform.position) : (transform.position + moveDir * hit.distance);
+                Vector3 outDir = transform.position - hitPt;
+                if (outDir.sqrMagnitude > 0.0001f) hitNorm = outDir.normalized;
+            }
         }
 
-        // Đặt vị trí viên đạn ngay tại bề mặt kèm khoảng hở an toàn để không bị kẹt lún vào collider
-        Vector3 safePos = hitPt + hitNorm * (hitRadius + 0.04f);
+        // Đặt vị trí quả cầu ngay trên bề mặt kèm khoảng hở an toàn để không bao giờ kẹt lún vào collider
+        Vector3 safePos = hitPt + hitNorm * (hitRadius + 0.05f);
         transform.position = safePos;
 
-        // Tính vector phản xạ đàn hồi (Reflect)
-        Vector3 reflected = Vector3.Reflect(currentVelocity, hitNorm) * bounciness;
-
-        // Nếu va chạm với mặt đất phẳng hoặc dốc nhẹ (hitNorm hướng lên):
-        if (hitNorm.y > 0.65f)
+        // Nếu va chạm với mặt đất hoặc bậc dốc (hitNorm hướng lên):
+        if (hitNorm.y > 0.50f)
         {
-            if (groundBounceCount < 4)
+            hasBouncedOnGround = true;
+
+            // Bảo toàn 92% tốc độ bay ngang (không bị nhân kép bounciness * 0.88 làm cầu khựng lại!)
+            Vector3 horizVel = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
+            float horizMag = horizVel.magnitude;
+            Vector3 horizDir = horizMag > 0.05f
+                ? (horizVel / horizMag)
+                : new Vector3(moveDir.x, 0f, moveDir.z).normalized;
+            if (horizDir.sqrMagnitude < 0.001f) horizDir = transform.forward;
+
+            // Nếu người chơi ném cắm thẳng xuống đất, chuyển hóa một phần động năng cắm xuống thành lực lướt bay về phía trước
+            float minForwardSpeed = Mathf.Max(4.5f, Mathf.Max(14f, speed) * 0.72f * Mathf.Pow(0.90f, groundBounceCount));
+            float newHorizSpeed = Mathf.Max(horizMag * 0.92f, minForwardSpeed);
+
+            if (groundBounceCount < 6)
             {
-                // Nhảy lật bật liên tiếp 4 nhịp trước khi lăn chậm dần
-                float minBounceY = 4.2f * Mathf.Pow(0.72f, groundBounceCount);
-                reflected.y = Mathf.Max(Mathf.Abs(reflected.y), minBounceY);
-                reflected.x *= 0.88f;
-                reflected.z *= 0.88f;
+                // Nảy vọt liên hoàn 6 nhịp cao và thanh thoát (1.83m -> 1.35m -> 0.96m -> 0.68m -> 0.47m -> 0.32m) đúng chất quả cầu phép bay!
+                float targetBounceVy = 6.0f * Mathf.Pow(0.855f, groundBounceCount);
+                float naturalReflectVy = Mathf.Abs(currentVelocity.y) * Mathf.Max(0.82f, bounciness);
+                float finalVy = Mathf.Max(naturalReflectVy, targetBounceVy);
+                currentVelocity = horizDir * newHorizSpeed + Vector3.up * finalVy;
                 groundBounceCount++;
             }
-            else if (Mathf.Abs(reflected.y) < 0.8f)
+            else
             {
-                reflected.y = 0f;
-                reflected.x *= 0.85f;
-                reflected.z *= 0.85f;
+                float tailVy = Mathf.Abs(currentVelocity.y) * 0.70f;
+                if (tailVy < 1.2f) tailVy = 1.2f;
+                currentVelocity = horizDir * (horizMag * 0.88f) + Vector3.up * tailVy;
             }
         }
-
-        currentVelocity = reflected;
+        else
+        {
+            // Va đập tường thẳng đứng / bia mộ / cột đá: phản xạ đàn hồi nảy bật dứt khoát
+            Vector3 reflected = Vector3.Reflect(currentVelocity, hitNorm);
+            float wallElasticity = Mathf.Max(0.82f, bounciness);
+            reflected.x *= wallElasticity;
+            reflected.z *= wallElasticity;
+            reflected.y = Mathf.Max(reflected.y * wallElasticity, 2.2f);
+            currentVelocity = reflected;
+        }
 
         if (currentVelocity.sqrMagnitude > 0.001f)
         {
@@ -418,10 +491,10 @@ public class MagicWaveOrb : MonoBehaviour
     /// </summary>
     private bool CheckAndHitNearbyGhosts(Vector3 checkPos, float radius)
     {
-        PumpkinGhostAI[] activeGhosts = UnityEngine.Object.FindObjectsByType<PumpkinGhostAI>(FindObjectsInactive.Exclude);
-        if (activeGhosts != null && activeGhosts.Length > 0)
+        var activeGhosts = PumpkinGhostAI.ActiveGhosts;
+        if (activeGhosts != null && activeGhosts.Count > 0)
         {
-            for (int i = 0; i < activeGhosts.Length; i++)
+            for (int i = 0; i < activeGhosts.Count; i++)
             {
                 PumpkinGhostAI ghost = activeGhosts[i];
                 if (ghost == null || !ghost.gameObject.activeInHierarchy) continue;
@@ -464,11 +537,23 @@ public class MagicWaveOrb : MonoBehaviour
             return false;
         }
 
+        // Bot phe Người luôn cho phép cầu phép bay xuyên qua (không cản đạn đồng đội)
+        if (col.GetComponentInParent<HumanBotTarget>() != null || col.GetComponent<HumanBotTarget>() != null)
+        {
+            return true;
+        }
+
         Transform root = col.transform.root;
         string rootName = root.name;
         string colName = col.name;
 
-        // Nếu root hoặc collider chứa từ khóa Ghost hoặc Pumpkin -> Là Ma Bí Ngô, không phải Human!
+        // Xử lý chính xác RemotePlayer_{actorNr}_{nickName}_{Ghost|Human} (tránh lỗi khi tên người chơi chứa chữ "Ghost")
+        if (rootName.StartsWith("RemotePlayer_", StringComparison.OrdinalIgnoreCase))
+        {
+            return !rootName.EndsWith("_Ghost", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Nếu root hoặc collider của đối tượng thường chứa từ khóa Ghost hoặc Pumpkin -> Là Ma Bí Ngô, không phải Human!
         if (rootName.IndexOf("Ghost", StringComparison.OrdinalIgnoreCase) >= 0 ||
             rootName.IndexOf("Pumpkin", StringComparison.OrdinalIgnoreCase) >= 0 ||
             colName.IndexOf("Ghost", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -521,17 +606,11 @@ public class MagicWaveOrb : MonoBehaviour
             return true;
         }
 
-        // 6. Kiểm tra Remote Player trong Multiplayer (nếu không phải Ghost thì chắc chắn là Human Player)
-        if (rootName.StartsWith("RemotePlayer", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
         return false;
     }
 
     /// <summary>
-    /// Nhận diện collider của Người Bí Ngô từ xa (Remote Ghost Avatar)
+    /// Nhận diện collider của Người Bí Ngô từ xa (Remote Ghost Avatar) không cấp phát mảng Split
     /// </summary>
     private bool IsRemoteGhostCollider(Collider col, out int ghostActorNr)
     {
@@ -539,12 +618,25 @@ public class MagicWaveOrb : MonoBehaviour
         if (col == null) return false;
 
         string rootName = col.transform.root.name;
-        if (rootName.Contains("RemotePlayer") && rootName.Contains("Ghost"))
+        if (rootName.StartsWith("RemotePlayer_", StringComparison.OrdinalIgnoreCase) &&
+            rootName.EndsWith("_Ghost", StringComparison.OrdinalIgnoreCase))
         {
-            string[] parts = rootName.Split('_');
-            if (parts.Length >= 2 && int.TryParse(parts[1], out int nr))
+            int firstUnderscore = rootName.IndexOf('_');
+            if (firstUnderscore >= 0 && firstUnderscore + 1 < rootName.Length)
             {
-                ghostActorNr = nr;
+                int secondUnderscore = rootName.IndexOf('_', firstUnderscore + 1);
+                if (secondUnderscore > firstUnderscore + 1)
+                {
+                    int nr = 0;
+                    bool validDigits = true;
+                    for (int i = firstUnderscore + 1; i < secondUnderscore; i++)
+                    {
+                        char ch = rootName[i];
+                        if (ch < '0' || ch > '9') { validDigits = false; break; }
+                        nr = nr * 10 + (ch - '0');
+                    }
+                    if (validDigits) ghostActorNr = nr;
+                }
             }
             return true;
         }
@@ -554,10 +646,10 @@ public class MagicWaveOrb : MonoBehaviour
 
     private bool TriggerGroundImpactAOE(Vector3 impactPoint)
     {
-        PumpkinGhostAI[] activeGhosts = UnityEngine.Object.FindObjectsByType<PumpkinGhostAI>(FindObjectsInactive.Exclude);
-        if (activeGhosts != null && activeGhosts.Length > 0)
+        var activeGhosts = PumpkinGhostAI.ActiveGhosts;
+        if (activeGhosts != null && activeGhosts.Count > 0)
         {
-            for (int i = 0; i < activeGhosts.Length; i++)
+            for (int i = 0; i < activeGhosts.Count; i++)
             {
                 PumpkinGhostAI ghost = activeGhosts[i];
                 if (ghost == null || !ghost.gameObject.activeInHierarchy) continue;

@@ -16,6 +16,18 @@ public static class MultiplayerTestLauncher
         LaunchClients(3);
     }
 
+    /// <summary>
+    /// Build tự động không mở hộp thoại chặn (dùng cho CLI / kiểm thử tự động).
+    /// </summary>
+    public static void BuildStandaloneHeadless()
+    {
+        bool ok = BuildStandaloneTestPlayer(interactive: false);
+        if (!ok && Application.isBatchMode)
+        {
+            EditorApplication.Exit(1);
+        }
+    }
+
     private static bool EnsureBuildExists()
     {
         if (!File.Exists(BUILD_EXE))
@@ -50,7 +62,7 @@ public static class MultiplayerTestLauncher
         }
     }
 
-    private static bool BuildStandaloneTestPlayer()
+    private static bool BuildStandaloneTestPlayer(bool interactive = true)
     {
         try
         {
@@ -105,7 +117,10 @@ public static class MultiplayerTestLauncher
         else
         {
             UnityEngine.Debug.LogError($"<color=#FF4444>[GhostMaze Test] Build gặp lỗi! Kết quả: {summary.result}, Số lỗi: {summary.totalErrors}</color>");
-            EditorUtility.DisplayDialog("Build Gặp Lỗi", $"Quá trình build gặp lỗi: {summary.result}. Vui lòng kiểm tra Console.", "Đóng");
+            if (interactive && !Application.isBatchMode)
+            {
+                EditorUtility.DisplayDialog("Build Gặp Lỗi", $"Quá trình build gặp lỗi: {summary.result}. Vui lòng kiểm tra Console.", "Đóng");
+            }
             return false;
         }
     }
@@ -124,7 +139,7 @@ public static class MultiplayerTestLauncher
             ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = fullExePath,
-                Arguments = "-screen-fullscreen 0 -screen-width 854 -screen-height 480 -popupwindow",
+                Arguments = "-screen-fullscreen 0 -screen-width 854 -screen-height 480",
                 WorkingDirectory = Path.GetDirectoryName(fullExePath)
             };
 

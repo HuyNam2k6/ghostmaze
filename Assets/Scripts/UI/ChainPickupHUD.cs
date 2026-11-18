@@ -43,6 +43,11 @@ public class ChainPickupHUD : MonoBehaviour
 
     private ChainPickupItem currentNearbyItem;
     private bool isActionHeld;
+    private bool registeredWithTouchUI;
+    private int lastCharges = -1;
+    private int lastMaxCharges = -1;
+    private KeyCode lastPickupKey = KeyCode.None;
+    private GameLocalizationManager.Language lastLanguage = (GameLocalizationManager.Language)(-1);
 
     private static Sprite s_HandSprite;
     private static Sprite s_PentacleChainSprite;
@@ -104,7 +109,27 @@ public class ChainPickupHUD : MonoBehaviour
 
     private void Update()
     {
+        TryRegisterWithTouchUI();
+
         ThirdPersonPlayerController player = ThirdPersonPlayerController.Instance;
+        bool isEditingHUD = VirtualJoystickTouchUI.Instance != null && VirtualJoystickTouchUI.Instance.IsEditingHUDLayout;
+
+        // Khi đang ở chế độ Chỉnh sửa bố cục HUD trong Cài Đặt:
+        // Ép hiện cả nút Bàn Tay và nút Dấu Ấn & Xích để người chơi thấy, kéo thả và chỉnh kích cỡ!
+        if (isEditingHUD)
+        {
+            HasNearbyPickup = false;
+            if (handPickupBtnObj != null && !handPickupBtnObj.activeSelf) handPickupBtnObj.SetActive(true);
+            UpdateHandPickupLabelIfNeeded();
+            if (itemActionBtnObj != null && !itemActionBtnObj.activeSelf) itemActionBtnObj.SetActive(true);
+            if (player != null)
+            {
+                UpdateItemBadgeTextIfNeeded(player.currentChainCharges, player.maxChainCharges);
+            }
+            ReleaseActionHold(player);
+            return;
+        }
+
         if (player == null || !ChainPickupItem.IsLocalHumanAlive(player) || ThirdPersonCamera.isUIPanelOpen)
         {
             HasNearbyPickup = false;
@@ -123,10 +148,7 @@ public class ChainPickupHUD : MonoBehaviour
             if (HasNearbyPickup)
             {
                 if (!handPickupBtnObj.activeSelf) handPickupBtnObj.SetActive(true);
-                if (handPickupLabel != null)
-                {
-                    handPickupLabel.text = $"NHẶT {currentNearbyItem.DisplayName.ToUpperInvariant()} [{pickupKey}]";
-                }
+                UpdateHandPickupLabelIfNeeded();
 
                 if (ReadPickupKeyDown(pickupKey))
                 {
@@ -149,10 +171,33 @@ public class ChainPickupHUD : MonoBehaviour
                 if (!shouldShowItemButton) ReleaseActionHold(player);
             }
 
-            if (shouldShowItemButton && itemActionBadgeText != null)
+            if (shouldShowItemButton)
             {
-                itemActionBadgeText.text = $"{player.currentChainCharges}/{player.maxChainCharges}";
+                UpdateItemBadgeTextIfNeeded(player.currentChainCharges, player.maxChainCharges);
             }
+        }
+    }
+
+    private void UpdateHandPickupLabelIfNeeded()
+    {
+        if (handPickupLabel == null) return;
+        var currentLang = GameLocalizationManager.CurrentLanguage;
+        if (lastPickupKey != pickupKey || lastLanguage != currentLang)
+        {
+            lastPickupKey = pickupKey;
+            lastLanguage = currentLang;
+            handPickupLabel.text = string.Format(GameLocalizationManager.T("HUD_PICKUP_HAND", "NHẶT DẤU ẤN [{0}]"), pickupKey);
+        }
+    }
+
+    private void UpdateItemBadgeTextIfNeeded(int charges, int maxCharges)
+    {
+        if (itemActionBadgeText == null) return;
+        if (lastCharges != charges || lastMaxCharges != maxCharges)
+        {
+            lastCharges = charges;
+            lastMaxCharges = maxCharges;
+            itemActionBadgeText.text = $"{charges}/{maxCharges}";
         }
     }
 
@@ -205,17 +250,14 @@ public class ChainPickupHUD : MonoBehaviour
         canvasGo.transform.SetParent(transform, false);
         hudCanvas = canvasGo.AddComponent<Canvas>();
         hudCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        hudCanvas.sortingOrder = 120;
+        hudCanvas.sortingOrder = 105;
 
         CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.matchWidthOrHeight = 0.5f;
+        UIFontHelper.ConfigureCrispCanvas(hudCanvas, scaler);
 
         canvasGo.AddComponent<GraphicRaycaster>();
 
-        Font uiFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (uiFont == null) uiFont = Font.CreateDynamicFontFromOSFont("Arial", 18);
+        Font uiFont = UIFontHelper.GetCrispFont(24);
 
         // 1. Nút Bàn Tay Nhặt Vật Phẩm (giữa dưới màn hình)
         handPickupBtnObj = new GameObject("HandPickupButton");
@@ -350,6 +392,29 @@ public class ChainPickupHUD : MonoBehaviour
         trigger.triggers.Add(exitEntry);
 
         itemActionBtnObj.SetActive(false);
+        TryRegisterWithTouchUI();
+    }
+
+    private void TryRegisterWithTouchUI()
+    {
+        if (registeredWithTouchUI || VirtualJoystickTouchUI.Instance == null) return;
+        if (handRt == null || actRt == null) return;
+
+        registeredWithTouchUI = true;
+        VirtualJoystickTouchUI.Instance.RegisterExternalHUDTarget(
+            "HandPickup",
+            GameLocalizationManager.T("HUD_EDIT_HAND_BTN", "Nút Bàn Tay Nhặt [F]"),
+            handRt,
+            handButtonAnchoredPos,
+            1f
+        );
+        VirtualJoystickTouchUI.Instance.RegisterExternalHUDTarget(
+            "PentacleChainAction",
+            GameLocalizationManager.T("HUD_EDIT_SEAL_BTN", "Nút Dấu Ấn & Xích [E]"),
+            actRt,
+            itemActionAnchoredPos,
+            1f
+        );
     }
 
     private static void EnsureSprites()

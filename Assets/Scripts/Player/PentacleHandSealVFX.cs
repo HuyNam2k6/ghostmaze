@@ -13,11 +13,14 @@ public class PentacleHandSealVFX : MonoBehaviour
     [Tooltip("(Tùy chọn) Kéo Prefab/Model Pentacle tải từ Sketchfab vào đây. Để trống sẽ tự dựng Pentacle 3D phát sáng đỏ.")]
     public GameObject customPentaclePrefab;
 
-    [Tooltip("Kích thước dấu ấn Pentacle trên tay")]
-    [Range(0.05f, 0.8f)] public float sealScale = 0.24f;
+    [Tooltip("Kích thước dấu ấn Pentacle ngay trong lòng bàn tay (đơn vị mét thế giới thực)")]
+    [Range(0.05f, 0.8f)] public float sealScale = 0.22f;
 
-    [Tooltip("Độ lệch vị trí dấu ấn so với xương bàn tay")]
-    public Vector3 handLocalOffset = new Vector3(0.02f, 0.04f, 0.08f);
+    [Tooltip("Độ lệch tinh chỉnh của dấu ấn tính từ tâm lòng bàn tay theo hướng chiếu ra trước (đơn vị mét thế giới thực, không bị phóng đại theo xương FBX)")]
+    public Vector3 handLocalOffset = new Vector3(0f, 0.01f, 0.03f);
+
+    [Tooltip("Tỷ lệ nội suy từ cổ tay (RightHand) tới khớp ngón giữa (RightHandMiddle1) để định tâm lòng bàn tay")]
+    [Range(0f, 1f)] public float palmFingerLerp = 0.58f;
 
     [Tooltip("Độ rộng sợi xích LineRenderer nối từ tay tới ma")]
     [Range(0.03f, 0.35f)] public float chainBeamWidth = 0.13f;
@@ -31,11 +34,17 @@ public class PentacleHandSealVFX : MonoBehaviour
     private static Material s_SharedParticleMaterial;
     private static Texture2D s_SharedChainTexture;
     private static Texture2D s_SharedSparkTexture;
+    private static readonly int s_BaseMapId = Shader.PropertyToID("_BaseMap");
+    private static readonly int s_MainTexId = Shader.PropertyToID("_MainTex");
+    private static bool s_ChainLineHasBaseMap;
+    private static bool s_ChainLineHasMainTex;
 
     private Transform currentHandAnchor;
     private Transform currentTarget;
     private GameObject sealRoot;
+    private Transform sealSpinPivot;
     private GameObject sealVisual;
+    private Vector3 basePivotScale = Vector3.one;
     private Light sealLight;
     private ParticleSystem handParticles;
     private LineRenderer chainLine;
@@ -50,6 +59,7 @@ public class PentacleHandSealVFX : MonoBehaviour
 
         currentTarget = target;
         EnsureSetup(handAnchor);
+        SyncSealTransformToPalm();
 
         if (!isActive)
         {
@@ -60,6 +70,7 @@ public class PentacleHandSealVFX : MonoBehaviour
             {
                 sealRoot.SetActive(true);
             }
+            SyncSealTransformToPalm();
             if (sealLight != null)
             {
                 sealLight.enabled = true;
@@ -72,6 +83,7 @@ public class PentacleHandSealVFX : MonoBehaviour
             {
                 chainLine.enabled = true;
             }
+            UpdateChainLine();
         }
     }
 
@@ -111,13 +123,14 @@ public class PentacleHandSealVFX : MonoBehaviour
         }
 
         activeTimer += Time.deltaTime;
+        SyncSealTransformToPalm();
 
-        // Xoay nhẹ dấu ấn Pentacle + nhịp đập phát sáng trên tay
-        if (sealVisual != null)
+        // Xoay nhẹ dấu ấn Pentacle quanh đúng tâm hình học ngay giữa lòng bàn tay + nhịp đập phát sáng
+        if (sealSpinPivot != null)
         {
-            sealVisual.transform.Rotate(Vector3.forward, 110f * Time.deltaTime, Space.Self);
+            sealSpinPivot.localRotation = Quaternion.Euler(0f, 0f, activeTimer * 110f);
             float pulse = 1f + Mathf.Sin(activeTimer * 10f) * 0.08f;
-            sealVisual.transform.localScale = Vector3.one * (sealScale * pulse);
+            sealSpinPivot.localScale = basePivotScale * pulse;
         }
 
         if (sealLight != null)
@@ -126,6 +139,54 @@ public class PentacleHandSealVFX : MonoBehaviour
         }
 
         UpdateChainLine();
+    }
+
+    private void SyncSealTransformToPalm()
+    {
+        if (sealRoot == null) return;
+
+        // Giữ tỷ lệ thế giới thực của sealRoot luôn chuẩn 1:1 (bất chấp Player scale 0.1 hay xương FBX scale 100/7.2)
+        Vector3 parentLossy = transform.lossyScale;
+        float invX = Mathf.Abs(parentLossy.x) > 0.0001f ? 1f / parentLossy.x : 1f;
+        float invY = Mathf.Abs(parentLossy.y) > 0.0001f ? 1f / parentLossy.y : 1f;
+        float invZ = Mathf.Abs(parentLossy.z) > 0.0001f ? 1f / parentLossy.z : 1f;
+        sealRoot.transform.localScale = new Vector3(invX, invY, invZ);
+
+        Vector3 palmWorldPos;
+        Quaternion palmWorldRot;
+        var playerCtrl = GetComponent<ThirdPersonPlayerController>();
+        if (playerCtrl != null)
+        {
+            playerCtrl.palmFingerLerp = palmFingerLerp;
+        }
+        if (playerCtrl != null && playerCtrl.TryGetRightPalmWorldPose(out palmWorldPos, out palmWorldRot))
+        {
+            // Đã lấy chính xác tọa độ tâm lòng bàn tay động (giữa cổ tay & khớp ngón giữa)
+        }
+        else if (currentHandAnchor != null && currentHandAnchor != transform)
+        {
+            palmWorldPos = currentHandAnchor.position;
+            palmWorldRot = currentHandAnchor.rotation;
+        }
+        else
+        {
+            palmWorldPos = transform.position + transform.rotation * new Vector3(0.18f, 1.05f, 0.32f);
+            palmWorldRot = transform.rotation;
+        }
+
+        // Hướng mặt phẳng Dấu Ấn Pentacle từ lòng bàn tay chiếu thẳng về phía con Ma đang bị trói
+        Quaternion aimRot = palmWorldRot;
+        if (currentTarget != null)
+        {
+            Vector3 toTarget = (currentTarget.position + Vector3.up * 0.95f) - palmWorldPos;
+            if (toTarget.sqrMagnitude > 0.001f)
+            {
+                aimRot = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+            }
+        }
+
+        sealRoot.transform.position = palmWorldPos + (aimRot * handLocalOffset);
+        sealRoot.transform.rotation = aimRot;
     }
 
     private void UpdateChainLine()
@@ -161,20 +222,22 @@ public class PentacleHandSealVFX : MonoBehaviour
             chainLine.SetPosition(i, p);
         }
 
-        // Cuộn texture mắt xích dọc theo tia bắn
+        // Cuộn texture mắt xích dọc theo tia bắn (0 tra cứu chuỗi mỗi frame)
         if (s_SharedChainLineMaterial != null)
         {
             float tileCount = Mathf.Max(1.5f, dist * 3.2f);
             float scroll = -activeTimer * 2.5f;
-            if (s_SharedChainLineMaterial.HasProperty("_BaseMap"))
+            Vector2 scaleVec = new Vector2(tileCount, 1f);
+            Vector2 offsetVec = new Vector2(scroll, 0f);
+            if (s_ChainLineHasBaseMap)
             {
-                s_SharedChainLineMaterial.SetTextureScale("_BaseMap", new Vector2(tileCount, 1f));
-                s_SharedChainLineMaterial.SetTextureOffset("_BaseMap", new Vector2(scroll, 0f));
+                s_SharedChainLineMaterial.SetTextureScale(s_BaseMapId, scaleVec);
+                s_SharedChainLineMaterial.SetTextureOffset(s_BaseMapId, offsetVec);
             }
-            if (s_SharedChainLineMaterial.HasProperty("_MainTex"))
+            if (s_ChainLineHasMainTex)
             {
-                s_SharedChainLineMaterial.SetTextureScale("_MainTex", new Vector2(tileCount, 1f));
-                s_SharedChainLineMaterial.SetTextureOffset("_MainTex", new Vector2(scroll, 0f));
+                s_SharedChainLineMaterial.SetTextureScale(s_MainTexId, scaleVec);
+                s_SharedChainLineMaterial.SetTextureOffset(s_MainTexId, offsetVec);
             }
         }
     }
@@ -187,72 +250,127 @@ public class PentacleHandSealVFX : MonoBehaviour
     private void EnsureSetup(Transform handAnchor)
     {
         Transform anchor = handAnchor != null ? handAnchor : transform;
+        currentHandAnchor = anchor;
 
         if (sealRoot != null)
         {
-            if (currentHandAnchor != anchor)
-            {
-                currentHandAnchor = anchor;
-                sealRoot.transform.SetParent(anchor, false);
-                sealRoot.transform.localPosition = anchor == transform ? new Vector3(0.32f, 1.2f, 0.45f) : handLocalOffset;
-                sealRoot.transform.localRotation = Quaternion.identity;
-            }
+            SyncSealTransformToPalm();
             return;
         }
 
         EnsureSharedResources();
-        currentHandAnchor = anchor;
 
+        // Gắn sealRoot vào gốc nhân vật (không gắn trực tiếp làm con của xương FBX có scale 7.2x/100x để không bao giờ bị lệch vị trí hay biến dạng kích thước)
         sealRoot = new GameObject("PentacleHandSeal_Root");
-        sealRoot.transform.SetParent(anchor, false);
-        sealRoot.transform.localPosition = anchor == transform ? new Vector3(0.32f, 1.2f, 0.45f) : handLocalOffset;
-        sealRoot.transform.localRotation = Quaternion.identity;
+        sealRoot.transform.SetParent(transform, false);
+        SyncSealTransformToPalm();
 
-        // 1. Visual Pentacle 3D trên tay
+        GameObject spinGo = new GameObject("PentacleSpinPivot");
+        spinGo.transform.SetParent(sealRoot.transform, false);
+        spinGo.transform.localPosition = Vector3.zero;
+        spinGo.transform.localRotation = Quaternion.identity;
+        spinGo.transform.localScale = Vector3.one;
+        sealSpinPivot = spinGo.transform;
+
+        // 1. Visual Pentacle 3D ngay trong lòng bàn tay (tự động căn chỉnh tâm hình học & mặt phẳng của FBX bất kỳ về đúng (0,0,0) của lòng bàn tay)
         GameObject prefabToUse = customPentaclePrefab != null
             ? customPentaclePrefab
             : Resources.Load<GameObject>("VFX/PentaclePrefab");
 
         if (prefabToUse != null)
         {
-            sealVisual = Instantiate(prefabToUse, sealRoot.transform, false);
+            sealVisual = Instantiate(prefabToUse, sealSpinPivot, false);
             sealVisual.name = "CustomPentacleModel";
             sealVisual.transform.localPosition = Vector3.zero;
             sealVisual.transform.localRotation = Quaternion.identity;
-
-            // Căn chỉnh tỷ lệ model Pentacle vừa vặn với bàn tay (~0.28m)
-            Renderer[] childRenderers = sealVisual.GetComponentsInChildren<Renderer>(true);
-            if (childRenderers.Length > 0)
+            sealVisual.transform.localScale = Vector3.one;
+            foreach (Collider col in sealVisual.GetComponentsInChildren<Collider>(true))
             {
-                Bounds b = childRenderers[0].bounds;
-                for (int i = 1; i < childRenderers.Length; i++)
+                col.enabled = false;
+            }
+
+            // Nếu FBX Pentacle nằm ngang trên mặt sàn XZ (trục Y mỏng nhất) hoặc YZ (trục X mỏng nhất), xoay dựng mặt ngôi sao hướng thẳng ra trước (+Z)
+            MeshFilter[] mfs = sealVisual.GetComponentsInChildren<MeshFilter>(true);
+            if (mfs.Length > 0 && mfs[0] != null && mfs[0].sharedMesh != null)
+            {
+                Vector3 ms = mfs[0].sharedMesh.bounds.size;
+                if (ms.y < ms.x * 0.35f && ms.y < ms.z * 0.35f)
                 {
-                    b.Encapsulate(childRenderers[i].bounds);
+                    sealVisual.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 }
-                float maxDim = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
-                if (maxDim > 1.2f || maxDim < 0.1f)
+                else if (ms.x < ms.y * 0.35f && ms.x < ms.z * 0.35f)
                 {
-                    float targetSize = 0.28f;
-                    float s = targetSize / Mathf.Max(0.001f, maxDim);
-                    sealVisual.transform.localScale = Vector3.one * s;
+                    sealVisual.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+                }
+            }
+
+            // Gán vật liệu URP phát sáng đỏ và căn chỉnh kích thước + đưa đúng tâm Bounds của Mesh trùng khít 100% vào lòng bàn tay
+            Renderer[] childRenderers = sealVisual.GetComponentsInChildren<Renderer>(true);
+            bool hasMeshBounds = false;
+            Bounds combinedBounds = default;
+            for (int i = 0; i < childRenderers.Length; i++)
+            {
+                Renderer r = childRenderers[i];
+                if (r == null || r is ParticleSystemRenderer) continue;
+                if (s_SharedSealMaterial != null)
+                {
+                    int matCount = Mathf.Max(1, r.sharedMaterials.Length);
+                    Material[] mats = new Material[matCount];
+                    for (int m = 0; m < matCount; m++) mats[m] = s_SharedSealMaterial;
+                    r.sharedMaterials = mats;
+                }
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+                if (!hasMeshBounds)
+                {
+                    combinedBounds = r.bounds;
+                    hasMeshBounds = true;
                 }
                 else
                 {
-                    sealVisual.transform.localScale = Vector3.one * sealScale;
+                    combinedBounds.Encapsulate(r.bounds);
+                }
+            }
+
+            if (hasMeshBounds)
+            {
+                float maxDim = Mathf.Max(combinedBounds.size.x, Mathf.Max(combinedBounds.size.y, combinedBounds.size.z));
+                float targetSize = Mathf.Max(0.08f, sealScale);
+                if (maxDim > 0.0001f)
+                {
+                    float s = targetSize / maxDim;
+                    sealVisual.transform.localScale = sealVisual.transform.localScale * s;
+                }
+
+                // Tính lại Bounds sau khi scale và dịch ngược để tâm ngôi sao nằm ngay chính giữa (0,0,0) của lòng bàn tay!
+                hasMeshBounds = false;
+                for (int i = 0; i < childRenderers.Length; i++)
+                {
+                    Renderer r = childRenderers[i];
+                    if (r == null || r is ParticleSystemRenderer) continue;
+                    if (!hasMeshBounds) { combinedBounds = r.bounds; hasMeshBounds = true; }
+                    else combinedBounds.Encapsulate(r.bounds);
+                }
+                if (hasMeshBounds)
+                {
+                    Vector3 worldCenterOffset = combinedBounds.center - sealSpinPivot.position;
+                    sealVisual.transform.position -= worldCenterOffset;
                 }
             }
             else
             {
                 sealVisual.transform.localScale = Vector3.one * sealScale;
             }
+            basePivotScale = Vector3.one;
         }
         else
         {
             sealVisual = new GameObject("ProceduralPentacle3D");
-            sealVisual.transform.SetParent(sealRoot.transform, false);
+            sealVisual.transform.SetParent(sealSpinPivot, false);
             sealVisual.transform.localPosition = Vector3.zero;
             sealVisual.transform.localRotation = Quaternion.identity;
             sealVisual.transform.localScale = Vector3.one * sealScale;
+            basePivotScale = Vector3.one;
 
             MeshFilter mf = sealVisual.AddComponent<MeshFilter>();
             mf.sharedMesh = s_SharedPentacleMesh;
@@ -319,7 +437,7 @@ public class PentacleHandSealVFX : MonoBehaviour
 
         var shape = ps.shape;
         shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = 0.14f;
+        shape.radius = 0.08f;
 
         var vol = ps.velocityOverLifetime;
         vol.enabled = true;
@@ -372,10 +490,16 @@ public class PentacleHandSealVFX : MonoBehaviour
                 ?? Shader.Find("Sprites/Default");
             s_SharedChainLineMaterial = new Material(lineShader);
             s_SharedChainLineMaterial.color = new Color(1.0f, 0.22f, 0.16f, 1.0f);
-            if (s_SharedChainLineMaterial.HasProperty("_BaseMap"))
-                s_SharedChainLineMaterial.SetTexture("_BaseMap", s_SharedChainTexture);
-            if (s_SharedChainLineMaterial.HasProperty("_MainTex"))
-                s_SharedChainLineMaterial.SetTexture("_MainTex", s_SharedChainTexture);
+            if (s_SharedChainLineMaterial.HasProperty(s_BaseMapId))
+            {
+                s_ChainLineHasBaseMap = true;
+                s_SharedChainLineMaterial.SetTexture(s_BaseMapId, s_SharedChainTexture);
+            }
+            if (s_SharedChainLineMaterial.HasProperty(s_MainTexId))
+            {
+                s_ChainLineHasMainTex = true;
+                s_SharedChainLineMaterial.SetTexture(s_MainTexId, s_SharedChainTexture);
+            }
             if (s_SharedChainLineMaterial.HasProperty("_BaseColor"))
                 s_SharedChainLineMaterial.SetColor("_BaseColor", new Color(1.0f, 0.25f, 0.18f, 1.0f));
             if (s_SharedChainLineMaterial.HasProperty("_EmissionColor"))

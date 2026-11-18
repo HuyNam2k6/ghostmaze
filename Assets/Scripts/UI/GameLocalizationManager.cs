@@ -1029,6 +1029,116 @@ public static class GameLocalizationManager
             "💀 ELIMINATED — NO REMAINING TEAMMATES",
             "💀 ELIMINADO — NO HAY COMPAÑEROS VIVOS",
             "💀 已阵亡 — 无剩余队友"
+        } },
+
+        // BOT & WAITING ROOM & PENTACLE SEAL PICKUP (VI, EN, ES, ZH)
+        { "WAITING_BTN_ADD_BOT", new string[] {
+            "🤖 Thêm Máy ({0}/{1})",
+            "🤖 Add Bot ({0}/{1})",
+            "🤖 Añadir Bot ({0}/{1})",
+            "🤖 添加人机 ({0}/{1})"
+        } },
+        { "WAITING_BTN_BOT_FULL", new string[] {
+            "🤖 Đủ Máy ({0}/{1}) - Xóa",
+            "🤖 Bots Full ({0}/{1}) - Clear",
+            "🤖 Bots Llenos ({0}/{1}) - Quitar",
+            "🤖 人机已满 ({0}/{1}) - 清除"
+        } },
+        { "WAITING_BTN_READY_ENTER", new string[] {
+            "✔ SẴN SÀNG VÀO GAME ➔",
+            "✔ READY TO PLAY ➔",
+            "✔ LISTO PARA JUGAR ➔",
+            "✔ 准备进入游戏 ➔"
+        } },
+        { "WAITING_SLOT_BOT_BADGE", new string[] {
+            "VỊ TRÍ #{0} (MÁY / BOT)",
+            "SLOT #{0} (BOT)",
+            "ESPACIO #{0} (BOT)",
+            "位置 #{0} (人机)"
+        } },
+        { "WAITING_SLOT_BOT_READY", new string[] {
+            "✔ Sẵn sàng  ●  Random Ma / Người",
+            "✔ Ready  ●  Random Ghost / Human",
+            "✔ Listo  ●  Fantasma / Humano",
+            "✔ 已准备 ● 随机鬼/人"
+        } },
+        { "WAITING_BANNER_BOTS_READY", new string[] {
+            "🤖 ĐÃ THÊM {0} MÁY ({1}/4): Vai trò Ma/Người ngẫu nhiên! Bấm [✔ SẴN SÀNG] để vào game!",
+            "🤖 ADDED {0} BOTS ({1}/4): Random Ghost/Human roles! Press [✔ READY] to start!",
+            "🤖 {0} BOTS AÑADIDOS ({1}/4): ¡Rol aleatorio! ¡Pulsa [✔ LISTO] para jugar!",
+            "🤖 已添加 {0} 名人机 ({1}/4)：随机分配鬼/人！点击 [✔ 准备] 开始！"
+        } },
+        { "WAITING_BANNER_EMPTY_ROOM", new string[] {
+            "🎮 PHÒNG CHỜ: Bấm [🤖 Thêm Máy] hoặc chờ bạn bè, rồi bấm [✔ SẴN SÀNG] để vào game!",
+            "🎮 WAITING ROOM: Click [Add Bot] or wait for friends, then press [READY] to play!",
+            "🎮 SALA DE ESPERA: Pulsa [Añadir Bot] o espera amigos, y pulsa [LISTO]!",
+            "🎮 准备房间：点击 [添加人机] 或等待好友，然后点击 [准备] 开始！"
+        } },
+        { "MATCH_BTN_FILL_BOTS", new string[] {
+            "⚡ Ghép Máy Đủ 4/4 Ngay ➔",
+            "⚡ Fill Bots 4/4 Now ➔",
+            "⚡ Llenar Bots 4/4 Ahora ➔",
+            "⚡ 立即补齐4/4人机 ➔"
+        } },
+        { "MATCH_COUNT_SEARCHING", new string[] {
+            "👥 Đã tìm thấy: <color=#2EE87A>{0} / 4</color> người chơi (Tự ghép Máy đủ 4/4 sau 12s)",
+            "👥 Found: <color=#2EE87A>{0} / 4</color> players (Auto-fill Bots in 12s)",
+            "👥 Encontrados: <color=#2EE87A>{0} / 4</color> jugadores (Bots en 12s)",
+            "👥 已找到：<color=#2EE87A>{0} / 4</color> 玩家（12秒后自动补齐人机）"
+        } },
+        { "HUD_PICKUP_HAND", new string[] {
+            "NHẶT DẤU ẤN [{0}]",
+            "PICK UP SEAL [{0}]",
+            "RECOGER SELLO [{0}]",
+            "拾取封印 [{0}]"
+        } },
+        { "HUD_SEAL_COUNTER", new string[] {
+            "Dấu Ấn [E]: {0} / {1}",
+            "Seals [E]: {0} / {1}",
+            "Sellos [E]: {0} / {1}",
+            "封印 [E]: {0} / {1}"
+        } },
+        { "NOTICE_SEAL_PICKED", new string[] {
+            "Nhặt được Dấu Ấn Pentacle! ({0}/{1})",
+            "Picked up Pentacle Seal! ({0}/{1})",
+            "¡Sello Pentáculo recogido! ({0}/{1})",
+            "已拾取五芒星封印！({0}/{1})"
+        } },
+        { "NOTICE_SEAL_FULL", new string[] {
+            "Đã đầy {0}/{1} Dấu Ấn!",
+            "Seals full ({0}/{1})!",
+            "¡Sellos llenos ({0}/{1})!",
+            "封印已满 ({0}/{1})！"
+        } },
+        { "NOTICE_NEED_SEAL", new string[] {
+            "Chưa có Dấu Ấn Pentacle! Hãy tìm nhặt dưới sàn!",
+            "No Pentacle Seal! Find & pick one up on the floor!",
+            "¡Sin Sello Pentáculo! ¡Búscalo en el suelo!",
+            "暂无五芒星封印！请在地面寻找拾取！"
+        } },
+        { "NOTICE_OUT_OF_SEALS", new string[] {
+            "Hết Dấu Ấn! Tìm nhặt quanh bản đồ ({0}/{1})",
+            "Out of Seals! Find more on the map ({0}/{1})",
+            "¡Sin Sellos! Busca más en el mapa ({0}/{1})",
+            "封印已用完！请在地图中寻找 ({0}/{1})"
+        } },
+        { "NOTICE_NO_GHOST_TARGET", new string[] {
+            "Không tìm thấy mục tiêu!",
+            "No target found!",
+            "¡Objetivo no encontrado!",
+            "未找到目标！"
+        } },
+        { "HUD_EDIT_HAND_BTN", new string[] {
+            "Nút Bàn Tay Nhặt [F]",
+            "Pickup Hand Button [F]",
+            "Botón Recoger [F]",
+            "拾取手势按钮 [F]"
+        } },
+        { "HUD_EDIT_SEAL_BTN", new string[] {
+            "Nút Dấu Ấn & Xích [E]",
+            "Seal & Chain Button [E]",
+            "Botón Sello y Cadena [E]",
+            "封印与锁链按钮 [E]"
         } }
     };
 
